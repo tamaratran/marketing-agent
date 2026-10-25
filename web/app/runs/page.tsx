@@ -1,6 +1,7 @@
 import { dateOf, get, type Run } from "@/lib/api";
 import { startRun } from "../actions";
 import { button, Card, H1, input, Table } from "../ui";
+import { RefreshButtons } from "../refresh";
 
 export const dynamic = "force-dynamic";
 
@@ -9,6 +10,7 @@ export default async function Page() {
   return (
     <>
       <H1 sub="Each run is a Devin session that scrapes, classifies, picks a concept, writes scripts, renders, polls creator posts and pushes state. The cron does one a day; this starts an extra one.">Runs</H1>
+      <div className="mb-4"><RefreshButtons /></div>
       <Card title="Start a run" className="mb-5">
         <form action={startRun} className="flex flex-wrap gap-2">
           <input name="niche" defaultValue="wearables" className={`${input} w-28`} />
