@@ -10,13 +10,12 @@ export default async function Page() {
   return (
     <>
       <H1 sub={`${o.niche}: what the loop has seen and what is beating the account baseline`}>Overview</H1>
-      <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-6">
+      <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-5">
         <Stat label="videos tracked" value={o.videos} />
         <Stat label="scored" value={o.scored} />
         <Stat label="tagged by classifier" value={o.tagged} />
         <Stat label="concepts" value={o.concepts} />
         <Stat label="spent on clips" value={usd(o.spent_usd)} />
-        <Stat label="owed to creators" value={usd(o.owed_usd)} />
       </div>
       <Card title="Learning status">
         <p className="text-sm text-neutral-300">
