@@ -47,6 +47,7 @@ mkt poll <url> ...                    # record stats for posted videos
 mkt creators payouts                  # views/1k x rate, capped, settled after 7 days
 mkt creators report                   # who posts, who stalled
 mkt scoreboard                        # reward per video, hooks/concepts ranked, throttled accounts
+mkt dashboard tanning                 # static HTML (data/site/index.html) with clips copied next to it
 ```
 
 ## Scoreboard

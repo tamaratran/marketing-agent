@@ -108,7 +108,8 @@ Setup (in the repo):
   FAL_KEY is in your environment; renders cost about $0.22/s at 480p, keep to --renders {renders}.
   The scraper drives the Chrome already running in your VM at http://localhost:29229.
 
-State lives on the `{state_branch}` branch (sqlite db + daily reports), checked out as a worktree:
+State lives on the `{state_branch}` branch (sqlite db, daily reports, and site/ with the static dashboard and its clips),
+checked out as a worktree:
   git fetch origin {state_branch} && git worktree add ../mkt-state {state_branch}
   (if the branch does not exist: git worktree add --detach ../mkt-state && cd ../mkt-state \\
    && git checkout --orphan {state_branch} && git rm -rfq . ; cd -)
@@ -116,7 +117,7 @@ State lives on the `{state_branch}` branch (sqlite db + daily reports), checked 
 
 Run:
   mkt daily {niche} {tag_str} --product "{product}" --renders {renders} --resolution {resolution} \\
-    --report ../mkt-state/reports/{day}.md
+    --report ../mkt-state/reports/{day}.md --dashboard ../mkt-state/site/index.html
 
 Then:
 1. Read the report. Every stage has ok/failed. If a stage failed because of a code bug, make the
