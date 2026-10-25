@@ -58,6 +58,14 @@ with n, standard error and win rate, so a hook that won once on a huge account d
 that wins consistently. Videos under 24 h old are listed but not scored. Accounts whose last 3+
 posts all sit under 1k views are flagged as possibly throttled.
 
+## Feedback loop
+
+`mkt run ... --product X` no longer scripts the concept with the highest early score. `policy.pick_concept`
+samples a score per concept from the radar prior plus the scoreboard's observed mean reward (noise
+shrinks with n), so with no data it follows the radar, with data it follows what earned views, and
+it still explores. `mkt scripts` passes the scoreboard's winning and losing hooks, concepts and
+styles into the prompt. `mkt policy <niche>` shows what the loop has learned.
+
 ## Known limits
 
 - Watch time and completion are not public for other people's videos. The scoreboard uses views,

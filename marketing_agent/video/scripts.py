@@ -50,6 +50,7 @@ def write_scripts(
     n: int = 12,
     min_score: int = 3,
     model: str = "gpt-5.4",
+    context: str = "",
 ) -> list[dict]:
     client = OpenAI()
     resp = client.responses.parse(
@@ -63,6 +64,11 @@ def write_scripts(
                     description=concept["description"],
                     hook=concept.get("hook_pattern", ""),
                     product=product,
+                )
+                + (
+                    f"\n\nWhat has worked so far on this account (reward is log10 views vs baseline):\n{context}\nLean on the winners, avoid the losers, but keep 2-3 scripts that try something else."
+                    if context
+                    else ""
                 ),
             }
         ],
