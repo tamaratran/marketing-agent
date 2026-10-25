@@ -116,3 +116,70 @@ def test_scoreboard_rewards_and_flags():
     assert hooks[0]["hook_type"] == "pov"
     flags = shadowban_flags(list(scored.values()), now=now)
     assert [f["author"] for f in flags] == ["a"] and flags[0]["max_views"] == 700
+
+
+def test_creator_ops_roundtrip(tmp_path):
+    import json
+    import time
+
+    from marketing_agent.creators.ops import (
+        add_creator,
+        create_brief,
+        creator_report,
+        payouts,
+        record_post,
+    )
+    from marketing_agent.store import Store
+
+    store = Store(tmp_path / "t.sqlite")
+    sid = store.insert(
+        "scripts",
+        {
+            "concept_id": 1,
+            "product": "Glow",
+            "created_at": 1,
+            "hook": "POV: you see the tan before you book",
+            "body": "x",
+            "demo_score": 5,
+            "payload": json.dumps(
+                {
+                    "hook": "POV: you see the tan before you book",
+                    "captions": ["0:03-0:06 open Glow", "pick shade"],
+                }
+            ),
+        },
+    )
+    b = create_brief(store, "Glow", [sid], rate_per_1k=1.5, cap_usd=100, deadline_days=3)
+    assert "$1.50 per 1,000 views" in b["body"] and "- open Glow" in b["body"]
+    add_creator(store, "@amy", "discord", 1.5, followers=1200)
+    old = int(time.time()) - 10 * 86400
+    record_post(
+        store,
+        "amy",
+        "https://www.tiktok.com/@amy/video/123",
+        b["id"],
+        sid,
+        stats={
+            "id": "123",
+            "url": "u",
+            "author": "amy",
+            "followers": 1200,
+            "create_time": old,
+            "duration": 12,
+            "desc": "",
+            "music": "",
+            "hashtags": [],
+            "source_tag": "post",
+            "views": 90_000,
+            "likes": 1,
+            "comments": 0,
+            "shares": 0,
+            "saves": 0,
+        },
+    )
+    pay = payouts(store)
+    assert (
+        pay[0]["owed_usd"] == 100.0 and pay[0]["settled"]
+    )  # 90k views x $1.5 = 135, capped at 100
+    rep = creator_report(store)
+    assert rep[0]["posts"] == 1 and rep[0]["status"] == "stalled"
