@@ -165,10 +165,11 @@ def scripts(concept_id, product, n, min_score):
     default=None,
     help="fal (default, Seedance 2.5), replicate (Seedance 2.0 fast) or stub",
 )
-@click.option("--duration", default=10)
+@click.option("--duration", default=12, help="Seconds of generated video")
+@click.option("--resolution", default="720p", help="480p, 720p or 1080p")
 @click.option("--sound", type=click.Path(exists=True), default=None)
 @click.option("--ref", multiple=True, help="Reference image path/URL (product, creator)")
-def render(script_ids, provider, duration, sound, ref):
+def render(script_ids, provider, duration, resolution, sound, ref):
     """Generate a clip per script with Seedance and cut a captioned 1080x1920 video."""
     from .video.edit import assemble, captions_from_script, probe_duration
     from .video.generate import GenRequest, get_provider
@@ -185,7 +186,12 @@ def render(script_ids, provider, duration, sound, ref):
         final = settings.renders_dir / f"s{sid}.mp4"
         t0 = time.time()
         res = prov.generate(
-            GenRequest(prompt=s["video_prompt"], duration_s=duration, reference_images=list(ref)),
+            GenRequest(
+                prompt=s["video_prompt"],
+                duration_s=duration,
+                resolution=resolution,
+                reference_images=list(ref),
+            ),
             raw,
         )
         caps = captions_from_script(s["hook"], s.get("captions") or [], probe_duration(raw))

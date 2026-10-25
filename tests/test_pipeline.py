@@ -88,7 +88,7 @@ def test_tags_schema_accepts_classifier_output():
 def test_stub_render_and_edit(tmp_path: Path):
     raw = StubProvider().generate(GenRequest(prompt="x", duration_s=3), tmp_path / "raw.mp4").path
     caps = captions_from_script(
-        "Stop tanning like this", ["[0:00-0:02] hook", "0:02-0:05 show app"], 3.0
+        "Stop tanning like this", ["[0:00-0:02] hook", "0:02-0:05 show app"], 8.0
     )
     assert caps[0].text == "Stop tanning like this" and len(caps) == 3
     assert [c.text for c in caps[1:]] == ["hook", "show app"]

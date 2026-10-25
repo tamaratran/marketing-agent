@@ -127,12 +127,22 @@ def probe_duration(path: Path) -> float:
 TIMESTAMP_RE = re.compile(r"^\[?\d+:\d{2}\s*(-|to)\s*\d+:\d{2}\]?\s*")
 
 
+HOOK_S = 2.5
+MIN_LINE_S = 2.5
+
+
 def captions_from_script(hook: str, lines: list[str], total_s: float) -> list[Caption]:
-    """Hook on screen for the first 2.5s, then the script's on-screen lines spread over the rest."""
-    caps = [Caption(hook, 0, min(2.5, total_s))]
+    """Hook on screen for the first 2.5s, then the script's on-screen lines spread over the rest.
+
+    Never shows a line for less than MIN_LINE_S, so short clips drop trailing lines
+    instead of flashing all of them.
+    """
+    caps = [Caption(hook, 0, min(HOOK_S, total_s))]
     lines = [TIMESTAMP_RE.sub("", ln.strip(" -•")) for ln in lines if ln.strip()][:6]
-    if lines and total_s > 2.5:
-        step = (total_s - 2.5) / len(lines)
+    max_lines = int((total_s - HOOK_S) // MIN_LINE_S)
+    lines = lines[:max_lines]
+    if lines:
+        step = (total_s - HOOK_S) / len(lines)
         for i, ln in enumerate(lines):
             caps.append(Caption(ln[:60], 2.5 + i * step, 2.5 + (i + 1) * step))
     return caps
