@@ -1,5 +1,8 @@
 export const API = (process.env.NEXT_PUBLIC_API_URL ?? "https://mkt-api.fly.dev").replace(/\/$/, "");
 
+// Clips live next to the static dashboard (the daily run copies them there); the API only has the db.
+export const CLIPS = (process.env.NEXT_PUBLIC_CLIPS_URL ?? "https://mkt-dashboard-eta.vercel.app/renders").replace(/\/$/, "");
+
 export async function get<T>(path: string): Promise<T> {
   const r = await fetch(`${API}${path}`, { cache: "no-store" });
   if (!r.ok) throw new Error(`${path}: ${r.status}`);
