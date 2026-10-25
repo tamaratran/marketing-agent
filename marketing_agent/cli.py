@@ -110,6 +110,74 @@ def classify(limit, model):
 
 @cli.command()
 @click.argument("niche")
+@click.argument("tags", nargs=-1, required=True)
+@click.option("--scrolls", default=6)
+@click.option("--max-classify", default=100, help="Cohort videos to download and tag this run")
+def cohort(niche, tags, scrolls, max_classify):
+    """Enroll fresh videos (<6h old) from the niche's hashtags as a cohort, snapshot their
+    creators, download and tag all of them, and build the feature rows. Repoll keeps the curves."""
+    from .cohort import build_features, enroll, snapshot_creator
+    from .research.tiktok_browser import profile_stats, scrape_hashtag_sync
+
+    store = _store()
+    store.set_niche_tags(niche, list(tags))
+    fresh: list[dict] = []
+    for tag in tags:
+        rows = scrape_hashtag_sync(tag, settings.cdp_url, scrolls=scrolls)
+        for r in rows:
+            store.upsert_video(r)
+        got = enroll(store, niche, rows)
+        fresh += got
+        console.print(f"#{tag}: {len(rows)} seen, {len(got)} fresh enough for the cohort")
+    for author in sorted({r["author"] for r in fresh if r.get("author")}):
+        try:
+            stats = profile_stats(author)
+        except Exception as e:  # noqa: BLE001 - a missing baseline must not stop the run
+            console.print(f"[yellow]profile @{author}: {e!r}")
+            stats = None
+        snap = snapshot_creator(store, author, stats=stats)
+        console.print(
+            f"@{author}: {snap['followers']} followers, {snap['video_count']} posts, "
+            f"{snap['n_posts']} in db (median {snap['median_views']} views)"
+        )
+    ctx = click.get_current_context()
+    cohort_ids = {r["id"] for r in fresh}
+    from .research.tiktok_browser import fetch_video_sync
+
+    n = 0
+    for v in store.rows(
+        "SELECT * FROM videos WHERE cohort_at IS NOT NULL AND local_path IS NULL ORDER BY cohort_at DESC"
+    ):
+        if n >= max_classify:
+            break
+        out = settings.videos_dir / f"{v['id']}.mp4"
+        try:
+            fetch_video_sync(v["url"], out, settings.cdp_url)
+            store.set_local_path(v["id"], str(out))
+            n += 1
+        except Exception as e:  # noqa: BLE001
+            console.print(f"[red]{v['id']}: {e!r}")
+    ctx.invoke(classify, limit=max_classify, model=None)
+    console.print(f"features: {build_features(store, niche)} rows ({len(cohort_ids)} new today)")
+
+
+@cli.command()
+@click.option("--max-age-days", default=8.0)
+@click.option("--niche", default=None)
+def repoll(max_age_days, niche):
+    """Re-record public stats for every cohort video still inside the window, then rebuild
+    features. No browser needed; this is what the 2-hourly cron runs."""
+    from .cohort import build_features
+    from .cohort import repoll as do_repoll
+
+    store = _store()
+    res = do_repoll(store, max_age_days, niche)
+    res["features"] = build_features(store, niche)
+    console.print(res)
+
+
+@cli.command()
+@click.argument("niche")
 @click.option("--tag", default=None)
 @click.option("--max-age-h", default=72)
 @click.option("--limit", default=40)
@@ -484,6 +552,10 @@ def daily(ctx, niche, tags, product, top, renders, resolution, report, dashboard
             console.print(f"[red]{name} failed: {e!r}")
 
     stage("run", lambda: ctx.invoke(run, niche=niche, tags=tags, product=product, top=top))
+    stage(
+        "cohort",
+        lambda: ctx.invoke(cohort, niche=niche, tags=tags, scrolls=6, max_classify=100),
+    )
     store = _store()
     todays = [
         r["id"]

@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
+from .cohort import build_features, features, latest_snapshot, repoll
 from .config import settings
 from .creators.ops import add_creator, create_brief, creator_report, payouts, record_post
 from .policy import concept_scores, winning_traits
@@ -285,3 +286,70 @@ async def db_import(request: Request):
     tmp.write_bytes(body)
     tmp.replace(path)
     return {"ok": True, "bytes": len(body)}
+
+
+@app.post("/repoll", dependencies=[Depends(_auth)])
+def repoll_cohort(max_age_days: float = 8.0, niche: str | None = None):
+    """Re-poll every cohort video inside the window and rebuild features. The 2-hourly Modal cron
+    calls this so the curves are recorded here, race-free, rather than by replacing the db."""
+    store = _store()
+    res = repoll(store, max_age_days, niche)
+    res["features"] = build_features(store, niche)
+    return res
+
+
+@app.get("/features")
+def features_list(niche: str = "wearables"):
+    return features(_store(), niche)
+
+
+@app.get("/videos/{video_id}")
+def video_detail(video_id: str):
+    """Everything we know about one video: the row, its observation curve, tags with the
+    classifier's run record, its feature row and the creator's baseline snapshot."""
+    store = _store()
+    rows = store.rows("SELECT * FROM videos WHERE id=?", (video_id,))
+    if not rows:
+        raise HTTPException(404, "no video")
+    v = rows[0]
+    v["hashtags"] = json.loads(v.get("hashtags") or "[]")
+    tag_rows = store.rows(
+        "SELECT model, tagged_at, payload FROM tags WHERE video_id=?", (video_id,)
+    )
+    feat = store.rows("SELECT payload FROM features WHERE video_id=?", (video_id,))
+    return {
+        "video": v,
+        "observations": store.rows(
+            "SELECT * FROM observations WHERE video_id=? ORDER BY observed_at", (video_id,)
+        ),
+        "tags": json.loads(tag_rows[0]["payload"]) if tag_rows else None,
+        "tagged_at": tag_rows[0]["tagged_at"] if tag_rows else None,
+        "features": json.loads(feat[0]["payload"]) if feat else None,
+        "creator": latest_snapshot(store, v["author"]),
+    }
+
+
+@app.get("/creators/{handle}")
+def creator_detail(handle: str):
+    """An account's videos with their latest stats, plus its baseline snapshots over time."""
+    store = _store()
+    vids = store.rows(
+        """SELECT v.id, v.url, v.desc, v.create_time, v.duration, v.music, v.source_tag, v.niche,
+                  v.cohort_at, o.views, o.likes, o.comments, o.shares
+           FROM videos v JOIN observations o ON o.video_id=v.id
+           WHERE v.author=? AND o.observed_at=(SELECT MAX(observed_at) FROM observations WHERE video_id=v.id)
+           ORDER BY v.create_time DESC""",
+        (handle,),
+    )
+    if not vids:
+        raise HTTPException(404, "no creator")
+    feats = {f["video_id"]: f for f in features(store) if f["author"] == handle}
+    for v in vids:
+        v["lift_72h"] = feats.get(v["id"], {}).get("lift_72h")
+    return {
+        "handle": handle,
+        "videos": vids,
+        "snapshots": store.rows(
+            "SELECT * FROM creator_snapshots WHERE author=? ORDER BY taken_at", (handle,)
+        ),
+    }
