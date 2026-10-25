@@ -15,6 +15,9 @@ class Script(BaseModel):
     body: str = Field(
         description="Shot-by-shot script with timestamps, 10-20s total, product visible by 0:05"
     )
+    captions: list[str] = Field(
+        description="3-5 short on-screen caption lines shown after the hook, in order, under 40 chars each"
+    )
     product_reveal_s: float
     demo_score_1_5: int = Field(
         ge=1, le=5, description="Does the product demo visually within 5 seconds?"

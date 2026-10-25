@@ -1,8 +1,11 @@
 """ffmpeg editing: trim/concat clips, burn TikTok-style captions, mix a sound, export 1080x1920 H.264.
 A TikTok-library sound cannot be attached via API, so audio is baked in here."""
 
+import re
 import shlex
 import subprocess
+import tempfile
+import textwrap
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -16,16 +19,18 @@ class Caption:
     end: float
 
 
-def _esc(s: str) -> str:
-    return s.replace("\\", "\\\\").replace(":", "\\:").replace("'", "\\\\\\'").replace("%", "\\%")
-
-
-def drawtext_filters(captions: list[Caption], fontsize: int = 64) -> str:
+def drawtext_filters(
+    captions: list[Caption], workdir: Path, fontsize: int = 64, wrap: int = 24
+) -> str:
+    """One drawtext per caption. Text goes through a file so quotes/colons need no escaping and
+    long hooks wrap onto several centred lines instead of running off the 1080 px frame."""
     parts = []
-    for c in captions:
+    for i, c in enumerate(captions):
+        tf = workdir / f"cap{i}.txt"
+        tf.write_text("\n".join(textwrap.wrap(c.text, wrap)) or " ")
         parts.append(
-            f"drawtext=fontfile={FONT}:text='{_esc(c.text)}':fontsize={fontsize}:fontcolor=white:"
-            f"borderw=4:bordercolor=black:x=(w-text_w)/2:y=h*0.72:"
+            f"drawtext=fontfile={FONT}:textfile={tf}:fontsize={fontsize}:fontcolor=white:"
+            f"borderw=4:bordercolor=black:line_spacing=10:x=(w-text_w)/2:y=h*0.68:"
             f"enable='between(t,{c.start},{c.end})'"
         )
     return ",".join(parts)
@@ -56,8 +61,9 @@ def assemble(
     concat = "".join(f"[v{i}][a{i}]" for i in range(n)) + f"concat=n={n}:v=1:a=1[vc][ac];"
     fc = vchain + achain + concat
     vlabel = "[vc]"
+    workdir = Path(tempfile.mkdtemp(prefix="mkt-captions-"))
     if captions:
-        fc += f"{vlabel}{drawtext_filters(captions)}[vcap];"
+        fc += f"{vlabel}{drawtext_filters(captions, workdir)}[vcap];"
         vlabel = "[vcap]"
     alabel = "[ac]"
     if sound:
@@ -118,12 +124,13 @@ def probe_duration(path: Path) -> float:
     return float(r.stdout.strip())
 
 
-def captions_from_script(hook: str, body: str, total_s: float) -> list[Caption]:
-    """Hook on screen for the first 2.5s, then short body lines spread over the rest."""
+TIMESTAMP_RE = re.compile(r"^\[?\d+:\d{2}\s*(-|to)\s*\d+:\d{2}\]?\s*")
+
+
+def captions_from_script(hook: str, lines: list[str], total_s: float) -> list[Caption]:
+    """Hook on screen for the first 2.5s, then the script's on-screen lines spread over the rest."""
     caps = [Caption(hook, 0, min(2.5, total_s))]
-    lines = [ln.strip(" -•") for ln in body.splitlines() if ln.strip()]
-    lines = [ln.split("]", 1)[-1].strip() for ln in lines]  # drop [0:00-0:02] style prefixes
-    lines = [ln for ln in lines if ln][:6]
+    lines = [TIMESTAMP_RE.sub("", ln.strip(" -•")) for ln in lines if ln.strip()][:6]
     if lines and total_s > 2.5:
         step = (total_s - 2.5) / len(lines)
         for i, ln in enumerate(lines):
