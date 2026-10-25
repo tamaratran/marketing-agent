@@ -6,7 +6,7 @@ export const metadata: Metadata = { title: "mkt", description: "organic marketin
 
 const nav = [
   ["/", "Overview"], ["/findings", "Findings"], ["/concepts", "Concepts"], ["/scripts", "Scripts"], ["/clips", "Clips"],
-  ["/creators", "Creators"], ["/briefs", "Briefs"], ["/payouts", "Payouts"], ["/runs", "Runs"],
+  ["/runs", "Runs"],
 ];
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

@@ -15,37 +15,9 @@ async function post(path: string, body?: unknown) {
   return r.json();
 }
 
-export async function addCreator(form: FormData) {
-  await post("/creators", {
-    handle: String(form.get("handle")).replace(/^@/, ""),
-    channel: form.get("channel") || "discord",
-    rate_per_1k: Number(form.get("rate_per_1k") || 1),
-    followers: form.get("followers") ? Number(form.get("followers")) : null,
-    notes: form.get("notes") || "",
-  });
-  revalidatePath("/creators");
-}
 
-export async function setBriefStatus(id: number, status: string) {
-  await post(`/briefs/${id}/status?status=${status}`);
-  revalidatePath("/briefs");
-}
 
-export async function addPost(form: FormData) {
-  await post("/posts", {
-    creator: String(form.get("creator")).replace(/^@/, ""),
-    url: form.get("url"),
-    brief_id: form.get("brief_id") ? Number(form.get("brief_id")) : null,
-    script_id: form.get("script_id") ? Number(form.get("script_id")) : null,
-  });
-  revalidatePath("/creators");
-  revalidatePath("/payouts");
-}
 
-export async function markPaid(videoId: string, amount: number, views: number) {
-  await post(`/payouts/${videoId}/paid`, { amount_usd: amount, views });
-  revalidatePath("/payouts");
-}
 
 export async function startRun(form: FormData) {
   await post("/runs", {
