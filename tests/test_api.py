@@ -90,3 +90,86 @@ def test_db_export_import_roundtrip(client):
     r = client.post("/db", content=exported.content, headers=AUTH)
     assert r.json()["bytes"] == len(exported.content)
     assert settings.db_path.read_bytes() == exported.content
+
+
+def test_site_reads_are_niche_scoped_and_honest(client):
+    from marketing_agent import api
+
+    store = api._store()
+    store.set_niche_tags("wearables", ["smartring"])
+    c_w = store.insert(
+        "concepts",
+        {
+            "niche": "wearables",
+            "name": "Demo",
+            "description": "",
+            "early_score": 1,
+            "created_at": 1,
+        },
+    )
+    c_t = store.insert(
+        "concepts",
+        {"niche": "tanning", "name": "Tan", "description": "", "early_score": 1, "created_at": 1},
+    )
+    now = int(__import__("time").time())
+    s_w = store.insert(
+        "scripts",
+        {
+            "concept_id": c_w,
+            "product": "ring",
+            "created_at": now,
+            "hook": "Text on screen: before vs after",
+            "body": "",
+            "demo_score": 5,
+            "payload": "{}",
+        },
+    )
+    s_t = store.insert(
+        "scripts",
+        {
+            "concept_id": c_t,
+            "product": "tan",
+            "created_at": now,
+            "hook": "tan",
+            "body": "",
+            "demo_score": 5,
+            "payload": "{}",
+        },
+    )
+    store.insert(
+        "renders",
+        {
+            "script_id": s_w,
+            "created_at": now,
+            "model": "stub",
+            "cost_usd": 0,
+            "final_path": "x.mp4",
+        },
+    )
+    store.insert(
+        "renders",
+        {
+            "script_id": s_w,
+            "created_at": now,
+            "model": "seedance",
+            "cost_usd": 1,
+            "final_path": "y.mp4",
+        },
+    )
+    store.insert(
+        "renders",
+        {
+            "script_id": s_t,
+            "created_at": now,
+            "model": "seedance",
+            "cost_usd": 1,
+            "final_path": "z.mp4",
+        },
+    )
+    scripts = client.get("/scripts?niche=wearables").json()
+    assert [s["id"] for s in scripts] == [s_w] and scripts[0]["hook"] == "before vs after"
+    renders = client.get("/renders?niche=wearables").json()
+    assert [r["final_path"] for r in renders] == ["y.mp4"] and renders[0][
+        "hook"
+    ] == "before vs after"
+    assert store.niche_tags("wearables") == ["smartring"]

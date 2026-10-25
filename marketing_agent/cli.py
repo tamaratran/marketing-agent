@@ -430,6 +430,7 @@ def policy(niche):
 @click.pass_context
 def run(ctx, niche, tags, product, top):
     """Daily loop: scrape -> download top -> classify -> concepts -> pick by reward -> scripts."""
+    _store().set_niche_tags(niche, list(tags))
     ctx.invoke(scrape, tags=tags, scrolls=3)
     ctx.invoke(download, tag=None, top=top, max_age_h=72)
     ctx.invoke(classify, limit=top, model=None)
@@ -625,6 +626,17 @@ def devin_kickoff(niche, tags, product, renders, resolution, repo, max_acu, wait
         tags=["marketing-agent", niche],
         repos=[repo],
         max_acu_limit=max_acu,
+    )
+    _store().insert(
+        "runs",
+        {
+            "created_at": int(time.time()),
+            "session_id": s["session_id"],
+            "url": s["url"],
+            "niche": niche,
+            "product": product,
+            "note": "cli",
+        },
     )
     console.print(f"session {s['session_id']}: {s['url']}")
     if wait:

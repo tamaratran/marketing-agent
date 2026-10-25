@@ -101,6 +101,11 @@ CREATE TABLE IF NOT EXISTS runs (
   product TEXT,
   note TEXT
 );
+CREATE TABLE IF NOT EXISTS niche_tags (
+  niche TEXT,
+  tag TEXT,
+  PRIMARY KEY (niche, tag)
+);
 CREATE TABLE IF NOT EXISTS payouts (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   creator TEXT,
@@ -176,6 +181,19 @@ class Store:
         args.append(limit)
         with self.conn() as c:
             return [dict(r) for r in c.execute(q, args)]
+
+    def set_niche_tags(self, niche: str, tags: list[str]) -> None:
+        """Remember which hashtags were scraped for a niche, so per-niche views can exclude the
+        other niches' videos."""
+        with self.conn() as c:
+            c.executemany(
+                "INSERT OR IGNORE INTO niche_tags (niche, tag) VALUES (?, ?)",
+                [(niche, t) for t in tags],
+            )
+
+    def niche_tags(self, niche: str) -> list[str]:
+        with self.conn() as c:
+            return [r[0] for r in c.execute("SELECT tag FROM niche_tags WHERE niche=?", (niche,))]
 
     def untagged(self, limit: int = 50) -> list[dict]:
         with self.conn() as c:
