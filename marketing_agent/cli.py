@@ -155,7 +155,11 @@ def scripts(concept_id, product, n, min_score):
 
 @cli.command()
 @click.argument("script_ids", nargs=-1, type=int, required=True)
-@click.option("--provider", default=None, help="replicate (default) or stub")
+@click.option(
+    "--provider",
+    default=None,
+    help="fal (default, Seedance 2.5), replicate (Seedance 2.0 fast) or stub",
+)
 @click.option("--duration", default=10)
 @click.option("--sound", type=click.Path(exists=True), default=None)
 @click.option("--ref", multiple=True, help="Reference image path/URL (product, creator)")
