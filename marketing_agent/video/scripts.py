@@ -33,7 +33,7 @@ class ScriptBatch(BaseModel):
 
 
 PROMPT = """You write TikTok scripts that remix a trending CONCEPT (a format) to a PRODUCT.
-Rules: 1-3 second hook, product on screen by 5 seconds, 10-20 seconds total, UGC feel (one person,
+Rules: the video_prompt describes picture and sound only; never ask the video model for on-screen text, captions, titles or legible app UI (the captions field is burned in afterwards, generated text renders as gibberish). The hook field is the caption text itself, with no 'Text on screen:' label. 1-3 second hook, product on screen by 5 seconds, 10-20 seconds total, UGC feel (one person,
 phone camera, natural light), no brand-ad polish, no em dashes. Each script must be filmable by one
 creator in one take or be generatable by a video model. Vary the hooks across scripts.
 Score demo_score_1_5 honestly: 5 means the product's value is obvious on screen within 5s, 1 means it
