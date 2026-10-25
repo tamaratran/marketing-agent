@@ -446,5 +446,144 @@ def run(ctx, niche, tags, product, top):
             ctx.invoke(scripts, concept_id=best["id"], product=product, n=12, min_score=3)
 
 
+@cli.command()
+@click.argument("niche")
+@click.argument("tags", nargs=-1, required=True)
+@click.option("--product", required=True)
+@click.option("--top", default=8)
+@click.option("--renders", default=1, help="Render the N best scripts written today (0 = skip)")
+@click.option("--resolution", default="480p")
+@click.option("--report", type=click.Path(), default=None, help="Markdown report path")
+@click.pass_context
+def daily(ctx, niche, tags, product, top, renders, resolution, report):
+    """The whole loop in order with a report at the end: run (scrape, classify, concepts, pick,
+    scripts), render, poll creator posts, payouts, scoreboard, policy. A failed stage is recorded
+    and the rest still runs."""
+    import os
+
+    from .orchestrator import DailyReport
+    from .research.tiktok_browser import poll_public_stats
+
+    rep = DailyReport(niche, product)
+
+    def stage(name, fn):
+        t0 = time.time()
+        try:
+            note = fn()
+            rep.ok(name, time.time() - t0, note or "")
+        except Exception as e:  # noqa: BLE001 - every stage must be reported, not raised
+            rep.fail(name, e)
+            console.print(f"[red]{name} failed: {e!r}")
+
+    stage("run", lambda: ctx.invoke(run, niche=niche, tags=tags, product=product, top=top))
+    store = _store()
+    day_start = int(rep.started) - int(rep.started) % 86400
+    todays = [
+        r["id"]
+        for r in store.rows(
+            "SELECT id FROM scripts WHERE product=? AND created_at>=? ORDER BY demo_score DESC, id",
+            (product, day_start),
+        )
+    ]
+    if not renders:
+        rep.skip("render", "--renders 0")
+    elif not todays:
+        rep.skip("render", "no scripts written today")
+    elif not os.environ.get("FAL_KEY"):
+        rep.skip("render", "FAL_KEY not set")
+    else:
+        stage(
+            "render",
+            lambda: ctx.invoke(
+                render,
+                script_ids=tuple(todays[:renders]),
+                provider=None,
+                duration=12,
+                resolution=resolution,
+                sound=None,
+                ref=(),
+            ),
+        )
+
+    def poll_posts():
+        urls = [r["url"] for r in store.rows("SELECT url FROM posts")]
+        n = 0
+        for u in urls:
+            row = poll_public_stats(u)
+            if row:
+                store.upsert_video(row)
+                n += 1
+        return f"{n}/{len(urls)} posts polled"
+
+    stage("poll_posts", poll_posts)
+    stage("payouts", lambda: ctx.invoke(creators_payouts, min_age_days=7))
+    stage("creators", lambda: ctx.invoke(creators_report, stall_days=7))
+    stage("scoreboard", lambda: ctx.invoke(scoreboard, tag=None, top=15))
+    stage("policy", lambda: ctx.invoke(policy, niche=niche))
+
+    report = (
+        Path(report)
+        if report
+        else settings.data_dir / "reports" / f"{time.strftime('%Y-%m-%d')}.md"
+    )
+    rep.write(report, store)
+    console.print(f"report: {report}" + (f"  failed: {rep.failed}" if rep.failed else "  all ok"))
+    if rep.failed:
+        ctx.exit(1)
+
+
+@cli.group()
+def devin():
+    """Have Devin run the loop: start a session through the Devin API that runs `mkt daily`,
+    fixes what broke, pushes the state branch and reports."""
+
+
+@devin.command("kickoff")
+@click.argument("niche")
+@click.argument("tags", nargs=-1, required=True)
+@click.option("--product", required=True)
+@click.option("--renders", default=1)
+@click.option("--resolution", default="480p")
+@click.option("--repo", default=None, help="owner/repo (default MKT_REPO)")
+@click.option("--max-acu", default=10, help="ACU cap for the session")
+@click.option("--wait/--no-wait", default=False, help="Block until the session settles")
+@click.option("--dry-run", is_flag=True, help="Print the prompt, start nothing")
+def devin_kickoff(niche, tags, product, renders, resolution, repo, max_acu, wait, dry_run):
+    from .orchestrator import DEFAULT_REPO, DevinClient, daily_prompt
+
+    repo = repo or DEFAULT_REPO
+    prompt = daily_prompt(niche, list(tags), product, renders, resolution, repo)
+    if dry_run:
+        click.echo(prompt)
+        return
+    client = DevinClient()
+    s = client.create_session(
+        prompt,
+        title=f"mkt daily {niche} {time.strftime('%Y-%m-%d')}",
+        tags=["marketing-agent", niche],
+        repos=[repo],
+        max_acu_limit=max_acu,
+    )
+    console.print(f"session {s['session_id']}: {s['url']}")
+    if wait:
+        s = client.wait(s["session_id"])
+        console.print(f"{s.get('status')} / {s.get('status_detail')}")
+        for pr in s.get("pull_requests") or []:
+            console.print(f"PR {pr.get('pr_url')} [{pr.get('pr_state')}]")
+
+
+@devin.command("status")
+@click.argument("session_id")
+def devin_status(session_id):
+    from .orchestrator import DevinClient
+
+    s = DevinClient().get_session(session_id)
+    console.print(f"{s.get('title')}: {s.get('status')} / {s.get('status_detail')}  {s.get('url')}")
+    for pr in s.get("pull_requests") or []:
+        console.print(f"PR {pr.get('pr_url')} [{pr.get('pr_state')}]")
+    if s.get("structured_output"):
+        console.print(json.dumps(s["structured_output"], indent=2))
+
+
 if __name__ == "__main__":
     cli()

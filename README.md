@@ -73,3 +73,29 @@ styles into the prompt. `mkt policy <niche>` shows what the loop has learned.
 - TikTok's posting API cannot attach a library sound, so the editor bakes audio in (`--sound file.mp3`).
 - Seedance 2.5 on fal takes 1-2 min per clip and costs about $0.22 per second at 480p, $0.47 at 720p; Replicate Seedance 2.0 fast is about $0.08 per second.
 - Anonymous TikTok keyword search returns nothing; hashtag pages are the entry point.
+
+## Letting Devin run it
+
+`mkt daily` runs every stage in order and writes a markdown report; a stage that fails is recorded
+and the rest still runs:
+
+```bash
+MKT_DB=../mkt-state/mkt.sqlite mkt daily wearables smartring whoop ouraring \
+  --product "a smart ring that tracks sleep, stress and recovery" --renders 1 --report ../mkt-state/reports/today.md
+```
+
+`mkt devin kickoff` starts a Devin session through the Devin API that does the judgment part: runs
+`mkt daily`, reads the report, fixes a stage that broke (one PR per fix), pushes the db and report to
+the `state` branch, and replies with the day's summary and the rendered clips.
+
+```bash
+export DEVIN_API_KEY=...   # Settings > Devin API > PATs
+export DEVIN_ORG_ID=org-... # top of Settings > Devin API
+mkt devin kickoff wearables smartring whoop ouraring --product "..." --dry-run   # show the prompt
+mkt devin kickoff wearables smartring whoop ouraring --product "..."             # start it
+mkt devin status <session_id>
+```
+
+State is kept out of `main`: the sqlite db and `reports/` live on the `state` branch, which each
+session checks out as a worktree (`MKT_DB` points the CLI at it). Schedule the kickoff with cron or a
+Devin Automation and the loop runs itself; humans still do the posting.
