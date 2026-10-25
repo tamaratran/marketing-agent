@@ -116,3 +116,52 @@ def test_scoreboard_rewards_and_flags():
     assert hooks[0]["hook_type"] == "pov"
     flags = shadowban_flags(list(scored.values()), now=now)
     assert [f["author"] for f in flags] == ["a"] and flags[0]["max_views"] == 700
+
+
+def test_policy_prefers_observed_winner(tmp_path):
+    import random
+
+    from marketing_agent.policy import pick_concept
+    from marketing_agent.store import Store
+
+    store = Store(tmp_path / "p.sqlite")
+    for name, early in (("Loud", 900), ("Quiet", 5)):
+        store.insert(
+            "concepts",
+            {
+                "niche": "x",
+                "created_at": 1,
+                "name": name,
+                "description": "",
+                "video_ids": "[]",
+                "early_score": early,
+                "payload": "{}",
+            },
+        )
+    old = 1_700_000_000
+    for i, (concept, views) in enumerate(
+        [("Quiet", 5000), ("Quiet", 8000), ("Loud", 100), ("Loud", 120)]
+    ):
+        store.upsert_video(
+            {
+                "id": f"v{i}",
+                "url": "",
+                "author": f"a{i}",
+                "followers": 10,
+                "create_time": old,
+                "duration": 10,
+                "desc": "",
+                "music": "",
+                "hashtags": [],
+                "source_tag": "x",
+                "views": views,
+                "likes": 0,
+                "comments": 0,
+                "shares": 0,
+                "saves": 0,
+            },
+            observed_at=old + 10,
+        )
+        store.save_tags(f"v{i}", "m", {"tags": {"concept": concept, "hook_type": "pov"}})
+    picks = [pick_concept(store, "x", random.Random(s))["name"] for s in range(50)]
+    assert picks.count("Quiet") > 35  # observed reward beats the radar prior

@@ -145,7 +145,11 @@ def scripts(concept_id, product, n, min_score):
     if not rows:
         raise click.ClickException(f"no concept {concept_id}")
     c = {**json.loads(rows[0]["payload"]), "id": concept_id}
-    out = write_scripts(store, c, product, n, min_score, settings.openai_model)
+    from .policy import winning_traits
+
+    out = write_scripts(
+        store, c, product, n, min_score, settings.openai_model, winning_traits(store)
+    )
     for s in out:
         mark = "keep" if s["kept"] else "drop"
         console.print(
@@ -282,19 +286,21 @@ def scoreboard(tag, top):
 @click.option("--top", default=8)
 @click.pass_context
 def run(ctx, niche, tags, product, top):
-    """Daily loop: scrape -> download top -> classify -> concepts (-> scripts)."""
+    """Daily loop: scrape -> download top -> classify -> concepts -> pick by reward -> scripts."""
     ctx.invoke(scrape, tags=tags, scrolls=3)
     ctx.invoke(download, tag=None, top=top, max_age_h=72)
     ctx.invoke(classify, limit=top, model=None)
     ctx.invoke(concepts, niche=niche, tag=None, max_age_h=72, limit=40)
     if product:
-        store = _store()
-        best = store.rows(
-            "SELECT id FROM concepts WHERE niche=? ORDER BY created_at DESC, early_score DESC LIMIT 1",
-            (niche,),
-        )
+        from .policy import pick_concept
+
+        best = pick_concept(_store(), niche)
         if best:
-            ctx.invoke(scripts, concept_id=best[0]["id"], product=product, n=12, min_score=3)
+            console.print(
+                f"picked concept {best['id']} '{best['name']}' (prior {best['prior']}, "
+                f"observed {best['mean_reward']}, n={best['n']}, sampled {best['sampled']})"
+            )
+            ctx.invoke(scripts, concept_id=best["id"], product=product, n=12, min_score=3)
 
 
 if __name__ == "__main__":
