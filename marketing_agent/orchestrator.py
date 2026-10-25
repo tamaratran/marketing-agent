@@ -168,7 +168,7 @@ class DailyReport:
         from .policy import concept_scores, winning_traits
         from .scoreboard import build
 
-        day_start = int(self.started) - int(self.started) % 86400
+        run_start = int(self.started)
         lines = [
             f"# Daily run {datetime.fromtimestamp(self.started, UTC):%Y-%m-%d} - {self.niche}",
             "",
@@ -189,7 +189,7 @@ class DailyReport:
             """SELECT s.id, s.hook, s.demo_score, c.name concept FROM scripts s
                LEFT JOIN concepts c ON c.id=s.concept_id
                WHERE s.created_at>=? AND s.product=? ORDER BY s.demo_score DESC, s.id""",
-            (day_start, self.product),
+            (run_start, self.product),
         )
         lines += ["", "## Today's scripts", ""]
         if scripts:
@@ -201,7 +201,7 @@ class DailyReport:
         renders = store.rows(
             """SELECT r.script_id, r.final_path, r.cost_usd, r.model FROM renders r
                JOIN scripts s ON s.id=r.script_id WHERE r.created_at>=? AND s.product=?""",
-            (day_start, self.product),
+            (run_start, self.product),
         )
         lines += ["", "## Renders", ""]
         lines += [

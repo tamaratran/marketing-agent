@@ -451,7 +451,7 @@ def run(ctx, niche, tags, product, top):
 @click.argument("tags", nargs=-1, required=True)
 @click.option("--product", required=True)
 @click.option("--top", default=8)
-@click.option("--renders", default=1, help="Render the N best scripts written today (0 = skip)")
+@click.option("--renders", default=1, help="Render the N best scripts written this run (0 = skip)")
 @click.option("--resolution", default="480p")
 @click.option("--report", type=click.Path(), default=None, help="Markdown report path")
 @click.pass_context
@@ -477,18 +477,17 @@ def daily(ctx, niche, tags, product, top, renders, resolution, report):
 
     stage("run", lambda: ctx.invoke(run, niche=niche, tags=tags, product=product, top=top))
     store = _store()
-    day_start = int(rep.started) - int(rep.started) % 86400
     todays = [
         r["id"]
         for r in store.rows(
             "SELECT id FROM scripts WHERE product=? AND created_at>=? ORDER BY demo_score DESC, id",
-            (product, day_start),
+            (product, int(rep.started)),
         )
     ]
     if not renders:
         rep.skip("render", "--renders 0")
     elif not todays:
-        rep.skip("render", "no scripts written today")
+        rep.skip("render", "no scripts written this run")
     elif not os.environ.get("FAL_KEY"):
         rep.skip("render", "FAL_KEY not set")
     else:
