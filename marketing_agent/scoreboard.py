@@ -24,7 +24,7 @@ def _winsor(values: list[float], pct: float = WINSOR_PCT) -> float:
     if not values:
         return math.inf
     s = sorted(values)
-    return s[min(len(s) - 1, int(len(s) * pct))]
+    return s[max(0, min(len(s) - 1, math.ceil(len(s) * pct) - 1))]
 
 
 def rewards(rows: list[dict], now: int | None = None) -> list[dict]:
