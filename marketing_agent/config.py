@@ -14,7 +14,9 @@ class Settings(BaseModel):
 
     @property
     def db_path(self) -> Path:
-        return self.data_dir / "mkt.sqlite"
+        return (
+            Path(os.environ["MKT_DB"]) if os.environ.get("MKT_DB") else self.data_dir / "mkt.sqlite"
+        )
 
     @property
     def videos_dir(self) -> Path:
