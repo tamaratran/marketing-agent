@@ -27,3 +27,29 @@ export type Creator = { handle: string; channel: string; rate_per_1k: number; po
 export type Brief = { id: number; created_at: number; product: string; script_ids: string; rate_per_1k: number; cap_usd: number; deadline_days: number; body: string; status: string };
 export type Payout = { creator: string; video_id: string; url: string; age_days: number; views: number; rate_per_1k: number; owed_usd: number; settled: boolean; paid_usd: number };
 export type Run = { id: number; created_at: number; session_id: string; url: string; niche: string; product: string; note: string };
+
+export type Level = { level: string; n: number; coef: number; se: number; lo: number; hi: number; raw_mean: number; reference: boolean; verdict: string; travels?: boolean };
+export type Fit = { n: number; k?: number; r2?: number; reference?: string; levels: Level[] };
+export type Findings = {
+  built_at?: number; collecting: boolean; min_n?: number;
+  status: { videos: number; tagged?: number; with_baseline?: number; reached: Record<string, number>; eta_72h?: number | null; niches?: Record<string, number> };
+  outcomes?: Record<string, string>;
+  fits: Record<string, { pooled: Record<string, Fit>; per_niche: Record<string, Record<string, Fit>> }>;
+};
+export type Observation = { video_id: string; observed_at: number; views: number | null; likes: number | null; comments: number | null; shares: number | null; saves: number | null };
+export type Features = Record<string, number | string | boolean | string[] | null>;
+export type VideoDetail = {
+  video: { id: string; url: string; author: string; followers: number | null; create_time: number; duration: number | null; desc: string; music: string; hashtags: string[]; source_tag: string; niche: string | null; cohort_at: number | null };
+  observations: Observation[];
+  tags: { tags: Record<string, unknown>; run: { model: string; prompt_version: string; latency_s: number; transcript: string; frame_times: number[] } } | null;
+  tagged_at: number | null;
+  features: Features | null;
+  creator: { followers: number | null; n_posts: number; median_views: number | null; video_count: number | null; heart_count: number | null; taken_at: number } | null;
+};
+export type CreatorDetail = {
+  handle: string;
+  videos: { id: string; url: string; desc: string; create_time: number; duration: number | null; music: string; source_tag: string; niche: string | null; cohort_at: number | null; views: number | null; likes: number | null; lift_72h: number | null }[];
+  snapshots: { taken_at: number; followers: number | null; n_posts: number; median_views: number | null; video_count: number | null; heart_count: number | null }[];
+};
+export const ageH = (createTime: number, at: number) => (at - createTime) / 3600;
+export const fmt = (n: number | null | undefined, d = 2) => (n === null || n === undefined ? "" : n.toFixed(d));

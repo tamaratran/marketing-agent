@@ -1,10 +1,11 @@
-import { get, usd, type Overview } from "@/lib/api";
+import Link from "next/link";
+import { get, usd, type Findings, type Overview } from "@/lib/api";
 import { Card, H1, Stat, Table, reward } from "./ui";
 
 export const dynamic = "force-dynamic";
 
 export default async function Page() {
-  const o = await get<Overview>("/overview");
+  const [o, fs] = await Promise.all([get<Overview>("/overview"), get<Findings>("/findings")]);
   return (
     <>
       <H1 sub={`${o.niche}: what the loop has seen and what is beating the account baseline`}>Overview</H1>
@@ -16,28 +17,26 @@ export default async function Page() {
         <Stat label="spent on clips" value={usd(o.spent_usd)} />
         <Stat label="owed to creators" value={usd(o.owed_usd)} />
       </div>
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card title="Hooks">
-          <Table head={["hook", "n", "reward", "win rate"]} rows={o.hooks.map((h) => [h.hook_type, h.n, reward(h.mean_reward), `${Math.round(h.win_rate * 100)}%`])} />
-        </Card>
-        <Card title="Styles">
-          <Table head={["style", "n", "reward", "win rate"]} rows={o.styles.map((s) => [s.visual_style, s.n, reward(s.mean_reward), `${Math.round(s.win_rate * 100)}%`])} />
-        </Card>
-      </div>
-      <Card title="Fed into tomorrow's scripts" className="mt-4">
-        <pre className="whitespace-pre-wrap text-sm text-neutral-300">{o.winning || "Nothing beats baseline yet."}</pre>
+      <Card title="Learning status">
+        <p className="text-sm text-neutral-300">
+          {fs.status.videos} cohort videos being followed, {fs.status.tagged ?? 0} tagged, {fs.status.reached["72h"] ?? 0} have reached 72h.
+          {fs.collecting
+            ? ` Still collecting: no trait is called better or worse until ${fs.min_n ?? 20} videos per cell reach 72h${fs.status.eta_72h ? ` (first ones around ${new Date(fs.status.eta_72h * 1000).toUTCString()})` : ""}.`
+            : " Controlled findings are in."}
+          {" "}<Link href="/findings" className="text-sky-300 hover:underline">Findings</Link>
+        </p>
       </Card>
       {o.stuck_accounts.length > 0 && (
         <Card title="Accounts that look throttled" className="mt-4">
           <Table head={["account", "posts", "median views"]} rows={o.stuck_accounts.map((a) => [a.author, a.n ?? "", a.median_views ?? ""])} />
         </Card>
       )}
-      <Card title="Top tagged videos" className="mt-4">
+      <Card title="Top tagged videos (reward = log views vs the account baseline, uncontrolled)" className="mt-4">
         <Table
           head={["video", "author", "views", "reward", "hook", "style"]}
           rows={o.top_videos.map((v) => [
-            <a key={v.id} href={v.url} target="_blank" className="text-sky-300 hover:underline">{(v.desc || v.id).slice(0, 60)}</a>,
-            `@${v.author}`, v.views.toLocaleString(), reward(v.reward), v.hook_type, v.visual_style,
+            <Link key={v.id} href={`/videos/${v.id}`} className="text-sky-300 hover:underline">{(v.desc || v.id).slice(0, 60)}</Link>,
+            <Link key={`a${v.id}`} href={`/creators/${v.author}`} className="hover:underline">@{v.author}</Link>, v.views.toLocaleString(), reward(v.reward), v.hook_type, v.visual_style,
           ])}
         />
       </Card>
