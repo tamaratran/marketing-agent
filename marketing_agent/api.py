@@ -16,6 +16,7 @@ from .creators.ops import add_creator, create_brief, creator_report, payouts, re
 from .policy import concept_scores, winning_traits
 from .scoreboard import build
 from .store import Store
+from .video.edit import strip_label
 
 
 def _store() -> Store:
@@ -47,7 +48,7 @@ def health():
 @app.get("/overview")
 def overview(niche: str = "wearables"):
     store = _store()
-    sb = build(store)
+    sb = build(store, tags=store.niche_tags(niche) or None)
     spent = sum(r["cost_usd"] or 0 for r in store.rows("SELECT cost_usd FROM renders"))
     pays = payouts(store)
     return {
@@ -73,12 +74,12 @@ def concepts(niche: str = "wearables"):
 
 
 @app.get("/scripts")
-def scripts(days: int = 7, product: str | None = None, limit: int = 100):
+def scripts(days: int = 7, product: str | None = None, limit: int = 100, niche: str = "wearables"):
     since = int(time.time()) - days * 86400
     sql = """SELECT s.id, s.concept_id, c.name concept, s.product, s.created_at, s.hook,
                     s.demo_score, s.payload FROM scripts s LEFT JOIN concepts c ON c.id=s.concept_id
-             WHERE s.created_at>=?"""
-    args: list = [since]
+             WHERE s.created_at>=? AND c.niche=?"""
+    args: list = [since, niche]
     if product:
         sql += " AND s.product=?"
         args.append(product)
@@ -87,18 +88,24 @@ def scripts(days: int = 7, product: str | None = None, limit: int = 100):
     out = []
     for r in _store().rows(sql, tuple(args)):
         payload = json.loads(r.pop("payload") or "{}")
+        r["hook"] = strip_label(r["hook"] or "")
         out.append({**r, "captions": payload.get("captions"), "body": payload.get("body")})
     return out
 
 
 @app.get("/renders")
-def renders(limit: int = 50):
-    return _store().rows(
+def renders(limit: int = 50, niche: str = "wearables"):
+    """Real clips only: the stub provider's colour cards are for offline tests, not the site."""
+    rows = _store().rows(
         """SELECT r.id, r.script_id, r.created_at, r.model, r.cost_usd, r.final_path, s.hook
-           FROM renders r JOIN scripts s ON s.id=r.script_id
-           WHERE r.final_path IS NOT NULL ORDER BY r.created_at DESC LIMIT ?""",
-        (limit,),
+           FROM renders r JOIN scripts s ON s.id=r.script_id JOIN concepts c ON c.id=s.concept_id
+           WHERE r.final_path IS NOT NULL AND r.model!='stub' AND c.niche=?
+           ORDER BY r.created_at DESC LIMIT ?""",
+        (niche, limit),
     )
+    for r in rows:
+        r["hook"] = strip_label(r["hook"] or "")
+    return rows
 
 
 @app.get("/renders/{render_id}/file")

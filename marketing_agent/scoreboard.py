@@ -122,10 +122,14 @@ def shadowban_flags(rows: list[dict], now: int | None = None) -> list[dict]:
     return sorted(flags, key=lambda f: f["max_views"])
 
 
-def build(store: Store, tag: str | None = None, limit: int = 500) -> dict:
+def build(
+    store: Store, tag: str | None = None, limit: int = 500, tags: list[str] | None = None
+) -> dict:
     """Everything the CLI and the next-batch picker need: scored videos, hook and concept tables,
     stuck accounts."""
     rows = store.latest(tag, limit=limit)
+    if tags:
+        rows = [r for r in rows if r["source_tag"] in tags]
     tags = store.tags_for([r["id"] for r in rows])
     for r in rows:
         t = tags.get(r["id"], {}).get("tags", {})
