@@ -49,9 +49,10 @@ class ReplicateSeedance(VideoProvider):
         self.model = model
 
     def generate(self, req: GenRequest, out: Path) -> GenResult:
+        duration = max(-1, min(req.duration_s, 15))  # Replicate schema: -1 (auto) to 15 s
         inputs = {
             "prompt": req.prompt,
-            "duration": req.duration_s,
+            "duration": duration,
             "aspect_ratio": req.aspect_ratio,
             "resolution": req.resolution,
             "generate_audio": req.generate_audio,
@@ -77,7 +78,7 @@ class ReplicateSeedance(VideoProvider):
             path=out,
             model=self.model,
             seconds=round(time.time() - t0, 1),
-            cost_usd=round(req.duration_s * self.PRICE_PER_S.get(self.model, 0.1), 3),
+            cost_usd=round(max(duration, 5) * self.PRICE_PER_S.get(self.model, 0.1), 3),
             raw={"input": {k: v for k, v in inputs.items() if k != "reference_images"}, "url": url},
         )
 
