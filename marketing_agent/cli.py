@@ -118,7 +118,11 @@ def concepts(niche, tag, max_age_h, limit):
     from .research.radar import cluster, rank
 
     store = _store()
-    out = cluster(store, niche, rank(store, tag, max_age_h, limit), settings.openai_model)
+    ranked = rank(store, tag, max_age_h, limit)
+    niche_tags = store.niche_tags(niche)
+    if not tag and niche_tags:
+        ranked = [r for r in ranked if r["source_tag"] in niche_tags]
+    out = cluster(store, niche, ranked, settings.openai_model)
     t = Table("id", "early", "n", "top views", "concept", "hook pattern")
     for c in out:
         t.add_row(
