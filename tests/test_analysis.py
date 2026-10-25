@@ -53,3 +53,41 @@ def test_analyze_reports_collecting_and_roundtrips(tmp_path):
     assert res["status"]["videos"] == 0 and res["fits"]["lift_72h"]["pooled"]
     save_findings(store, res)
     assert controlled_lift(store, "hook_type") == {}
+
+
+def test_script_prompt_uses_controlled_findings_only_when_ready(tmp_path):
+    from marketing_agent.policy import controlled_traits, winning_traits
+
+    store = Store(tmp_path / "t.sqlite")
+    assert controlled_traits(store) == ""
+    res = analyze(store)
+    res["status"]["reached"]["72h"] = 50
+    res["status"]["videos"] = 60
+    res["fits"]["lift_72h"]["pooled"]["hook_type"] = {
+        "reference": "text_on_screen",
+        "levels": [
+            {
+                "level": "text_on_screen",
+                "reference": True,
+                "verdict": "reference",
+                "coef": 0,
+                "n": 30,
+            },
+            {
+                "level": "pov",
+                "reference": False,
+                "verdict": "better",
+                "coef": 0.41,
+                "n": 25,
+                "travels": True,
+            },
+            {"level": "question", "reference": False, "verdict": "thin", "coef": 0.9, "n": 3},
+        ],
+    }
+    save_findings(store, res)
+    text = winning_traits(store)
+    assert (
+        "Controlled for account size" in text
+        and "pov +0.41 vs text_on_screen (n=25, travels" in text
+    )
+    assert "question" not in text

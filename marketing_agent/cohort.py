@@ -140,7 +140,7 @@ def views_at(obs: list[tuple[float, float]], age_h: float) -> float | None:
         return 10 ** (math.log10(max(v0, 1)) * (1 - f) + math.log10(max(v1, 1)) * f)
     a, v = after[0] if after else before[-1]
     if abs(a - age_h) <= age_h * 0.25:
-        return v * age_h / a if a else v
+        return v  # nearest observation, not a projection: views only grow, so this is a floor
     return None
 
 
