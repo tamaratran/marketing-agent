@@ -1,5 +1,6 @@
-"""Video generation behind a small provider interface. Default: Seedance 2.0 fast on Replicate
-(~$0.08 per second of 720p with native audio). Generation takes 45-90s, so callers should batch."""
+"""Video generation behind a small provider interface. Default: Seedance 2.5 on fal.ai
+(newest Seedance; ~$0.22/s at 480p, $0.47/s at 720p). Replicate Seedance 2.0 fast is the cheap
+fallback (~$0.08/s). Generation takes 45-120 s per clip, so callers should batch."""
 
 import os
 import time
@@ -83,6 +84,56 @@ class ReplicateSeedance(VideoProvider):
         )
 
 
+class FalSeedance(VideoProvider):
+    """Seedance on fal.ai (newest version: 2.5, US-hosted). 4-30 s or auto duration, 480p/720p/1080p,
+    9:16, synchronized audio with lip-synced speech. Reference images/videos/audio switch the endpoint
+    to reference-to-video; refer to them in the prompt as @Image1, @Video1, @Audio1."""
+
+    PRICE_PER_S: ClassVar[dict[str, float]] = {"480p": 0.2205, "720p": 0.473, "1080p": 0.80}
+
+    def __init__(self, model: str = "bytedance/seedance-2.5/us"):
+        if not os.environ.get("FAL_KEY"):
+            raise RuntimeError("FAL_KEY not set")
+        import fal_client
+
+        self.fal = fal_client
+        self.model = model.rstrip("/")
+
+    def _url(self, ref: str) -> str:
+        return self.fal.upload_file(ref) if os.path.exists(ref) else ref
+
+    def generate(self, req: GenRequest, out: Path) -> GenResult:
+        duration = "auto" if req.duration_s < 0 else str(max(4, min(req.duration_s, 30)))
+        args: dict = {
+            "prompt": req.prompt,
+            "duration": duration,
+            "aspect_ratio": req.aspect_ratio,
+            "resolution": req.resolution,
+            "generate_audio": req.generate_audio,
+        }
+        endpoint = f"{self.model}/text-to-video"
+        if req.reference_images:
+            endpoint = f"{self.model}/reference-to-video"
+            args["image_urls"] = [self._url(p) for p in req.reference_images]
+        t0 = time.time()
+        result = self.fal.subscribe(endpoint, arguments=args, with_logs=False)
+        url = result["video"]["url"]
+        out.parent.mkdir(parents=True, exist_ok=True)
+        with httpx.stream("GET", url, follow_redirects=True, timeout=300) as r:
+            r.raise_for_status()
+            with out.open("wb") as f:
+                for chunk in r.iter_bytes():
+                    f.write(chunk)
+        secs = req.duration_s if req.duration_s > 0 else 5
+        return GenResult(
+            path=out,
+            model=endpoint,
+            seconds=round(time.time() - t0, 1),
+            cost_usd=round(secs * self.PRICE_PER_S.get(req.resolution, 0.5), 3),
+            raw={"input": {k: v for k, v in args.items() if k != "image_urls"}, "result": result},
+        )
+
+
 class StubProvider(VideoProvider):
     """Renders a colour card with ffmpeg so the pipeline runs end to end without any API key."""
 
@@ -119,9 +170,13 @@ class StubProvider(VideoProvider):
 
 
 def get_provider(name: str | None = None) -> VideoProvider:
-    name = name or os.environ.get("MKT_VIDEO_PROVIDER", "replicate")
+    name = name or os.environ.get("MKT_VIDEO_PROVIDER", "fal")
     if name == "stub":
         return StubProvider()
+    if name == "fal":
+        return FalSeedance(os.environ.get("MKT_VIDEO_MODEL", "bytedance/seedance-2.5/us"))
     if name == "replicate":
-        return ReplicateSeedance(os.environ.get("MKT_VIDEO_MODEL", "bytedance/seedance-2.0-fast"))
+        return ReplicateSeedance(
+            os.environ.get("MKT_REPLICATE_MODEL", "bytedance/seedance-2.0-fast")
+        )
     raise ValueError(f"unknown provider {name}")
