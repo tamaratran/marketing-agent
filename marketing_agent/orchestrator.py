@@ -107,6 +107,11 @@ Setup (in the repo):
   export OPENAI_API_KEY="$ANSWERSNAP_OPENAI_KEY"   # the personal OpenAI key has no credits
   FAL_KEY is in your environment; renders cost about $0.22/s at 480p, keep to --renders {renders}.
   The scraper drives the Chrome already running in your VM at http://localhost:29229.
+  Own-post discovery requires a TikTok session in that Chrome. `mkt own login` reuses a verified
+  login or submits TIKTOK_POST_HANDLE and TIKTOK_POST_PASSWORD from protected environment secrets.
+  Do not print them, put them in prompts, export cookies, or copy them to shared services.
+  If TikTok requires verification/CAPTCHA or the browser is signed into another account, stop
+  that stage and report it. A fresh VM is not guaranteed to inherit a personal browser login.
 
 State lives on the `{state_branch}` branch (sqlite db, daily reports, and site/ with the static dashboard and its clips),
 checked out as a worktree:
@@ -116,7 +121,7 @@ checked out as a worktree:
   export MKT_DB=$PWD/../mkt-state/mkt.sqlite
 
 Before running, take the API's db if it has one (it is the source of truth between runs; the human
-dashboard writes creators, briefs and payouts there): mkt sync pull   (MKT_API_TOKEN is in your env)
+dashboard reads its data there): mkt sync pull   (MKT_API_TOKEN is in your env)
 
 Run:
   mkt daily {niche} {tag_str} --product "{product}" --renders {renders} --resolution {resolution} \\

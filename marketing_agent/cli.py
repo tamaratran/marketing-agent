@@ -187,31 +187,47 @@ def analyze(niche):
 
 @cli.group()
 def own():
-    """Our own posting accounts: the posts humans make from them are found by hashtag, matched
-    to their script and fed back into the picker. Nothing here posts."""
+    """Discover our accounts' posts and feed performance back into the picker. Never posts."""
+
+
+@own.command("login")
+def own_login():
+    """Verify/reuse Chrome's TikTok login, or log in using protected environment credentials."""
+    from .research.tiktok_auth import LoginRequired, ensure_login_sync
+
+    try:
+        status = ensure_login_sync(settings.cdp_url)
+    except LoginRequired as exc:
+        raise click.ClickException(str(exc)) from None
+    console.print(f"TikTok session verified ({status}). Nothing posted.")
 
 
 @own.command("add")
 @click.argument("handle")
-@click.option("--tag", required=True, help="Campaign hashtag every clip caption carries")
+@click.option("--tag", default="", help="Optional campaign hashtag for fallback discovery")
 @click.option("--product", default="")
 def own_add(handle, tag, product):
     from .own import add_account
 
     add_account(_store(), handle, tag, product)
-    console.print(f"@{handle.lstrip('@')} tracked via #{tag.lstrip('#')}")
+    console.print("Account registered for profile discovery. Historical posts are baseline only.")
 
 
 @own.command("sync")
 @click.argument("niche")
 @click.argument("tags", nargs=-1)
-def own_sync(niche, tags):
-    """Find new posts from our accounts (campaign tag + niche tags) and enrol them as ours."""
+@click.option("--source", type=click.Choice(["profile", "hashtag"]), default="profile")
+def own_sync(niche, tags, source="profile"):
+    """Read our profiles in Chrome; --source hashtag explicitly opts into fallback discovery."""
     from .own import sync_own
+    from .research.tiktok_auth import LoginRequired
 
     store = _store()
     niche_tags = list(tags) or store.niche_tags(niche)
-    console.print(sync_own(store, settings.cdp_url, niche, niche_tags))
+    try:
+        console.print(sync_own(store, settings.cdp_url, niche, niche_tags, source=source))
+    except LoginRequired as exc:
+        raise click.ClickException(str(exc)) from None
 
 
 @own.command("list")
@@ -624,12 +640,12 @@ def daily(ctx, niche, tags, product, top, renders, resolution, report, dashboard
             rep.fail(name, e)
             console.print(f"[red]{name} failed: {e!r}")
 
+    stage("own", lambda: ctx.invoke(own_sync, niche=niche, tags=tags))
     stage("run", lambda: ctx.invoke(run, niche=niche, tags=tags, product=product, top=top))
     stage(
         "cohort",
         lambda: ctx.invoke(cohort, niche=niche, tags=tags, scrolls=6, max_classify=100),
     )
-    stage("own", lambda: ctx.invoke(own_sync, niche=niche, tags=tags))
     stage("analyze", lambda: ctx.invoke(analyze, niche=()))
     if dashboard_out:
         stage(

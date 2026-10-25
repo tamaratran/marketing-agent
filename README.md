@@ -69,6 +69,36 @@ styles into the prompt. `mkt policy <niche>` shows what the loop has learned.
 
 ## Known limits
 
+### One-account login and feedback
+
+```bash
+# Supply TIKTOK_POST_HANDLE and TIKTOK_POST_PASSWORD through protected secrets, not CLI arguments.
+mkt own login
+mkt own add @youraccount --product "your product"
+mkt own sync wearables
+mkt own list
+```
+
+`own login` first verifies the signed-in identity and ownership controls on the profile. It
+reuses that session without submitting a password. If logged out, it tries the saved credentials
+once. Verification, CAPTCHA, login errors and a different signed-in account require human
+attention in Chrome. It never logs anyone out, reads email, exports cookies or publishes anything.
+The existing Chrome profile retains the login on this machine; a fresh scheduled VM may need
+verification again. Do not put personal passwords or session cookies into shared Modal secrets.
+
+`own sync` reads the account's recent profile feed (bounded scrolling, not a complete historical
+export), verifies each returned author, and deduplicates post IDs. A missing feed is an error, not
+zero posts. Posts older than registration provide a historical baseline only; they cannot be
+matched to new scripts or added to the campaign cohort. Later posts are matched only to scripts
+that existed when they were posted, in the same niche/product. Unmatched posts earn no concept
+reward. Caption similarity is heuristic, not proof of attribution.
+
+`mkt daily` syncs own posts before selecting the next concept. No new post means no new reward.
+Historical lifetime-view baselines are not age-matched 72-hour controls; early lift is provisional.
+Hashtag discovery remains an explicit fallback:
+`mkt own add @youraccount --tag yourtag`, then `mkt own sync wearables --source hashtag`.
+Without profile access, that fallback can miss posts without those hashtags.
+
 - Watch time and completion are not public for other people's videos. The scoreboard uses views,
   shares and saves normalised by age and follower count. For your own posts, TikTok Studio has them.
 - TikTok's posting API cannot attach a library sound, so the editor bakes audio in (`--sound file.mp3`).
