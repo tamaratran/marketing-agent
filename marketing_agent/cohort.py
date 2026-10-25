@@ -28,6 +28,8 @@ MIGRATIONS = [
          author TEXT, taken_at INTEGER, followers INTEGER, n_posts INTEGER,
          median_views REAL, median_log_views REAL, video_count INTEGER, heart_count INTEGER,
          PRIMARY KEY (author, taken_at))""",
+    "ALTER TABLE creator_snapshots ADD COLUMN video_count INTEGER",
+    "ALTER TABLE creator_snapshots ADD COLUMN heart_count INTEGER",
     """CREATE TABLE IF NOT EXISTS features (
          video_id TEXT PRIMARY KEY, built_at INTEGER, niche TEXT, payload TEXT)""",
 ]
