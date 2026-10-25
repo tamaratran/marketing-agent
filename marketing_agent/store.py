@@ -92,6 +92,15 @@ CREATE TABLE IF NOT EXISTS posts (
   posted_at INTEGER,
   url TEXT
 );
+CREATE TABLE IF NOT EXISTS runs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  created_at INTEGER,
+  session_id TEXT,
+  url TEXT,
+  niche TEXT,
+  product TEXT,
+  note TEXT
+);
 CREATE TABLE IF NOT EXISTS payouts (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   creator TEXT,

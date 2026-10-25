@@ -15,7 +15,8 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "ruff>=0.5"]
+dev = ["pytest>=8", "ruff>=0.5", "fastapi>=0.110", "uvicorn>=0.29"]
+api = ["fastapi>=0.110", "uvicorn[standard]>=0.29"]
 
 [project.scripts]
 mkt = "marketing_agent.cli:cli"
