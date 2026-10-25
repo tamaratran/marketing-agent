@@ -26,7 +26,8 @@ MIGRATIONS = [
     "ALTER TABLE videos ADD COLUMN sound_id TEXT",
     """CREATE TABLE IF NOT EXISTS creator_snapshots (
          author TEXT, taken_at INTEGER, followers INTEGER, n_posts INTEGER,
-         median_views REAL, median_log_views REAL, PRIMARY KEY (author, taken_at))""",
+         median_views REAL, median_log_views REAL, video_count INTEGER, heart_count INTEGER,
+         PRIMARY KEY (author, taken_at))""",
     """CREATE TABLE IF NOT EXISTS features (
          video_id TEXT PRIMARY KEY, built_at INTEGER, niche TEXT, payload TEXT)""",
 ]
@@ -34,10 +35,11 @@ MIGRATIONS = [
 
 def migrate(store: Store) -> None:
     with store.conn() as c:
-        cols = {r[1] for r in c.execute("PRAGMA table_info(videos)")}
         for sql in MIGRATIONS:
-            if sql.startswith("ALTER") and sql.split()[-2] in cols:
-                continue
+            if sql.startswith("ALTER"):
+                table, col = sql.split()[2], sql.split()[-2]
+                if col in {r[1] for r in c.execute(f"PRAGMA table_info({table})")}:
+                    continue
             c.execute(sql)
 
 
@@ -83,9 +85,12 @@ def repoll(store: Store, max_age_days: float = REPOLL_DAYS, niche: str | None = 
     return {"polled": ok, "failed": failed}
 
 
-def snapshot_creator(store: Store, author: str, posts: list[dict] | None = None) -> dict:
-    """Baseline for an account: median views of its other posts we know about (profile scrape when
-    given, otherwise whatever the db has)."""
+def snapshot_creator(
+    store: Store, author: str, posts: list[dict] | None = None, stats: dict | None = None
+) -> dict:
+    """Baseline for an account: median views of its other posts we know about, plus the public
+    profile totals (followers, video count, total likes) when given."""
+    stats = stats or {}
     if posts is None:
         posts = store.rows(
             """SELECT v.id, v.followers, o.views FROM videos v JOIN observations o ON o.video_id=v.id
@@ -97,8 +102,11 @@ def snapshot_creator(store: Store, author: str, posts: list[dict] | None = None)
     snap = {
         "author": author,
         "taken_at": int(time.time()),
-        "followers": max((p.get("followers") or 0) for p in posts) if posts else None,
+        "followers": stats.get("followers")
+        or (max((p.get("followers") or 0) for p in posts) if posts else None),
         "n_posts": len(views),
+        "video_count": stats.get("video_count"),
+        "heart_count": stats.get("heart_count"),
         "median_views": statistics.median(views) if views else None,
         "median_log_views": statistics.median(math.log10(v) for v in views) if views else None,
     }

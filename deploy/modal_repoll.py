@@ -4,7 +4,7 @@ happens on the API's own db, so there is no race with the daily session's sync.
 
 Deploy once:   modal deploy deploy/modal_repoll.py
 Try it:        modal run deploy/modal_repoll.py
-Secrets:       the `mkt-devin` Modal secret needs MKT_API_TOKEN (and optionally MKT_API_URL).
+Secrets:       modal secret create mkt-api MKT_API_TOKEN=...   (and optionally MKT_API_URL).
 """
 
 import os
@@ -18,7 +18,7 @@ SCHEDULE = modal.Cron("23 */2 * * *")
 
 
 @app.function(
-    image=image, schedule=SCHEDULE, secrets=[modal.Secret.from_name("mkt-devin")], timeout=1500
+    image=image, schedule=SCHEDULE, secrets=[modal.Secret.from_name("mkt-api")], timeout=1500
 )
 def repoll() -> dict:
     import httpx

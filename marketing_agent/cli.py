@@ -117,7 +117,7 @@ def cohort(niche, tags, scrolls, max_classify):
     """Enroll fresh videos (<6h old) from the niche's hashtags as a cohort, snapshot their
     creators, download and tag all of them, and build the feature rows. Repoll keeps the curves."""
     from .cohort import build_features, enroll, snapshot_creator
-    from .research.tiktok_browser import scrape_hashtag_sync, scrape_profile_sync
+    from .research.tiktok_browser import profile_stats, scrape_hashtag_sync
 
     store = _store()
     store.set_niche_tags(niche, list(tags))
@@ -131,12 +131,15 @@ def cohort(niche, tags, scrolls, max_classify):
         console.print(f"#{tag}: {len(rows)} seen, {len(got)} fresh enough for the cohort")
     for author in sorted({r["author"] for r in fresh if r.get("author")}):
         try:
-            posts = scrape_profile_sync(author, settings.cdp_url)
+            stats = profile_stats(author)
         except Exception as e:  # noqa: BLE001 - a missing baseline must not stop the run
             console.print(f"[yellow]profile @{author}: {e!r}")
-            posts = None
-        snap = snapshot_creator(store, author, posts)
-        console.print(f"@{author}: {snap['n_posts']} posts, median {snap['median_views']} views")
+            stats = None
+        snap = snapshot_creator(store, author, stats=stats)
+        console.print(
+            f"@{author}: {snap['followers']} followers, {snap['video_count']} posts, "
+            f"{snap['n_posts']} in db (median {snap['median_views']} views)"
+        )
     ctx = click.get_current_context()
     cohort_ids = {r["id"] for r in fresh}
     from .research.tiktok_browser import fetch_video_sync

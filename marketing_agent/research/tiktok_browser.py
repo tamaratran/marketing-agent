@@ -150,3 +150,36 @@ def poll_public_stats(url: str) -> dict | None:
     row = _row(item, source_tag="poll")
     row["observed_at"] = int(time.time())
     return row
+
+
+def profile_stats(author: str) -> dict | None:
+    """Public account totals from the profile page (plain HTTP): followers, video count, total
+    likes. TikTok returns an empty body for the posts API outside a signed session, so this is
+    the baseline we can get for any creator without logging in."""
+    import httpx
+
+    r = httpx.get(
+        f"https://www.tiktok.com/@{author}",
+        headers={
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/130 Safari/537.36"
+        },
+        follow_redirects=True,
+        timeout=30,
+    )
+    m = re.search(
+        r'<script id="__UNIVERSAL_DATA_FOR_REHYDRATION__" type="application/json">(.*?)</script>',
+        r.text,
+    )
+    if not m:
+        return None
+    try:
+        info = json.loads(m.group(1))["__DEFAULT_SCOPE__"]["webapp.user-detail"]["userInfo"]
+    except KeyError:
+        return None
+    st = info.get("stats") or info.get("statsV2") or {}
+    return {
+        "followers": int(st.get("followerCount") or 0),
+        "video_count": int(st.get("videoCount") or 0),
+        "heart_count": int(st.get("heartCount") or 0),
+        "verified": bool(info.get("user", {}).get("verified")),
+    }
