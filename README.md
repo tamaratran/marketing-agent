@@ -99,3 +99,9 @@ mkt devin status <session_id>
 State is kept out of `main`: the sqlite db and `reports/` live on the `state` branch, which each
 session checks out as a worktree (`MKT_DB` points the CLI at it). Schedule the kickoff with cron or a
 Devin Automation and the loop runs itself; humans still do the posting.
+
+The hosted cron is a Modal function (`deploy/modal_cron.py`, app `mkt-daily-kickoff`, workspace
+twerk) that calls `mkt devin kickoff` at 14:17 UTC daily; niche, tags and product come from the
+`mkt-devin` Modal secret (`MKT_NICHE`, `MKT_TAGS`, `MKT_PRODUCT`, `MKT_RENDERS`) next to
+`DEVIN_API_KEY` and `DEVIN_ORG_ID`. `modal run deploy/modal_cron.py --dry-run` prints the prompt
+without starting a session; `modal deploy deploy/modal_cron.py` ships a change.
