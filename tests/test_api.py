@@ -173,3 +173,35 @@ def test_site_reads_are_niche_scoped_and_honest(client):
         "hook"
     ] == "before vs after"
     assert store.niche_tags("wearables") == ["smartring"]
+
+
+def test_video_and_creator_detail(client):
+    from marketing_agent import api
+
+    store = api._store()
+    now = int(__import__("time").time())
+    store.upsert_video(
+        {
+            "id": "v1",
+            "url": "https://www.tiktok.com/@bob/video/v1",
+            "author": "bob",
+            "followers": 10,
+            "create_time": now - 3600,
+            "duration": 9,
+            "desc": "d #x",
+            "music": "m",
+            "hashtags": ["x"],
+            "source_tag": "smartring",
+            "views": 5,
+            "likes": 0,
+            "comments": 0,
+            "shares": 0,
+            "saves": 0,
+        }
+    )
+    d = client.get("/videos/v1").json()
+    assert d["video"]["author"] == "bob" and len(d["observations"]) == 1 and d["tags"] is None
+    c = client.get("/creators/bob").json()
+    assert c["videos"][0]["id"] == "v1"
+    assert client.get("/videos/nope").status_code == 404
+    assert client.post("/repoll").status_code in (401, 503)

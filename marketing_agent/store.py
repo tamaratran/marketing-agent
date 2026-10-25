@@ -124,6 +124,7 @@ class Store:
         self.path = path
         with self.conn() as c:
             c.executescript(SCHEMA)
+            self.migrate()
 
     @contextmanager
     def conn(self):
@@ -134,6 +135,11 @@ class Store:
             c.commit()
         finally:
             c.close()
+
+    def migrate(self) -> None:
+        from .cohort import migrate
+
+        migrate(self)
 
     def upsert_video(self, v: dict, observed_at: int | None = None) -> None:
         now = observed_at or int(time.time())
