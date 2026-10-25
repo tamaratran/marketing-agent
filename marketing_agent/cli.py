@@ -223,28 +223,56 @@ def poll(urls):
 
 @cli.command()
 @click.option("--tag", default=None)
-def scoreboard(tag):
-    """Views over time plus classifier tags, so hooks/concepts can be ranked."""
+@click.option("--top", default=25)
+def scoreboard(tag, top):
+    """Reward per video (log views vs the account's baseline), hooks and concepts ranked by it,
+    and accounts stuck under 1k views."""
+    from .scoreboard import build, growth
+
     store = _store()
-    rows = store.latest(tag, limit=200)
-    tags = store.tags_for([r["id"] for r in rows])
-    t = Table("views", "likes", "shares", "obs", "hook", "style", "concept", "url")
-    for r in sorted(rows, key=lambda r: -(r["views"] or 0))[:40]:
-        n_obs = store.rows("SELECT COUNT(*) c FROM observations WHERE video_id=?", (r["id"],))[0][
-            "c"
-        ]
-        tg = tags.get(r["id"], {}).get("tags", {})
+    sb = build(store, tag)
+    console.print(
+        f"{len(sb['videos'])} videos, {sb['n_scored']} old enough to score, {sb['n_tagged']} tagged"
+    )
+    t = Table("reward", "views", "vph now", "eng/1k", "hook", "concept", "author", "url")
+    for r in sb["videos"][:top]:
+        g = growth(store, r["id"])
         t.add_row(
+            "" if r["reward"] is None else f"{r['reward']:+.2f}",
             str(r["views"]),
-            str(r["likes"]),
-            str(r["shares"]),
-            str(n_obs),
-            tg.get("hook_type", ""),
-            tg.get("visual_style", ""),
-            tg.get("concept", "")[:50],
+            "" if not g else str(g["vph_recent"]),
+            str(r["engagement_per_1k"]),
+            r.get("hook_type") or "",
+            (r.get("concept") or "")[:40],
+            r["author"],
             r["url"],
         )
     console.print(t)
+    for name, key in (("hooks", "hook_type"), ("concepts", "concept"), ("styles", "visual_style")):
+        if sb[name]:
+            t = Table(key, "n", "mean reward", "stderr", "win rate", title=name)
+            for row in sb[name]:
+                t.add_row(
+                    row[key][:50],
+                    str(row["n"]),
+                    f"{row['mean_reward']:+.2f}",
+                    f"{row['stderr']:.2f}",
+                    f"{row['win_rate']:.0%}",
+                )
+            console.print(t)
+    if sb["stuck_accounts"]:
+        t = Table(
+            "author", "followers", "posts", "max views", "median views", title="possibly throttled"
+        )
+        for f in sb["stuck_accounts"]:
+            t.add_row(
+                f["author"],
+                str(f["followers"]),
+                str(f["posts_checked"]),
+                str(f["max_views"]),
+                str(f["median_views"]),
+            )
+        console.print(t)
 
 
 @cli.command()

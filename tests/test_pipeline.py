@@ -94,3 +94,25 @@ def test_stub_render_and_edit(tmp_path: Path):
     assert [c.text for c in caps[1:]] == ["hook", "show app"]
     final = assemble([raw], tmp_path / "final.mp4", captions=caps)
     assert final.exists() and 2.5 < probe_duration(final) < 3.5
+
+
+def test_scoreboard_rewards_and_flags():
+    from marketing_agent.scoreboard import _winsor, rank_by, rewards, shadowban_flags
+
+    now = 2_000_000_000
+    old = now - 3 * 86400
+    rows = [
+        {"id": "a1", "author": "a", "views": 500, "create_time": old, "hook_type": "pov"},
+        {"id": "a2", "author": "a", "views": 700, "create_time": old, "hook_type": "pov"},
+        {"id": "a3", "author": "a", "views": 300, "create_time": old, "hook_type": "question"},
+        {"id": "b1", "author": "b", "views": 1_000_000, "create_time": old, "hook_type": "pov"},
+        {"id": "c1", "author": "c", "views": 50_000, "create_time": now - 3600, "hook_type": "pov"},
+    ]
+    scored = {r["id"]: r for r in rewards(rows, now=now)}
+    assert scored["c1"]["reward"] is None  # too young to judge
+    assert scored["a2"]["reward"] > 0 > scored["a3"]["reward"]  # relative to a's own median
+    assert _winsor([1.0] * 19 + [100.0]) == 1.0  # the outlier is capped at the 95th pct
+    hooks = rank_by(list(scored.values()), "hook_type", min_n=1)
+    assert hooks[0]["hook_type"] == "pov"
+    flags = shadowban_flags(list(scored.values()), now=now)
+    assert [f["author"] for f in flags] == ["a"] and flags[0]["max_views"] == 700
