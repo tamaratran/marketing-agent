@@ -179,7 +179,7 @@ def render(script_ids, provider, duration, sound, ref):
             GenRequest(prompt=s["video_prompt"], duration_s=duration, reference_images=list(ref)),
             raw,
         )
-        caps = captions_from_script(s["hook"], s["body"], probe_duration(raw))
+        caps = captions_from_script(s["hook"], s.get("captions") or [], probe_duration(raw))
         assemble([raw], final, captions=caps, sound=Path(sound) if sound else None)
         store.insert(
             "renders",
