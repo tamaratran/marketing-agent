@@ -454,8 +454,11 @@ def run(ctx, niche, tags, product, top):
 @click.option("--renders", default=1, help="Render the N best scripts written this run (0 = skip)")
 @click.option("--resolution", default="480p")
 @click.option("--report", type=click.Path(), default=None, help="Markdown report path")
+@click.option(
+    "--dashboard", "dashboard_out", type=click.Path(), default=None, help="index.html path"
+)
 @click.pass_context
-def daily(ctx, niche, tags, product, top, renders, resolution, report):
+def daily(ctx, niche, tags, product, top, renders, resolution, report, dashboard_out):
     """The whole loop in order with a report at the end: run (scrape, classify, concepts, pick,
     scripts), render, poll creator posts, payouts, scoreboard, policy. A failed stage is recorded
     and the rest still runs."""
@@ -529,6 +532,20 @@ def daily(ctx, niche, tags, product, top, renders, resolution, report):
     console.print(f"report: {report}" + (f"  failed: {rep.failed}" if rep.failed else "  all ok"))
     if rep.failed:
         ctx.exit(1)
+
+
+@cli.command()
+@click.argument("niche")
+@click.option(
+    "--out", type=click.Path(), default=None, help="index.html path (default data/site/index.html)"
+)
+@click.option("--no-assets", is_flag=True, help="Do not copy clips next to the page")
+def dashboard(niche, out, no_assets):
+    """Static HTML dashboard from the db: what works, concepts, clips, scripts, creators, payouts."""
+    from .dashboard import render as render_dashboard
+
+    out = Path(out) if out else settings.data_dir / "site" / "index.html"
+    console.print(f"dashboard: {render_dashboard(_store(), niche, out, copy_assets=not no_assets)}")
 
 
 @cli.group()
