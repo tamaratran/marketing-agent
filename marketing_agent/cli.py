@@ -186,6 +186,15 @@ def analyze(niche):
 
 
 @cli.command()
+@click.option("--out", default="site/frames", help="Directory for <video_id>.jpg posters")
+def frames(out):
+    """Poster frame for every downloaded video and rendered clip (served next to the dashboard)."""
+    from .cohort import poster_frames
+
+    console.print(f"frames: {poster_frames(_store(), out)} new in {out}")
+
+
+@cli.command()
 @click.option("--max-age-days", default=8.0)
 @click.option("--niche", default=None)
 def repoll(max_age_days, niche):
@@ -581,6 +590,11 @@ def daily(ctx, niche, tags, product, top, renders, resolution, report, dashboard
         lambda: ctx.invoke(cohort, niche=niche, tags=tags, scrolls=6, max_classify=100),
     )
     stage("analyze", lambda: ctx.invoke(analyze, niche=()))
+    if dashboard_out:
+        stage(
+            "frames",
+            lambda: ctx.invoke(frames, out=str(Path(dashboard_out).parent / "frames")),
+        )
     store = _store()
     todays = [
         r["id"]

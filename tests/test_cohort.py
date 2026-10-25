@@ -65,3 +65,33 @@ def test_cohort_enroll_snapshot_and_features(tmp_path):
     assert f["creator_baseline_log"] is not None and f["tagged"] is False
     assert set(f"views_{a}h" for a in AGES_H) <= set(f)
     assert json.loads(store.rows("SELECT payload FROM features")[0]["payload"])["video_id"] == "1"
+
+
+def test_poster_frames_skips_missing_and_existing(tmp_path):
+    import subprocess
+
+    from marketing_agent.cohort import poster_frames
+
+    store = Store(tmp_path / "t.sqlite")
+    clip = tmp_path / "v.mp4"
+    subprocess.run(
+        [
+            "ffmpeg",
+            "-loglevel",
+            "error",
+            "-y",
+            "-f",
+            "lavfi",
+            "-i",
+            "color=c=red:s=64x112:d=2",
+            str(clip),
+        ],
+        check=True,
+    )
+    store.upsert_video(_video(1, "ann", 1, 10))
+    store.set_local_path("1", str(clip))
+    store.upsert_video(_video(2, "ann", 1, 10))
+    store.set_local_path("2", str(tmp_path / "missing.mp4"))
+    out = tmp_path / "frames"
+    assert poster_frames(store, out) == 1 and (out / "1.jpg").exists()
+    assert poster_frames(store, out) == 0

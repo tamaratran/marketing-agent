@@ -1,4 +1,4 @@
-import { CLIPS, dateOf, get, usd, type Render } from "@/lib/api";
+import { CLIPS, dateOf, get, usd, type Render, frameUrl } from "@/lib/api";
 import { Card, H1 } from "../ui";
 
 export const dynamic = "force-dynamic";
@@ -13,7 +13,7 @@ export default async function Page() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {rows.map((r) => (
           <Card key={r.id}>
-            <video controls preload="metadata" className="aspect-[9/16] w-full rounded bg-black" src={`${CLIPS}/s${r.script_id}.mp4`} />
+            <video poster={frameUrl(`s${r.script_id}`)} controls preload="metadata" className="aspect-[9/16] w-full rounded bg-black" src={`${CLIPS}/s${r.script_id}.mp4`} />
             <p className="mt-2 text-sm font-medium">{r.hook}</p>
             <p className="text-xs text-neutral-500">script #{r.script_id} · {dateOf(r.created_at)} · {usd(r.cost_usd)} · {r.model.split("/").slice(0, 2).join("/")}</p>
           </Card>
