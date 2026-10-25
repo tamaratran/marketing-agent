@@ -3,6 +3,8 @@ A TikTok-library sound cannot be attached via API, so audio is baked in here."""
 
 import shlex
 import subprocess
+import tempfile
+import textwrap
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -16,16 +18,18 @@ class Caption:
     end: float
 
 
-def _esc(s: str) -> str:
-    return s.replace("\\", "\\\\").replace(":", "\\:").replace("'", "\\\\\\'").replace("%", "\\%")
-
-
-def drawtext_filters(captions: list[Caption], fontsize: int = 64) -> str:
+def drawtext_filters(
+    captions: list[Caption], workdir: Path, fontsize: int = 64, wrap: int = 24
+) -> str:
+    """One drawtext per caption. Text goes through a file so quotes/colons need no escaping and
+    long hooks wrap onto several centred lines instead of running off the 1080 px frame."""
     parts = []
-    for c in captions:
+    for i, c in enumerate(captions):
+        tf = workdir / f"cap{i}.txt"
+        tf.write_text("\n".join(textwrap.wrap(c.text, wrap)) or " ")
         parts.append(
-            f"drawtext=fontfile={FONT}:text='{_esc(c.text)}':fontsize={fontsize}:fontcolor=white:"
-            f"borderw=4:bordercolor=black:x=(w-text_w)/2:y=h*0.72:"
+            f"drawtext=fontfile={FONT}:textfile={tf}:fontsize={fontsize}:fontcolor=white:"
+            f"borderw=4:bordercolor=black:line_spacing=10:x=(w-text_w)/2:y=h*0.68:"
             f"enable='between(t,{c.start},{c.end})'"
         )
     return ",".join(parts)
@@ -56,8 +60,9 @@ def assemble(
     concat = "".join(f"[v{i}][a{i}]" for i in range(n)) + f"concat=n={n}:v=1:a=1[vc][ac];"
     fc = vchain + achain + concat
     vlabel = "[vc]"
+    workdir = Path(tempfile.mkdtemp(prefix="mkt-captions-"))
     if captions:
-        fc += f"{vlabel}{drawtext_filters(captions)}[vcap];"
+        fc += f"{vlabel}{drawtext_filters(captions, workdir)}[vcap];"
         vlabel = "[vcap]"
     alabel = "[ac]"
     if sound:
