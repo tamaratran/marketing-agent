@@ -5,7 +5,7 @@ import "./globals.css";
 export const metadata: Metadata = { title: "mkt", description: "organic marketing loop" };
 
 const nav = [
-  ["/", "Overview"], ["/findings", "Findings"], ["/concepts", "Concepts"], ["/scripts", "Scripts"], ["/clips", "Clips"],
+  ["/", "Overview"], ["/findings", "Findings"], ["/ours", "Our posts"], ["/concepts", "Concepts"], ["/scripts", "Scripts"], ["/clips", "Clips"],
   ["/runs", "Runs"],
 ];
 

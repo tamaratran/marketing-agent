@@ -15,6 +15,8 @@ from .analysis import analyze, latest_findings, save_findings
 from .cohort import build_features, features, latest_snapshot, repoll
 from .config import settings
 from .creators.ops import add_creator, create_brief, creator_report, payouts, record_post
+from .own import accounts as own_accounts
+from .own import own_posts, own_rewards
 from .policy import concept_scores, winning_traits
 from .scoreboard import build
 from .store import Store
@@ -374,3 +376,15 @@ def analyze_now(niche: str | None = None):
     res = analyze(store, [niche] if niche else None)
     save_findings(store, res)
     return res["status"]
+
+
+@app.get("/ours")
+def ours():
+    """Our own posts with script, concept, baseline and lift, plus the per-concept reward the
+    picker is currently using and the accounts we watch."""
+    store = _store()
+    return {
+        "accounts": own_accounts(store),
+        "posts": own_posts(store),
+        "rewards": own_rewards(store),
+    }

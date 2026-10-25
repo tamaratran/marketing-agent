@@ -119,52 +119,48 @@ def test_scoreboard_rewards_and_flags():
 
 
 def test_policy_prefers_observed_winner(tmp_path):
+    """Our own posts are the reward: a concept whose posts beat the account baseline wins the
+    pick over a concept with a loud radar prior whose posts flopped."""
+    import json
     import random
+    import time
 
+    from marketing_agent.cohort import snapshot_creator
     from marketing_agent.policy import pick_concept
     from marketing_agent.store import Store
+    from tests.test_cohort import _video
 
     store = Store(tmp_path / "p.sqlite")
+    now = int(time.time())
+    cids = {}
     for name, early in (("Loud", 900), ("Quiet", 5)):
-        store.insert(
+        cids[name] = store.insert(
             "concepts",
-            {
-                "niche": "x",
-                "created_at": 1,
-                "name": name,
-                "description": "",
-                "video_ids": "[]",
-                "early_score": early,
-                "payload": "{}",
-            },
+            {"niche": "x", "created_at": 1, "name": name, "description": "", "early_score": early},
         )
-    old = 1_700_000_000
+    for i in range(3):  # baseline posts, 1000 views each
+        store.upsert_video(_video(f"b{i}", "us", 500, 1000))
     for i, (concept, views) in enumerate(
         [("Quiet", 5000), ("Quiet", 8000), ("Loud", 100), ("Loud", 120)]
     ):
-        store.upsert_video(
+        sid = store.insert(
+            "scripts",
             {
-                "id": f"v{i}",
-                "url": "",
-                "author": f"a{i}",
-                "followers": 10,
-                "create_time": old,
-                "duration": 10,
-                "desc": "",
-                "music": "",
-                "hashtags": [],
-                "source_tag": "x",
-                "views": views,
-                "likes": 0,
-                "comments": 0,
-                "shares": 0,
-                "saves": 0,
+                "concept_id": cids[concept],
+                "product": "p",
+                "created_at": now,
+                "hook": concept,
+                "body": "",
+                "demo_score": 5,
+                "payload": json.dumps({"captions": []}),
             },
-            observed_at=old + 10,
         )
-        store.save_tags(f"v{i}", "m", {"tags": {"concept": concept, "hook_type": "pov"}})
-    picks = [pick_concept(store, "x", random.Random(s))["name"] for s in range(50)]
-    assert picks.count("Quiet") > 35  # observed reward beats the radar prior
+        store.upsert_video(_video(f"v{i}", "us", 80, views))
+        with store.conn() as c:
+            c.execute("UPDATE videos SET ours=1, script_id=? WHERE id=?", (sid, f"v{i}"))
+    snapshot_creator(store, "us")
+    picks = [pick_concept(store, "x", random.Random(seed))["name"] for seed in range(40)]
+    assert picks.count("Quiet") > 30
 
 
 def test_creator_ops_roundtrip(tmp_path):
