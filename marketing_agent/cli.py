@@ -281,6 +281,27 @@ def scoreboard(tag, top):
 
 @cli.command()
 @click.argument("niche")
+def policy(niche):
+    """What the loop has learned: winning traits and the per-concept prior/observed/sampled scores."""
+    from .policy import concept_scores, winning_traits
+
+    store = _store()
+    console.print(winning_traits(store) or "[dim]nothing scored yet; picks follow early score")
+    t = Table("id", "concept", "early", "prior", "observed", "n")
+    for c in concept_scores(store, niche):
+        t.add_row(
+            str(c["id"]),
+            c["name"][:40],
+            f"{c['early_score'] or 0:.0f}",
+            f"{c['prior']:.2f}",
+            "" if c["mean_reward"] is None else f"{c['mean_reward']:+.2f}",
+            str(c["n"]),
+        )
+    console.print(t)
+
+
+@cli.command()
+@click.argument("niche")
 @click.argument("tags", nargs=-1, required=True)
 @click.option("--product", default=None, help="If set, also write scripts for the top concept")
 @click.option("--top", default=8)
