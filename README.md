@@ -40,8 +40,17 @@ mkt concepts tanning                  # cluster into 3-8 reusable formats, flag 
 mkt scripts <concept_id> "Glow, ..."  # 12 scripts, keep demo_score >= 3
 mkt render <script_id> --duration 10  # Seedance clip + captions -> data/renders/s<id>.mp4
 mkt poll <url> ...                    # record stats for posted videos
-mkt scoreboard                        # views over time joined with tags
+mkt scoreboard                        # reward per video, hooks/concepts ranked, throttled accounts
 ```
+
+## Scoreboard
+
+`mkt scoreboard` turns raw views into a reward: `log10(views+1)`, winsorized at the 95th percentile,
+minus the account's own median (or the niche median for accounts with under 3 videos). +1 means 10x
+what that account normally gets. Hook types, concepts and visual styles are ranked by mean reward
+with n, standard error and win rate, so a hook that won once on a huge account does not outrank one
+that wins consistently. Videos under 24 h old are listed but not scored. Accounts whose last 3+
+posts all sit under 1k views are flagged as possibly throttled.
 
 ## Known limits
 
