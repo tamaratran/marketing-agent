@@ -12,9 +12,42 @@ from .store import Store
 EXPLORE_SD = 0.35
 
 
+def controlled_traits(store: Store, outcome: str = "lift_72h") -> str:
+    """Text from the latest controlled findings: trait levels called better or worse once account
+    size, niche, length and posting hour are held fixed. Empty while the panel is still
+    collecting (fewer than MIN_N videos per cell at 72h), so the raw tables are used instead."""
+    from .analysis import TRAITS, latest_findings
+
+    f = latest_findings(store)
+    if not f or f["status"]["reached"].get("72h", 0) < f["min_n"]:
+        return ""
+    parts = []
+    for trait in TRAITS:
+        fit = f["fits"].get(outcome, {}).get("pooled", {}).get(trait, {})
+        ref = fit.get("reference")
+        calls = [
+            f"{lvl['level']} {lvl['coef']:+.2f} vs {ref} (n={lvl['n']}"
+            + (", travels across niches" if lvl.get("travels") else "")
+            + ")"
+            for lvl in fit.get("levels", [])
+            if lvl["verdict"] in ("better", "worse")
+        ]
+        if calls:
+            parts.append(f"{trait}: " + "; ".join(calls))
+    if not parts:
+        return ""
+    return (
+        "Controlled for account size, niche, length and posting hour "
+        f"({f['status']['videos']} cohort videos):\n" + "\n".join(parts)
+    )
+
+
 def winning_traits(store: Store, tag: str | None = None, top: int = 3) -> str:
-    """Short text for the script prompt: which hooks, concepts and styles have beaten baseline,
-    with n, and which have lost. Empty when nothing has been scored yet."""
+    """Short text for the script prompt. Prefers the controlled findings; until those exist it
+    falls back to the raw scoreboard tables, labelled as such. Empty when nothing is scored."""
+    controlled = controlled_traits(store)
+    if controlled:
+        return controlled
     sb = build(store, tag)
     parts = []
     for name, key in (("hooks", "hook_type"), ("concepts", "concept"), ("styles", "visual_style")):
@@ -35,6 +68,8 @@ def winning_traits(store: Store, tag: str | None = None, top: int = 3) -> str:
             parts.append(f"{name} that beat the account baseline: " + "; ".join(win))
         if lose:
             parts.append(f"{name} that lost: " + "; ".join(lose))
+    if parts:
+        parts.insert(0, "Raw scoreboard, not yet controlled for account size or niche, small n:")
     return "\n".join(parts)
 
 
