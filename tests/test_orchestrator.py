@@ -69,3 +69,49 @@ def test_daily_report_writes_markdown_on_empty_store(tmp_path):
     assert rep.failed == ["render"]
     assert "| render | failed | 0 | RuntimeError: FAL_KEY not set |" in text
     assert "## Scoreboard" in text and "## Policy" in text
+
+
+def test_daily_report_only_counts_this_runs_scripts_and_renders(tmp_path):
+    store = Store(tmp_path / "db.sqlite")
+    rep = DailyReport("wearables", "a smart ring")
+    earlier = int(rep.started) - 60
+    old = store.insert(
+        "scripts",
+        {
+            "concept_id": 1,
+            "product": "a smart ring",
+            "created_at": earlier,
+            "hook": "old hook",
+            "body": "",
+            "demo_score": 5,
+            "payload": "{}",
+        },
+    )
+    store.insert(
+        "renders",
+        {
+            "script_id": old,
+            "created_at": earlier,
+            "model": "m",
+            "prompt": "",
+            "raw_path": "",
+            "final_path": "data/renders/old.mp4",
+            "cost_usd": 2.0,
+            "payload": "{}",
+        },
+    )
+    store.insert(
+        "scripts",
+        {
+            "concept_id": 2,
+            "product": "a smart ring",
+            "created_at": int(rep.started) + 1,
+            "hook": "new hook",
+            "body": "",
+            "demo_score": 4,
+            "payload": "{}",
+        },
+    )
+    text = rep.write(tmp_path / "today.md", store).read_text()
+    assert "new hook" in text and "1 kept" in text
+    assert "old hook" not in text and "old.mp4" not in text
