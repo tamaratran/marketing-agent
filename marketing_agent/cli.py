@@ -549,6 +549,52 @@ def dashboard(niche, out, no_assets):
 
 
 @cli.group()
+def sync():
+    """Move the SQLite between this machine and the API (MKT_API_URL, MKT_API_TOKEN)."""
+
+
+def _api():
+    import os
+
+    url = os.environ.get("MKT_API_URL", "https://mkt-api.fly.dev").rstrip("/")
+    return url, os.environ.get("MKT_API_TOKEN")
+
+
+@sync.command("pull")
+def sync_pull():
+    """Download the API's db over the local one (skips when the API has none yet)."""
+    import httpx
+
+    url, _ = _api()
+    r = httpx.get(f"{url}/db", timeout=120, follow_redirects=True)
+    if r.status_code == 404:
+        console.print("api has no db yet, keeping local")
+        return
+    r.raise_for_status()
+    settings.db_path.parent.mkdir(parents=True, exist_ok=True)
+    settings.db_path.write_bytes(r.content)
+    console.print(f"pulled {len(r.content)} bytes -> {settings.db_path}")
+
+
+@sync.command("push")
+def sync_push():
+    """Upload the local db to the API (needs MKT_API_TOKEN)."""
+    import httpx
+
+    url, token = _api()
+    if not token:
+        raise click.ClickException("MKT_API_TOKEN not set")
+    r = httpx.post(
+        f"{url}/db",
+        content=settings.db_path.read_bytes(),
+        headers={"Authorization": f"Bearer {token}", "content-type": "application/octet-stream"},
+        timeout=120,
+    )
+    r.raise_for_status()
+    console.print(f"pushed {r.json()['bytes']} bytes -> {url}")
+
+
+@cli.group()
 def devin():
     """Have Devin run the loop: start a session through the Devin API that runs `mkt daily`,
     fixes what broke, pushes the state branch and reports."""

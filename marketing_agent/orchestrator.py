@@ -115,6 +115,9 @@ checked out as a worktree:
    && git checkout --orphan {state_branch} && git rm -rfq . ; cd -)
   export MKT_DB=$PWD/../mkt-state/mkt.sqlite
 
+Before running, take the API's db if it has one (it is the source of truth between runs; the human
+dashboard writes creators, briefs and payouts there): mkt sync pull   (MKT_API_TOKEN is in your env)
+
 Run:
   mkt daily {niche} {tag_str} --product "{product}" --renders {renders} --resolution {resolution} \\
     --report ../mkt-state/reports/{day}.md --dashboard ../mkt-state/site/index.html
@@ -124,9 +127,10 @@ Then:
    smallest fix, rerun that stage (the individual mkt commands are in the README), and open one PR
    against main per fix with the failure and the fix in the description. If it failed for a missing
    key, credit or network reason, do not work around it; say so in your summary.
-2. Commit the state: cd ../mkt-state && git add -A && git commit -m "state: {day}" \\
+2. Push the finished db to the API: mkt sync push
+3. Commit the state: cd ../mkt-state && git add -A && git commit -m "state: {day}" \\
    && git push origin HEAD:{state_branch}
-3. Reply with a short summary: concept picked and why, how many scripts kept, renders made and their
+4. Reply with a short summary: concept picked and why, how many scripts kept, renders made and their
    cost, creator posts polled and payouts owed, top hooks/concepts on the scoreboard, what you fixed,
    PR links. Attach the rendered mp4s from data/renders/ and the report.
 

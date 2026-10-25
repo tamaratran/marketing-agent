@@ -6,7 +6,7 @@ import os
 import time
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
@@ -254,3 +254,27 @@ def runs_start(body: RunIn):
         },
     )
     return {"ok": True, "id": rid, "session_id": s["session_id"], "url": s["url"]}
+
+
+@app.get("/db")
+def db_export():
+    """The whole SQLite file, so a daily session can start from the API's state."""
+    path = settings.db_path
+    if not path.exists():
+        raise HTTPException(404, "no db yet")
+    return FileResponse(path, media_type="application/octet-stream", filename="mkt.sqlite")
+
+
+@app.post("/db", dependencies=[Depends(_auth)])
+async def db_import(request: Request):
+    """Replace the API's SQLite with the uploaded file (raw body). The daily session pushes its
+    finished db here, so the API is the source of truth between runs."""
+    body = await request.body()
+    if not body.startswith(b"SQLite format 3"):
+        raise HTTPException(400, "body is not a SQLite file")
+    path = settings.db_path
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".sqlite.tmp")
+    tmp.write_bytes(body)
+    tmp.replace(path)
+    return {"ok": True, "bytes": len(body)}

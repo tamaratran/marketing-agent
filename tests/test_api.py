@@ -78,3 +78,15 @@ def test_creator_brief_status_and_payout_flow(client):
     assert client.get("/payouts").json()[0]["creator"] == "amy"
     assert client.post("/payouts/123/paid", json={"amount_usd": 0.5}, headers=AUTH).json()["ok"]
     assert client.get("/payouts").json()[0]["paid_usd"] == 0.5
+
+
+def test_db_export_import_roundtrip(client):
+    from marketing_agent.config import settings
+
+    client.get("/overview")
+    exported = client.get("/db")
+    assert exported.status_code == 200 and exported.content.startswith(b"SQLite format 3")
+    assert client.post("/db", content=b"nope", headers=AUTH).status_code == 400
+    r = client.post("/db", content=exported.content, headers=AUTH)
+    assert r.json()["bytes"] == len(exported.content)
+    assert settings.db_path.read_bytes() == exported.content
