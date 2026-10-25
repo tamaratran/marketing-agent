@@ -1,5 +1,6 @@
 import { fmt, get, type Findings, type Level } from "@/lib/api";
 import { Card, H1, Pill, Stat, Table } from "../ui";
+import { RefreshButtons } from "../refresh";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +33,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ o
   return (
     <>
       <H1 sub="What videos that beat their creator's baseline have in common, with account size, niche, length and posting hour held fixed. Raw and controlled shown side by side; nothing under the minimum n is a finding.">Findings</H1>
+      <div className="mb-4"><RefreshButtons /></div>
       <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-6">
         <Stat label="cohort videos" value={st.videos} />
         <Stat label="tagged" value={st.tagged ?? 0} />

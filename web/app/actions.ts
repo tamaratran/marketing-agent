@@ -56,3 +56,17 @@ export async function startRun(form: FormData) {
   });
   revalidatePath("/runs");
 }
+
+export async function repollNow() {
+  const r = await post("/repoll");
+  revalidatePath("/findings");
+  revalidatePath("/");
+  return r;
+}
+
+export async function analyzeNow() {
+  const r = await post("/analyze");
+  revalidatePath("/findings");
+  revalidatePath("/");
+  return r;
+}
