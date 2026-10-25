@@ -2,6 +2,10 @@ export const API = (process.env.NEXT_PUBLIC_API_URL ?? "https://mkt-api.fly.dev"
 
 // Clips live next to the static dashboard (the daily run copies them there); the API only has the db.
 export const CLIPS = (process.env.NEXT_PUBLIC_CLIPS_URL ?? "https://mkt-dashboard-eta.vercel.app/renders").replace(/\/$/, "");
+// Poster frames (one jpg per downloaded video / clip) live beside the clips; `mkt frames` writes them.
+export const FRAMES = (process.env.NEXT_PUBLIC_FRAMES_URL ?? "https://mkt-dashboard-eta.vercel.app/frames").replace(/\/$/, "");
+export const frameUrl = (id: string) => `${FRAMES}/${id}.jpg`;
+export const tiktokEmbed = (id: string) => `https://www.tiktok.com/embed/v2/${id}`;
 
 export async function get<T>(path: string): Promise<T> {
   const r = await fetch(`${API}${path}`, { cache: "no-store" });

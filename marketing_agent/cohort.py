@@ -240,3 +240,47 @@ def features(store: Store, niche: str | None = None) -> list[dict]:
         sql += " WHERE niche=?"
         args = (niche,)
     return [json.loads(r["payload"]) for r in store.rows(sql, args)]
+
+
+def poster_frames(store: Store, out_dir, width: int = 360, at_s: float = 1.0) -> int:
+    """One small JPEG per downloaded video (and per rendered clip) in out_dir, named <id>.jpg, so
+    the site can show what a video looks like. Skips frames that already exist."""
+    import subprocess
+    from pathlib import Path
+
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    jobs = [
+        (r["id"], r["local_path"])
+        for r in store.rows("SELECT id, local_path FROM videos WHERE local_path IS NOT NULL")
+    ] + [
+        (f"s{r['script_id']}", r["final_path"])
+        for r in store.rows(
+            "SELECT script_id, final_path FROM renders WHERE final_path IS NOT NULL"
+        )
+    ]
+    made = 0
+    for name, src in jobs:
+        dst = out_dir / f"{name}.jpg"
+        if dst.exists() or not src or not Path(src).exists():
+            continue
+        cmd = [
+            "ffmpeg",
+            "-loglevel",
+            "error",
+            "-y",
+            "-ss",
+            str(at_s),
+            "-i",
+            src,
+            "-frames:v",
+            "1",
+            "-vf",
+            f"scale={width}:-2",
+            "-q:v",
+            "4",
+            str(dst),
+        ]
+        if subprocess.run(cmd, check=False).returncode == 0 and dst.exists():
+            made += 1
+    return made

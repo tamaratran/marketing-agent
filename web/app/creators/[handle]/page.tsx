@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { dateOf, fmt, get, type CreatorDetail } from "@/lib/api";
 import { Card, H1, Stat, Table } from "../../ui";
+import { Thumb } from "../../thumb";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +21,8 @@ export default async function Page({ params }: { params: Promise<{ handle: strin
         <Stat label="beat own baseline at 72h" value={lifts.length ? `${lifts.filter((x) => x > 0).length}/${lifts.length}` : "no 72h data"} />
       </div>
       <Card title="Videos">
-        <Table head={["posted", "video", "tag", "views", "likes", "lift 72h"]} rows={c.videos.map((v) => [
+        <Table head={["", "posted", "video", "tag", "views", "likes", "lift 72h"]} rows={c.videos.map((v) => [
+          <Thumb key={`t${v.id}`} id={v.id} href={`/videos/${v.id}`} />,
           dateOf(v.create_time),
           <Link key={v.id} href={`/videos/${v.id}`} className="text-sky-300 hover:underline">{(v.desc || v.id).slice(0, 70)}</Link>,
           v.source_tag, v.views?.toLocaleString() ?? "", v.likes?.toLocaleString() ?? "", fmt(v.lift_72h),

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { get, usd, type Findings, type Overview } from "@/lib/api";
 import { Card, H1, Stat, Table, reward } from "./ui";
+import { Thumb } from "./thumb";
 
 export const dynamic = "force-dynamic";
 
@@ -33,8 +34,9 @@ export default async function Page() {
       )}
       <Card title="Top tagged videos (reward = log views vs the account baseline, uncontrolled)" className="mt-4">
         <Table
-          head={["video", "author", "views", "reward", "hook", "style"]}
+          head={["", "video", "author", "views", "reward", "hook", "style"]}
           rows={o.top_videos.map((v) => [
+            <Thumb key={`t${v.id}`} id={v.id} href={`/videos/${v.id}`} />,
             <Link key={v.id} href={`/videos/${v.id}`} className="text-sky-300 hover:underline">{(v.desc || v.id).slice(0, 60)}</Link>,
             <Link key={`a${v.id}`} href={`/creators/${v.author}`} className="hover:underline">@{v.author}</Link>, v.views.toLocaleString(), reward(v.reward), v.hook_type, v.visual_style,
           ])}

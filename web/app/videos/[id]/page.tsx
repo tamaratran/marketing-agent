@@ -2,6 +2,8 @@ import Link from "next/link";
 import { get, fmt, type VideoDetail } from "@/lib/api";
 import { Card, H1, Pill, Stat, Table } from "../../ui";
 import { Curve } from "../../curve";
+import { Thumb } from "../../thumb";
+import { tiktokEmbed } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
 
@@ -31,10 +33,16 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
           <Stat label="lift at 72h (log10 vs creator)" value={f.lift_72h != null ? fmt(f.lift_72h as number) : f.creator_baseline_log == null ? "no baseline" : "not yet"} />
         </div>
       )}
-      <Card title="View curve (log-log; dashed line is the creator's median)">
-        <Curve obs={d.observations} createTime={v.create_time} baselineLog={f?.creator_baseline_log as number | null} />
-        <p className="mt-2 text-xs text-neutral-500">{d.observations.length} observations, oldest {d.observations[0] ? ((d.observations[0].observed_at - v.create_time) / 3600).toFixed(1) : "-"}h, latest {d.observations.at(-1) ? ((d.observations.at(-1)!.observed_at - v.create_time) / 3600).toFixed(1) : "-"}h after posting.</p>
-      </Card>
+      <div className="mb-4 grid gap-4 md:grid-cols-[minmax(0,1fr)_340px]">
+        <Card title="View curve (log-log; dashed line is the creator's median)">
+          <Curve obs={d.observations} createTime={v.create_time} baselineLog={f?.creator_baseline_log as number | null} />
+          <p className="mt-2 text-xs text-neutral-500">{d.observations.length} observations, oldest {d.observations[0] ? ((d.observations[0].observed_at - v.create_time) / 3600).toFixed(1) : "-"}h, latest {d.observations.at(-1) ? ((d.observations.at(-1)!.observed_at - v.create_time) / 3600).toFixed(1) : "-"}h after posting.</p>
+        </Card>
+        <Card title="Watch">
+          <iframe src={tiktokEmbed(v.id)} title={v.desc || v.id} className="h-[580px] w-full rounded border-0 bg-black" allow="encrypted-media; fullscreen" />
+          <details className="mt-2 text-xs text-neutral-500"><summary className="cursor-pointer">poster frame we classified</summary><div className="mt-2"><Thumb id={v.id} size={160} /></div></details>
+        </Card>
+      </div>
       <div className="mt-4 grid gap-4 md:grid-cols-2">
         <Card title={t ? `Classifier (${run?.model}, ${run?.latency_s}s)` : "Classifier"}>
           {t ? (
