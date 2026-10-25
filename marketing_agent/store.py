@@ -64,6 +64,43 @@ CREATE TABLE IF NOT EXISTS renders (
   cost_usd REAL,
   payload TEXT
 );
+CREATE TABLE IF NOT EXISTS creators (
+  handle TEXT PRIMARY KEY,
+  platform TEXT,
+  channel TEXT,
+  rate_per_1k REAL,
+  followers INTEGER,
+  added_at INTEGER,
+  notes TEXT
+);
+CREATE TABLE IF NOT EXISTS briefs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  created_at INTEGER,
+  product TEXT,
+  script_ids TEXT,
+  rate_per_1k REAL,
+  cap_usd REAL,
+  deadline_days INTEGER,
+  body TEXT,
+  status TEXT
+);
+CREATE TABLE IF NOT EXISTS posts (
+  video_id TEXT PRIMARY KEY,
+  creator TEXT,
+  brief_id INTEGER,
+  script_id INTEGER,
+  posted_at INTEGER,
+  url TEXT
+);
+CREATE TABLE IF NOT EXISTS payouts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  creator TEXT,
+  video_id TEXT,
+  views INTEGER,
+  amount_usd REAL,
+  computed_at INTEGER,
+  paid_at INTEGER
+);
 """
 
 
