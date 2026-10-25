@@ -17,3 +17,17 @@ def test_long_clip_keeps_all_lines_at_readable_pace():
 def test_clip_shorter_than_hook_only_shows_hook():
     caps = captions_from_script("hook", ["a"], 2.0)
     assert len(caps) == 1 and caps[0].end == 2.0
+
+
+def test_hook_label_is_not_burned_in():
+    caps = captions_from_script("Text on screen: before vs after", [], 5.0)
+    assert caps[0].text == "before vs after"
+    assert (
+        captions_from_script("POV: you wake up tired", [], 5.0)[0].text == "POV: you wake up tired"
+    )
+
+
+def test_video_prompt_bans_generated_text():
+    from marketing_agent.video.generate import GenRequest, video_prompt
+
+    assert "No on-screen text" in video_prompt(GenRequest(prompt="a tired selfie"))

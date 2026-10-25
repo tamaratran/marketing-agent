@@ -131,13 +131,24 @@ HOOK_S = 2.5
 MIN_LINE_S = 2.5
 
 
+LABEL_RE = re.compile(
+    r"^\s*(text on screen|on-screen text|on screen text|caption|title)\s*:\s*", re.I
+)
+
+
+def strip_label(text: str) -> str:
+    """'Text on screen: before vs after' -> 'before vs after'. The label is a stage direction from
+    the script writer, not something to burn into the video."""
+    return LABEL_RE.sub("", text).strip()
+
+
 def captions_from_script(hook: str, lines: list[str], total_s: float) -> list[Caption]:
     """Hook on screen for the first 2.5s, then the script's on-screen lines spread over the rest.
 
     Never shows a line for less than MIN_LINE_S, so short clips drop trailing lines
     instead of flashing all of them.
     """
-    caps = [Caption(hook, 0, min(HOOK_S, total_s))]
+    caps = [Caption(strip_label(hook), 0, min(HOOK_S, total_s))]
     lines = [TIMESTAMP_RE.sub("", ln.strip(" -•")) for ln in lines if ln.strip()][:6]
     max_lines = int((total_s - HOOK_S) // MIN_LINE_S)
     lines = lines[:max_lines]

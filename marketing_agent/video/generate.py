@@ -10,6 +10,18 @@ from typing import ClassVar
 
 import httpx
 
+NO_TEXT = (
+    " No on-screen text, captions, subtitles, titles, logos or watermarks anywhere in the frame;"
+    " any phone or app screen shows simple shapes and numbers only, no legible words."
+    " Captions are added afterwards."
+)
+
+
+def video_prompt(req: "GenRequest") -> str:
+    """The model prompt: the script's beats plus a standing ban on generated text, because the
+    editor burns the real captions in and generated text comes out as gibberish."""
+    return req.prompt.rstrip() + NO_TEXT
+
 
 @dataclass
 class GenRequest:
@@ -52,7 +64,7 @@ class ReplicateSeedance(VideoProvider):
     def generate(self, req: GenRequest, out: Path) -> GenResult:
         duration = max(-1, min(req.duration_s, 15))  # Replicate schema: -1 (auto) to 15 s
         inputs = {
-            "prompt": req.prompt,
+            "prompt": video_prompt(req),
             "duration": duration,
             "aspect_ratio": req.aspect_ratio,
             "resolution": req.resolution,
@@ -105,7 +117,7 @@ class FalSeedance(VideoProvider):
     def generate(self, req: GenRequest, out: Path) -> GenResult:
         duration = "auto" if req.duration_s < 0 else str(max(4, min(req.duration_s, 30)))
         args: dict = {
-            "prompt": req.prompt,
+            "prompt": video_prompt(req),
             "duration": duration,
             "aspect_ratio": req.aspect_ratio,
             "resolution": req.resolution,
