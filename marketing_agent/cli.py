@@ -162,6 +162,30 @@ def cohort(niche, tags, scrolls, max_classify):
 
 
 @cli.command()
+@click.option("--niche", multiple=True, help="Restrict to these niches (default: all in the panel)")
+def analyze(niche):
+    """Fit the controlled-effect tables (trait x outcome, pooled and per niche) on the cohort
+    feature rows and store them as the latest findings."""
+    from .analysis import analyze as run_analyze
+    from .analysis import save_findings
+
+    store = _store()
+    res = run_analyze(store, list(niche) or None)
+    save_findings(store, res)
+    st = res["status"]
+    console.print(
+        f"panel {st['videos']} videos, {st['tagged']} tagged, reached 72h: {st['reached']['72h']}"
+    )
+    for trait, fit in res["fits"]["lift_72h"]["pooled"].items():
+        for lvl in fit.get("levels", []):
+            if not lvl["reference"]:
+                console.print(
+                    f"{trait:>24} {lvl['level']:>18} {lvl['coef']:+.2f} "
+                    f"[{lvl['lo']:+.2f},{lvl['hi']:+.2f}] n={lvl['n']} {lvl['verdict']}"
+                )
+
+
+@cli.command()
 @click.option("--max-age-days", default=8.0)
 @click.option("--niche", default=None)
 def repoll(max_age_days, niche):
@@ -556,6 +580,7 @@ def daily(ctx, niche, tags, product, top, renders, resolution, report, dashboard
         "cohort",
         lambda: ctx.invoke(cohort, niche=niche, tags=tags, scrolls=6, max_classify=100),
     )
+    stage("analyze", lambda: ctx.invoke(analyze, niche=()))
     store = _store()
     todays = [
         r["id"]

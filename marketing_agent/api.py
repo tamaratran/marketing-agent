@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
+from .analysis import analyze, latest_findings, save_findings
 from .cohort import build_features, features, latest_snapshot, repoll
 from .config import settings
 from .creators.ops import add_creator, create_brief, creator_report, payouts, record_post
@@ -295,6 +296,7 @@ def repoll_cohort(max_age_days: float = 8.0, niche: str | None = None):
     store = _store()
     res = repoll(store, max_age_days, niche)
     res["features"] = build_features(store, niche)
+    save_findings(store, analyze(store))
     return res
 
 
@@ -353,3 +355,22 @@ def creator_detail(handle: str):
             "SELECT * FROM creator_snapshots WHERE author=? ORDER BY taken_at", (handle,)
         ),
     }
+
+
+@app.get("/findings")
+def findings_latest():
+    """Latest controlled-effect tables, or a `collecting` status with the 72h ETA when no video
+    in the panel has reached 72h yet."""
+    f = latest_findings(_store())
+    if not f:
+        return {"status": {"videos": 0, "reached": {"72h": 0}}, "fits": {}, "collecting": True}
+    f["collecting"] = f["status"]["reached"]["72h"] < f["min_n"]
+    return f
+
+
+@app.post("/analyze", dependencies=[Depends(_auth)])
+def analyze_now(niche: str | None = None):
+    store = _store()
+    res = analyze(store, [niche] if niche else None)
+    save_findings(store, res)
+    return res["status"]
