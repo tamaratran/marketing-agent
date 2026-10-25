@@ -72,7 +72,11 @@ def render(store: Store, niche: str, out: Path, copy_assets: bool = True) -> Pat
            WHERE r.final_path IS NOT NULL ORDER BY r.created_at DESC LIMIT 12"""
     )
     clips = []
+    seen = set()
     for r in renders:
+        if r["final_path"] in seen:
+            continue
+        seen.add(r["final_path"])
         src = Path(r["final_path"])
         rel = None
         if copy_assets and src.exists():
