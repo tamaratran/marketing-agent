@@ -185,6 +185,46 @@ def analyze(niche):
                 )
 
 
+@cli.group()
+def own():
+    """Our own posting accounts: the posts humans make from them are found by hashtag, matched
+    to their script and fed back into the picker. Nothing here posts."""
+
+
+@own.command("add")
+@click.argument("handle")
+@click.option("--tag", required=True, help="Campaign hashtag every clip caption carries")
+@click.option("--product", default="")
+def own_add(handle, tag, product):
+    from .own import add_account
+
+    add_account(_store(), handle, tag, product)
+    console.print(f"@{handle.lstrip('@')} tracked via #{tag.lstrip('#')}")
+
+
+@own.command("sync")
+@click.argument("niche")
+@click.argument("tags", nargs=-1)
+def own_sync(niche, tags):
+    """Find new posts from our accounts (campaign tag + niche tags) and enrol them as ours."""
+    from .own import sync_own
+
+    store = _store()
+    niche_tags = list(tags) or store.niche_tags(niche)
+    console.print(sync_own(store, settings.cdp_url, niche, niche_tags))
+
+
+@own.command("list")
+def own_list():
+    from .own import own_posts
+
+    for p in own_posts(_store()):
+        console.print(
+            f"{p['id']} @{p['author']} {p['age_h']}h views={p['views_now']} "
+            f"script={p['script_id']} concept={p['concept']} lift_now={p['lift_now']}"
+        )
+
+
 @cli.command()
 @click.option("--out", default="site/frames", help="Directory for <video_id>.jpg posters")
 def frames(out):
@@ -589,6 +629,7 @@ def daily(ctx, niche, tags, product, top, renders, resolution, report, dashboard
         "cohort",
         lambda: ctx.invoke(cohort, niche=niche, tags=tags, scrolls=6, max_classify=100),
     )
+    stage("own", lambda: ctx.invoke(own_sync, niche=niche, tags=tags))
     stage("analyze", lambda: ctx.invoke(analyze, niche=()))
     if dashboard_out:
         stage(

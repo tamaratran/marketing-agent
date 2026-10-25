@@ -138,8 +138,10 @@ class Store:
 
     def migrate(self) -> None:
         from .cohort import migrate
+        from .own import migrate as migrate_own
 
         migrate(self)
+        migrate_own(self)
 
     def upsert_video(self, v: dict, observed_at: int | None = None) -> None:
         now = observed_at or int(time.time())

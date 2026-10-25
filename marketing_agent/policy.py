@@ -74,10 +74,11 @@ def winning_traits(store: Store, tag: str | None = None, top: int = 3) -> str:
 
 
 def concept_scores(store: Store, niche: str, tag: str | None = None) -> list[dict]:
-    """Each stored concept for the niche with a prior (log early score, scaled) and, when the
-    classifier's concept label matches, the observed mean reward and n."""
-    sb = build(store, tag)
-    observed = {r["concept"].lower(): r for r in sb["concepts"]}
+    """Each stored concept for the niche with a prior (log early score, scaled) and the observed
+    mean reward and n from our own posts of that concept (see own.own_rewards)."""
+    from .own import own_rewards
+
+    ours = own_rewards(store)
     rows = store.rows(
         "SELECT id, name, description, early_score FROM concepts WHERE niche=? ORDER BY created_at DESC",
         (niche,),
@@ -88,7 +89,7 @@ def concept_scores(store: Store, niche: str, tag: str | None = None) -> list[dic
             continue
         seen.add(c["name"])
         prior = math.log10((c["early_score"] or 0) + 1) / 3  # ~0..1 for 1..1000 early score
-        obs = observed.get(c["name"].lower())
+        obs = ours.get(c["id"])
         out.append(
             {
                 **c,
