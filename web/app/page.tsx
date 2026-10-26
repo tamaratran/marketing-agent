@@ -1,96 +1,189 @@
 import Link from "next/link";
-import { get, usd, type Findings, type Overview, type Render, type Script } from "@/lib/api";
+import { CLIPS, frameUrl, get, usd, type Concept, type Findings, type Overview, type Render, type Script } from "@/lib/api";
 import type { Ours } from "@/lib/ours";
-import { Card, H1, Note, Stat, Table, human, pt, reward } from "./ui";
+import { startRun } from "./actions";
 import { Thumb } from "./thumb";
+import { button, Pill, human, pt, reward, times } from "./ui";
 
 export const dynamic = "force-dynamic";
 
-function Step({ n, href, title, value, children }: { n: number; href: string; title: string; value: string; children: React.ReactNode }) {
+const STEPS = ["What's working", "The format", "The script", "The clip", "Post it", "How it went"];
+
+type Q = { step?: string; clip?: string };
+
+export default async function Page({ searchParams }: { searchParams: Promise<Q> }) {
+  const q = await searchParams;
+  const [o, concepts, scripts, renders, ours, fs] = await Promise.all([
+    get<Overview>("/overview"), get<Concept[]>("/concepts"), get<Script[]>("/scripts?days=60&limit=500"),
+    get<Render[]>("/renders"), get<Ours>("/ours"), get<Findings>("/findings"),
+  ]);
+  const step = Math.min(Math.max(Number(q.step) || 1, 1), STEPS.length);
+  const account = ours.accounts[0]?.handle;
+  const posted = new Map(ours.posts.filter((p) => p.script_id).map((p) => [p.script_id as number, p]));
+  const clips = renders.filter((r, i) => renders.findIndex((x) => x.script_id === r.script_id) === i);
+  const clip = clips.find((r) => String(r.script_id) === q.clip) ?? clips.find((r) => !posted.has(r.script_id)) ?? clips[0];
+  const script = scripts.find((s) => s.id === clip?.script_id) ?? scripts[0];
+  const concept = concepts.find((c) => c.name === script?.concept) ?? concepts[0];
+  const scored = o.top_videos.filter((v) => v.reward != null && v.reward > 0);
+  const top = [...scored, ...o.top_videos.filter((v) => v.reward == null)].slice(0, 3);
+  const href = (n: number, c = clip?.script_id) => `/?step=${n}${c ? `&clip=${c}` : ""}`;
+
   return (
-    <Link href={href} className="group rounded-lg border border-neutral-800 bg-neutral-900/60 p-3 hover:border-neutral-600">
-      <div className="text-[11px] text-neutral-500">{n}. {title}</div>
-      <div className="mt-1 text-lg font-semibold tabular-nums group-hover:text-white">{value}</div>
-      <div className="mt-1 text-xs leading-snug text-neutral-400">{children}</div>
-    </Link>
+    <div className="mx-auto max-w-2xl">
+      <ol className="mb-6 flex gap-1">
+        {STEPS.map((s, i) => (
+          <li key={s} className="flex-1">
+            <Link href={href(i + 1)} className="block">
+              <div className={`h-1 rounded ${i + 1 <= step ? "bg-neutral-100" : "bg-neutral-800"}`} />
+              <div className={`mt-1 hidden text-[11px] sm:block ${i + 1 === step ? "text-neutral-100" : "text-neutral-500"}`}>{s}</div>
+            </Link>
+          </li>
+        ))}
+      </ol>
+
+      <div className="text-xs text-neutral-500">Step {step} of {STEPS.length}</div>
+
+      {step === 1 && (
+        <Screen title="What's working on TikTok" lead={`We watch ${o.videos} recent ${o.niche} videos from other accounts and track their views. These beat their creator's usual views by the most.`}>
+          <div className="space-y-3">
+            {top.map((v) => (
+              <a key={v.id} href={v.url} target="_blank" className="flex gap-3 rounded-lg border border-neutral-800 p-3 hover:border-neutral-600">
+                <Thumb id={v.id} size={48} />
+                <div className="min-w-0 text-sm">
+                  <div className="truncate">{v.desc || v.id}</div>
+                  <div className="mt-1 text-xs text-neutral-400">@{v.author} · {v.views.toLocaleString()} views · {reward(v.reward, "too new to compare")}</div>
+                  <div className="mt-1 text-xs text-neutral-500">{human(v.hook_type)} hook, {human(v.visual_style)}</div>
+                </div>
+              </a>
+            ))}
+          </div>
+          <Aside>{scored[0]?.reward != null && <>&quot;{times(scored[0].reward)} usual&quot; means {times(scored[0].reward).replace("x", "")} times the views that account normally gets. </>} These are other people&apos;s videos; we only learn from them.</Aside>
+        </Screen>
+      )}
+
+      {step === 2 && concept && (
+        <Screen title={concept.name} lead="The agent groups videos like these into reusable formats. This is the format behind the clip you are about to see.">
+          <p className="text-sm leading-relaxed text-neutral-300">{concept.description}</p>
+          <div className="mt-5 text-xs text-neutral-500">Other formats it found</div>
+          <ul className="mt-2 space-y-1 text-sm text-neutral-400">
+            {concepts.filter((c) => c.id !== concept.id).slice(0, 4).map((c) => <li key={c.id}>{c.name}</li>)}
+          </ul>
+          <Aside>Formats with more early views get picked more often. Once our own posts have results, the ones that work for us get picked more.</Aside>
+        </Screen>
+      )}
+
+      {step === 3 && script && (
+        <Screen title="The script" lead={`Written for ${account ? `@${account}` : "our account"} in that format.`}>
+          <Field label={script.hook_on_screen === false ? "Opening line (spoken)" : "Opening line (on screen)"}><span className="text-lg font-medium">{script.hook}</span></Field>
+          {script.spoken && script.spoken !== script.hook && <Field label="What's said">{script.spoken}</Field>}
+          {!!script.captions?.length && <Field label="Text on screen">{script.captions.join(" / ")}</Field>}
+          <Field label="Shots"><p className="whitespace-pre-wrap text-sm text-neutral-400">{script.body}</p></Field>
+          {clips.length > 1 && <Others clips={clips} current={clip?.script_id} step={3} posted={posted} />}
+        </Screen>
+      )}
+
+      {step === 4 && (clip ? (
+        <Screen title="The clip" lead="An AI preview of the script, captions included.">
+          <video key={clip.script_id} poster={frameUrl(`s${clip.script_id}`)} controls playsInline preload="metadata" className="mx-auto aspect-[9/16] w-full max-w-xs rounded-lg bg-black" src={`${CLIPS}/s${clip.script_id}.mp4`} />
+          <div className="mt-3 flex items-center justify-center gap-3 text-sm">
+            {posted.has(clip.script_id) ? <Pill tone="good">already posted</Pill> : <Pill tone="warn">not posted yet</Pill>}
+            <a href={`${CLIPS}/s${clip.script_id}.mp4`} download className="text-sky-300 hover:underline">Download</a>
+          </div>
+          {clips.length > 1 && <Others clips={clips} current={clip.script_id} step={4} posted={posted} />}
+        </Screen>
+      ) : (
+        <Screen title="The clip" lead="No clips yet. Make some at the last step." />
+      ))}
+
+      {step === 5 && (
+        <Screen title="Post it" lead={`Nothing is posted automatically. Post it yourself${account ? ` from @${account}` : ""}.`}>
+          <ol className="space-y-3 text-sm text-neutral-300">
+            <Li n={1}>Download the clip{clip ? <> (<a href={`${CLIPS}/s${clip.script_id}.mp4`} download className="text-sky-300 hover:underline">here</a>)</> : null} and upload it in TikTok.</Li>
+            <Li n={2}>
+              Add the sound:{" "}
+              {script?.sound ? (script.sound_url ? <a href={script.sound_url} target="_blank" className="text-sky-300 hover:underline">{script.sound}</a> : <b>{script.sound}</b>) : "none was picked, so use one that is trending in this format."}
+            </Li>
+            <Li n={3}>Start the caption with the opening line{script ? <>: <b>{script.hook}</b></> : null}. That is how we match the post back to this script.</Li>
+          </ol>
+          {!account && <Aside>No posting account is registered yet, so results can&apos;t be tracked. Run <code>mkt own add @handle</code>.</Aside>}
+        </Screen>
+      )}
+
+      {step === 6 && (
+        <Screen title="How it went" lead={account ? `Posts from @${account}, compared with the account's usual views.` : "No posting account yet."}>
+          {ours.posts.length ? (
+            <ul className="space-y-2 text-sm">
+              {ours.posts.slice(0, 6).map((p) => (
+                <li key={p.id} className="flex justify-between gap-3 border-b border-neutral-800 pb-2">
+                  <a href={p.url} target="_blank" className="truncate hover:underline">{p.desc || p.id}</a>
+                  <span className="shrink-0 text-neutral-400">{(p.views_72h ?? p.views_now ?? 0).toLocaleString()} views · {reward(p.lift_72h ?? p.lift_now, "too new")}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-neutral-400">Nothing posted yet. Once you post, views show up here within a day and steer which format gets picked next.</p>
+          )}
+          <p className="mt-4 text-sm text-neutral-400">
+            {fs.collecting
+              ? `Wider patterns across the niche need more 3-day-old videos${fs.status.eta_72h ? `; the first are ready ${pt(fs.status.eta_72h)}` : ""}.`
+              : <>Patterns across the niche are ready on <Link href="/findings" className="text-sky-300 hover:underline">Findings</Link>.</>}
+          </p>
+          <div className="mt-6 rounded-lg border border-neutral-800 p-4">
+            <div className="text-sm font-medium">Make the next batch</div>
+            <p className="mt-1 text-xs text-neutral-500">Re-reads what&apos;s working and how our posts did, writes new scripts and renders new clips. About 30 to 60 minutes, roughly $6 per clip. {usd(o.spent_usd)} spent so far.</p>
+            <form action={startRun} className="mt-3"><button className={button}>Make new clips</button></form>
+          </div>
+        </Screen>
+      )}
+
+      <div className="mt-8 flex items-center justify-between">
+        {step > 1 ? <Link href={href(step - 1)} className="rounded border border-neutral-700 px-4 py-2 text-sm hover:bg-neutral-800">Back</Link> : <span />}
+        {step < STEPS.length
+          ? <Link href={href(step + 1)} className="rounded bg-neutral-100 px-5 py-2 text-sm font-medium text-neutral-900 hover:bg-white">Next: {STEPS[step]}</Link>
+          : <Link href={href(1)} className="rounded border border-neutral-700 px-4 py-2 text-sm hover:bg-neutral-800">Start over</Link>}
+      </div>
+    </div>
   );
 }
 
-export default async function Page() {
-  const [o, fs, scripts, renders, ours] = await Promise.all([
-    get<Overview>("/overview"), get<Findings>("/findings"), get<Script[]>("/scripts?days=14&limit=200"), get<Render[]>("/renders"), get<Ours>("/ours"),
-  ]);
-  const account = ours.accounts[0]?.handle;
-  const posted = new Set(ours.posts.map((p) => p.script_id).filter(Boolean));
-  const clipScripts = [...new Set(renders.map((r) => r.script_id))];
-  const ready = clipScripts.filter((id) => !posted.has(id));
-  const tags = [...new Set(o.top_videos.map((v) => v.source_tag).filter(Boolean))];
+function Screen({ title, lead, children }: { title: string; lead: string; children?: React.ReactNode }) {
   return (
-    <>
-      <H1 sub={`Niche: ${o.niche}. The agent studies what other TikTok accounts in the niche are doing, turns the formats that are working into scripts and preview clips, and learns from how our own posts do.`}>Overview</H1>
+    <section className="mt-1">
+      <h1 className="text-2xl font-semibold">{title}</h1>
+      <p className="mt-2 mb-5 text-sm text-neutral-400">{lead}</p>
+      {children}
+    </section>
+  );
+}
 
-      <Card title="How the loop works" className="mb-4">
-        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
-          <Step n={1} href="/concepts" title="Watch the niche" value={`${o.videos} videos`}>
-            Other accounts&apos; recent videos{tags.length ? ` from ${tags.slice(0, 3).map((t) => `#${t}`).join(" ")}` : ""}, with their views tracked over time. {o.tagged} watched and tagged by the classifier.
-          </Step>
-          <Step n={2} href="/concepts" title="Find formats" value={`${o.concepts} concepts`}>
-            Reusable video formats that are picking up views fastest. One is picked each day.
-          </Step>
-          <Step n={3} href="/scripts" title="Write scripts" value={`${scripts.length} scripts`}>
-            The picked format remixed for the product, last 14 days.
-          </Step>
-          <Step n={4} href="/clips" title="Render previews" value={`${clipScripts.length} clip${clipScripts.length === 1 ? "" : "s"}`}>
-            AI video previews of the best scripts, {usd(o.spent_usd)} spent so far.
-          </Step>
-          <Step n={5} href="/ours" title="Post and learn" value={`${ours.posts.length} post${ours.posts.length === 1 ? "" : "s"}`}>
-            A person posts{account ? ` from @${account}` : ""}. Each post&apos;s views feed back into which format is picked next.
-          </Step>
-        </div>
-        <Note className="mt-3">
-          Research uses other people&apos;s videos only; our results use our own account only. The two are never mixed. A Devin session runs steps 1 to 4 when you press Run cycle on Runs; posting is always done by a person.
-        </Note>
-      </Card>
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="mb-4">
+      <div className="text-xs text-neutral-500">{label}</div>
+      <div className="mt-1 text-sm text-neutral-200">{children}</div>
+    </div>
+  );
+}
 
-      <Card title="What needs you" className="mb-4">
-        <ul className="space-y-1 text-sm text-neutral-300">
-          {ready.length > 0 ? (
-            <li>
-              <Link href="/clips" className="text-sky-300 hover:underline">{ready.length} clip{ready.length > 1 ? "s" : ""} ready to post</Link>
-              {account ? ` from @${account}` : ""}. Download one, post it with the caption and sound listed, and the next sync links it back to its script.
-            </li>
-          ) : (
-            <li>No new clips waiting to be posted. The next daily run renders more.</li>
-          )}
-          {!account && <li>No posting account registered yet, so nothing of ours can be measured. Run <code>mkt own add @handle</code>.</li>}
-          {o.stuck_accounts.length > 0 && <li className="text-amber-300">Our account may be throttled: its last few posts all stayed under 1k views.</li>}
-        </ul>
-      </Card>
+function Li({ n, children }: { n: number; children: React.ReactNode }) {
+  return <li className="flex gap-3"><span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-neutral-800 text-xs">{n}</span><span className="pt-0.5">{children}</span></li>;
+}
 
-      <div className="mb-4 grid gap-3 md:grid-cols-3">
-        <Stat label="research videos scored" value={o.scored} hint="A video is scored once it is a day old: its views compared with that creator's usual." />
-        <Stat label="findings" value={fs.collecting ? "collecting" : "ready"} hint={fs.collecting ? `Need ${fs.min_n ?? 20} videos per group at 3 days old before calling anything a pattern.${fs.status.eta_72h ? ` First ones reach 3 days ${pt(fs.status.eta_72h)}.` : ""}` : "Controlled patterns are in. See Findings."} />
-        <Stat label="our posts beating our usual" value={ours.posts.length ? `${ours.posts.filter((p) => (p.lift_72h ?? p.lift_now ?? 0) > 0).length}/${ours.posts.length}` : "none yet"} hint="Only posts made after the account was registered count." />
+function Aside({ children }: { children: React.ReactNode }) {
+  return <p className="mt-5 text-xs leading-relaxed text-neutral-500">{children}</p>;
+}
+
+function Others({ clips, current, step, posted }: { clips: Render[]; current?: number; step: number; posted: Map<number, unknown> }) {
+  return (
+    <div className="mt-6">
+      <div className="text-xs text-neutral-500">Other clips</div>
+      <div className="mt-2 flex flex-wrap gap-2">
+        {clips.map((c) => (
+          <Link key={c.script_id} href={`/?step=${step}&clip=${c.script_id}`} className={`rounded border px-2 py-1 text-xs ${c.script_id === current ? "border-neutral-300 text-white" : "border-neutral-800 text-neutral-400 hover:border-neutral-600"}`}>
+            {c.hook}{posted.has(c.script_id) ? " (posted)" : ""}
+          </Link>
+        ))}
       </div>
-
-      {o.stuck_accounts.length > 0 && (
-        <Card title="Accounts that look throttled" className="mb-4">
-          <Table head={["account", "posts", "median views"]} rows={o.stuck_accounts.map((a) => [a.author, a.n ?? "", a.median_views ?? ""])} />
-        </Card>
-      )}
-      <Card title="Best-performing research videos">
-        <Note className="mb-3">
-          Other accounts&apos; videos, ranked by how far they beat that creator&apos;s usual views (&quot;10x usual&quot; means ten times what the account normally gets). Not yet adjusted for account size or niche; that is what Findings does. Hook and style come from the classifier.
-        </Note>
-        <Table
-          head={["", "video", "creator", "views", "vs creator's usual", "hook", "style"]}
-          rows={o.top_videos.map((v) => [
-            <Thumb key={`t${v.id}`} id={v.id} href={`/videos/${v.id}`} />,
-            <Link key={v.id} href={`/videos/${v.id}`} className="text-sky-300 hover:underline">{(v.desc || v.id).slice(0, 60)}</Link>,
-            <Link key={`a${v.id}`} href={`/creators/${v.author}`} className="hover:underline">@{v.author}</Link>, v.views.toLocaleString(), reward(v.reward, "too new"), human(v.hook_type), human(v.visual_style),
-          ])}
-        />
-      </Card>
-    </>
+    </div>
   );
 }

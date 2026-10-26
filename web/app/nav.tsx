@@ -1,31 +1,23 @@
 "use client";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 
-const groups: { label?: string; links: [string, string][] }[] = [
-  { links: [["/", "Overview"]] },
-  { label: "Research", links: [["/concepts", "Concepts"], ["/findings", "Findings"]] },
-  { label: "Make", links: [["/scripts", "Scripts"], ["/clips", "Clips"]] },
-  { label: "Ours", links: [["/ours", "Our posts"]] },
-  { links: [["/runs", "Runs"]] },
+const pages: [string, string][] = [
+  ["/overview", "Overview"], ["/concepts", "Formats"], ["/findings", "Findings"], ["/scripts", "Scripts"],
+  ["/clips", "Clips"], ["/ours", "Our posts"], ["/runs", "Runs"],
 ];
 
 export function Nav() {
-  const path = usePathname();
-  const active = (href: string) => (href === "/" ? path === "/" : path.startsWith(href));
+  const key = usePathname() + useSearchParams().toString();
   return (
-    <nav className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-5 gap-y-2 px-4 py-3 text-sm">
-      <Link href="/" className="mr-1 font-semibold tracking-tight">mkt</Link>
-      {groups.map((g, i) => (
-        <div key={i} className="flex items-center gap-1">
-          {g.label && <span className="mr-1 text-[11px] uppercase tracking-wide text-neutral-600">{g.label}</span>}
-          {g.links.map(([href, label]) => (
-            <Link key={href} href={href} className={`rounded px-2 py-1 ${active(href) ? "bg-neutral-800 text-white" : "text-neutral-300 hover:bg-neutral-800 hover:text-white"}`}>
-              {label}
-            </Link>
-          ))}
+    <nav className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 text-sm">
+      <Link href="/" className="font-semibold tracking-tight">mkt</Link>
+      <details key={key} className="relative">
+        <summary className="cursor-pointer list-none text-xs text-neutral-500 hover:text-neutral-300">All details</summary>
+        <div className="absolute right-0 z-10 mt-2 w-40 rounded-lg border border-neutral-800 bg-neutral-900 py-1 shadow-lg">
+          {pages.map(([href, label]) => <Link key={href} href={href} className="block px-3 py-1.5 text-neutral-300 hover:bg-neutral-800">{label}</Link>)}
         </div>
-      ))}
+      </details>
     </nav>
   );
 }
