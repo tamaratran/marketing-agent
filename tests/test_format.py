@@ -260,3 +260,15 @@ def test_motion_score_separates_moving_from_still(tmp_path):
     assert motion_score(moving) > 0.0
     assert speed_label(12.0) == "sped up"
     assert speed_label(None) == "unknown"
+
+
+def test_burned_captions_drop_emoji_the_font_cannot_draw(tmp_path):
+    from marketing_agent.video.edit import Caption, drawable, drawtext_filters
+
+    assert drawable("After 402 calories \U0001f635\U0001f4a6") == "After 402 calories"
+    assert (
+        drawable("POV: cardio \U0001f3c3\U0001f3fd\u200d\u2640\ufe0f finally got fun")
+        == "POV: cardio finally got fun"
+    )
+    drawtext_filters([Caption("burned 475 \U0001f525", 0, 2)], tmp_path)
+    assert (tmp_path / "cap0.txt").read_text() == "burned 475"
