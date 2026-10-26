@@ -208,3 +208,51 @@ def test_learnings_endpoints(client):
     assert client.get("/learnings").json() == []
     md = client.get("/learnings.md")
     assert md.status_code == 200 and md.text.startswith("# Learnings")
+
+
+def test_renders_carry_the_text_to_type_into_tiktok(tmp_path):
+    import json
+    import time
+
+    from marketing_agent import api
+    from marketing_agent.store import Store
+
+    store = Store(tmp_path / "t.sqlite")
+    store.migrate()
+    api._store = lambda: store  # noqa: SLF001
+    client = TestClient(api.app)
+    now = int(time.time())
+    cid = store.insert(
+        "concepts", {"name": "c", "niche": "fitness", "created_at": now, "payload": "{}"}
+    )
+    sid = store.insert(
+        "scripts",
+        {
+            "concept_id": cid,
+            "product": "p",
+            "created_at": now,
+            "hook": "Text on screen: POV: cardio finally got fun",
+            "body": "",
+            "demo_score": 5,
+            "payload": json.dumps({"captions": ["POV: cardio", "finally got fun", " "]}),
+        },
+    )
+    store.insert(
+        "renders",
+        {
+            "script_id": sid,
+            "created_at": now,
+            "model": "seedance",
+            "cost_usd": 1,
+            "final_path": "s1.mp4",
+            "post_path": "s1_clean.mp4",
+        },
+    )
+    old = store.insert(
+        "renders",
+        {"script_id": sid, "created_at": now - 1, "model": "seedance", "final_path": "s0.mp4"},
+    )
+    rows = client.get("/renders?niche=fitness").json()
+    assert rows[0]["post_path"] == "s1_clean.mp4"
+    assert rows[0]["post_text"] == ["POV: cardio finally got fun", "POV: cardio", "finally got fun"]
+    assert [r["id"] for r in rows][1] == old and rows[1]["post_path"] is None

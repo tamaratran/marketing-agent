@@ -120,6 +120,9 @@ class Store:
 
         migrate(self)
         migrate_own(self)
+        with self.conn() as c:
+            if "post_path" not in {r[1] for r in c.execute("PRAGMA table_info(renders)")}:
+                c.execute("ALTER TABLE renders ADD COLUMN post_path TEXT")
 
     def upsert_video(self, v: dict, observed_at: int | None = None) -> None:
         now = observed_at or int(time.time())

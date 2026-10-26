@@ -427,7 +427,9 @@ def scripts(concept_id, product, n, min_score):
 @click.option("--sound", type=click.Path(exists=True), default=None)
 @click.option("--ref", multiple=True, help="Reference image path/URL (product, creator)")
 def render(script_ids, provider, duration, resolution, sound, ref):
-    """Generate a clip per script with Seedance and cut a captioned 1080x1920 video."""
+    """Generate a clip per script with Seedance and cut two 1080x1920 videos: the captioned preview
+    (s<id>.mp4) and a clean copy with no text (s<id>_clean.mp4) that is the one to post, with the
+    hook typed into TikTok's own text tool so TikTok reads it as text, not pixels."""
     from .video.edit import assemble, captions_from_script, probe_duration
     from .video.generate import GenRequest, get_provider
 
@@ -441,6 +443,7 @@ def render(script_ids, provider, duration, resolution, sound, ref):
         s = json.loads(rows[0]["payload"])
         raw = settings.renders_dir / f"s{sid}_raw.mp4"
         final = settings.renders_dir / f"s{sid}.mp4"
+        clean = settings.renders_dir / f"s{sid}_clean.mp4"
         t0 = time.time()
         res = prov.generate(
             GenRequest(
@@ -453,6 +456,7 @@ def render(script_ids, provider, duration, resolution, sound, ref):
         )
         caps = captions_from_script(s["hook"], s.get("captions") or [], probe_duration(raw))
         assemble([raw], final, captions=caps, sound=Path(sound) if sound else None)
+        assemble([raw], clean, sound=Path(sound) if sound else None)
         store.insert(
             "renders",
             {
@@ -462,6 +466,7 @@ def render(script_ids, provider, duration, resolution, sound, ref):
                 "prompt": s["video_prompt"],
                 "raw_path": str(raw),
                 "final_path": str(final),
+                "post_path": str(clean),
                 "cost_usd": res.cost_usd,
                 "payload": json.dumps(res.raw, default=str),
             },

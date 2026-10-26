@@ -26,7 +26,7 @@ export type Overview = {
 };
 export type Concept = { id: number; name: string; description: string; early_score: number; prior: number; mean_reward: number | null; n: number; kind?: string };
 export type Script = { id: number; concept: string; product: string; created_at: number; hook: string; demo_score: number; captions: string[]; body: string; spoken?: string; hook_on_screen?: boolean; sound?: string; sound_url?: string };
-export type Render = { id: number; script_id: number; created_at: number; model: string; cost_usd: number; hook: string };
+export type Render = { id: number; script_id: number; created_at: number; model: string; cost_usd: number; hook: string; post_path: string | null; post_text: string[] };
 export type Campaign = {
   account: { handle: string; backup_hashtag: string };
   niche: { name: string; hashtags: string[] };
