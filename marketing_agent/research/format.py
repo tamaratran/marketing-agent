@@ -28,13 +28,16 @@ FORMAT_KIND = "format"
 
 
 def _mentions(row: dict, needles: list[str]) -> bool:
-    desc = (row.get("desc") or "").lower().replace(" ", "")
+    """Does the caption (text or hashtags) name the product? The scrape's source_tag is not
+    enough: a #subwaysurfers search returns plain gameplay, a #immersiveworkout search returns
+    anything the ranking felt like. A needle written `a+b` requires every part (so
+    `subwaysurfers+cardio` is the cardio format, not the game)."""
     try:
-        hashtags = [h.lower().lstrip("#") for h in json.loads(row.get("hashtags") or "[]")]
+        hashtags = json.loads(row.get("hashtags") or "[]")
     except (TypeError, ValueError):
         hashtags = []
-    src = (row.get("source_tag") or "").lower()
-    return any(n == src or n in hashtags or n in desc for n in needles)
+    text = ((row.get("desc") or "") + " " + " ".join(hashtags)).lower().replace(" ", "")
+    return any(all(part in text for part in n.split("+") if part) for n in needles)
 
 
 def source_score(views: int, followers: int) -> float:
@@ -51,8 +54,8 @@ def product_sources(
     min_views: int = 10_000,
     per_author: int = 2,
 ) -> list[dict]:
-    """The product's best-performing videos in the db, any age: tagged with, hashtagged with or
-    captioned about one of `product_tags`. Short enough to clone in a 12s clip, at most
+    """The product's best-performing videos in the db, any age: captioned or hashtagged with one
+    of `product_tags` (`a+b` means both must appear). Short enough to clone in a 12s clip, at most
     `per_author` per account so one creator does not define the format alone."""
     needles = [t.lower().lstrip("#") for t in product_tags if t.strip()]
     if not needles:

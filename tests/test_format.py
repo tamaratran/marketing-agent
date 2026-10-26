@@ -19,7 +19,16 @@ from marketing_agent.video.scripts import format_prompt, write_scripts
 
 
 def _vid(
-    id, author, views, followers, duration=14, desc="", tag="subwaysurfers", music="x", age_d=30
+    id,
+    author,
+    views,
+    followers,
+    duration=14,
+    desc="",
+    tag="subwaysurfers",
+    music="x",
+    age_d=30,
+    hashtags=None,
 ):
     return {
         "id": id,
@@ -30,7 +39,7 @@ def _vid(
         "duration": duration,
         "desc": desc,
         "music": music,
-        "hashtags": [tag],
+        "hashtags": [tag] if hashtags is None else hashtags,
         "source_tag": tag,
         "views": views,
         "likes": 1,
@@ -71,8 +80,18 @@ def test_product_sources_rank_any_age_small_accounts_first(tmp_path: Path):
     store.upsert_video(_vid("6", "long", 9_000_000, 1_000, duration=75))  # too long to clone
     store.upsert_video(_vid("7", "tiny", 900, 10))  # under min views
     store.upsert_video(_vid("8", "cap", 500_000, 5_000, tag="fyp", desc="Subway Surfers cardio"))
-    out = product_sources(store, ["subwaysurfers"], limit=5)
-    assert [r["id"] for r in out] == ["1", "2", "8", "3"]
+    store.upsert_video(_vid("9", "game", 47_000_000, 1_000, hashtags=[]))
+    store.upsert_video(_vid("10", "carnaval", 12_000_000, 8_000, desc="#subwaysurfers #carnaval"))
+    out = product_sources(store, ["subwaysurfers"], limit=6)
+    assert [r["id"] for r in out] == [
+        "1",
+        "2",
+        "10",
+        "8",
+        "3",
+    ]  # 9: the search tag alone is not a mention
+    out = product_sources(store, ["subwaysurfers+cardio"], limit=5)
+    assert [r["id"] for r in out] == ["8"]
     assert source_score(3_700_000, 1_400) > source_score(3_700_000, 2_000_000)
     assert product_sources(store, []) == []
 
