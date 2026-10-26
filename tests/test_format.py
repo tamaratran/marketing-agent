@@ -195,3 +195,68 @@ def test_spoken_hook_is_not_burned_in():
 def test_daily_prompt_passes_product_tags():
     p = daily_prompt("fitness", ["a"], "P", product_tags=["immersiveworkout", "subwaysurfers"])
     assert '--product-tag "immersiveworkout" --product-tag "subwaysurfers"' in p
+
+
+def test_speech_lines_drops_whisper_hallucinations():
+    from marketing_agent.research.format import speech_lines
+
+    segs = [
+        {"start": 0.0, "end": 3.7, "text": "♪", "no_speech_prob": 0.1, "avg_logprob": -0.5},
+        {
+            "start": 3.7,
+            "end": 9.0,
+            "text": "place water shall flow",
+            "no_speech_prob": 0.2,
+            "avg_logprob": -1.9,
+        },
+        {
+            "start": 12.5,
+            "end": 14.0,
+            "text": "Go to Beadaholique.com",
+            "no_speech_prob": 0.8,
+            "avg_logprob": -0.4,
+        },
+    ]
+    assert speech_lines(segs) == "(no speech, music only)"
+    segs.append(
+        {
+            "start": 0.0,
+            "end": 2.0,
+            "text": "I burned 475 calories",
+            "no_speech_prob": 0.05,
+            "avg_logprob": -0.3,
+        }
+    )
+    assert speech_lines(segs) == "0.0-2.0s: I burned 475 calories"
+
+
+def test_motion_score_separates_moving_from_still(tmp_path):
+    import subprocess
+
+    from marketing_agent.research.format import motion_score, speed_label
+
+    still, moving = tmp_path / "still.mp4", tmp_path / "moving.mp4"
+    for path, src in ((still, "color=c=gray:s=96x160:r=10"), (moving, "testsrc=s=96x160:r=10")):
+        subprocess.run(
+            [
+                "ffmpeg",
+                "-y",
+                "-loglevel",
+                "error",
+                "-f",
+                "lavfi",
+                "-i",
+                src,
+                "-t",
+                "2",
+                "-pix_fmt",
+                "yuv420p",
+                str(path),
+            ],
+            check=True,
+        )
+    assert motion_score(still) == 0.0
+    assert speed_label(motion_score(still)) == "real time"
+    assert motion_score(moving) > 0.0
+    assert speed_label(12.0) == "sped up"
+    assert speed_label(None) == "unknown"

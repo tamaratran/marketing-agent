@@ -13,6 +13,9 @@ follow it beat for beat and carry the sound the human should pick when posting.
 import base64
 import json
 import math
+import re
+import statistics
+import subprocess
 import tempfile
 import time
 from collections import Counter
@@ -133,20 +136,126 @@ frames sampled every {every_s}s in order, and the audio transcript. Describe the
 (what the camera shows, when, at what speed, what is said, how much text is on screen), not the
 topic. Be concrete and literal: 'sweaty person in a living room, chest up, talking to the camera'
 beats 'engaging hook'. If the videos differ, describe the one with the most views and note the
-difference in `dont` or `summary`. Playback speed matters: frames are {every_s}s apart, so if the
-person covers far more movement between frames than real time allows, or the sound is a sped-up
-remix, the footage is sped up and `pacing` must say so. Say whether the hook is spoken (check the
-transcript) or only on screen. Timings in `beats` should fit a {clip_s} second clip."""
+difference in `dont` or `summary`. Each video comes with two measured facts; trust them over your
+impression of the frames: `playback` (sped up / real time, from frame-to-frame motion) must be
+stated in `pacing`, and `speech` (timed words, or none) decides whether the hook is spoken: with no
+speech the hook is on-screen text or the picture, never spoken. Frames are every 0.5s for the first
+3s, then every {every_s}s. Count the words of on-screen text you can read in the frames. Timings in
+`beats` should fit a {clip_s} second clip."""
+
+
+# Mean absolute pixel change between consecutive frames at 10 fps on a 96x160 grey frame. Measured
+# on the Immersive Workout sources: real-time footage (talking head, person on a walking pad,
+# our Seedance clips) scores 4-7; the same kind of footage played back sped up scores 10-14.
+MOTION_REALTIME = 7.0
+MOTION_SPED_UP = 9.5
+
+
+def motion_score(video: Path) -> float | None:
+    """How fast the picture changes, as a playback-speed proxy that frames sampled seconds apart
+    cannot give. Pure ffmpeg: frame difference -> signalstats YAVG per frame, median over the clip."""
+    r = subprocess.run(
+        [
+            "ffmpeg",
+            "-loglevel",
+            "info",
+            "-i",
+            str(video),
+            "-vf",
+            "fps=10,scale=96:160,format=gray,tblend=all_mode=difference,signalstats,"
+            "metadata=print:key=lavfi.signalstats.YAVG:file=-",
+            "-f",
+            "null",
+            "-",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    vals = [float(m) for m in re.findall(r"YAVG=([0-9.]+)", r.stdout)]
+    return round(statistics.median(vals), 1) if vals else None
+
+
+def speed_label(motion: float | None) -> str:
+    if motion is None:
+        return "unknown"
+    if motion >= MOTION_SPED_UP:
+        return "sped up"
+    if motion <= MOTION_REALTIME:
+        return "real time"
+    return "borderline"
+
+
+def speech(video: Path, client: OpenAI, model: str = "whisper-1") -> str:
+    """Timed speech, or '(no speech, music only)'. Whisper invents text over music (the 3.7M source
+    came back as a beading-supplies ad), so segments it is unsure of are dropped: high
+    no_speech_prob, very low avg_logprob, or music glyphs."""
+    with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as tmp:
+        audio = Path(tmp.name)
+    try:
+        subprocess.run(
+            [
+                "ffmpeg",
+                "-y",
+                "-loglevel",
+                "error",
+                "-i",
+                str(video),
+                "-vn",
+                "-ac",
+                "1",
+                "-ar",
+                "16000",
+                str(audio),
+            ],
+            check=True,
+        )
+        with audio.open("rb") as f:
+            r = client.audio.transcriptions.create(
+                model=model, file=f, response_format="verbose_json"
+            )
+    except Exception as e:  # noqa: BLE001
+        return f"[transcription failed: {e}]"
+    finally:
+        audio.unlink(missing_ok=True)
+    return speech_lines(
+        [
+            {
+                "start": g.start,
+                "end": g.end,
+                "text": g.text,
+                "no_speech_prob": g.no_speech_prob,
+                "avg_logprob": g.avg_logprob,
+            }
+            for g in (getattr(r, "segments", None) or [])
+        ]
+    )
+
+
+def speech_lines(segments: list[dict]) -> str:
+    kept = []
+    for g in segments:
+        text = (g.get("text") or "").strip()
+        if not text or set(text) <= set("♪¶ .") or len(text) < 3:
+            continue
+        if (g.get("no_speech_prob") or 0) > 0.5 or (g.get("avg_logprob") or 0) < -1.0:
+            continue
+        kept.append(f"{g['start']:.1f}-{g['end']:.1f}s: {text}")
+    return "\n".join(kept) if kept else "(no speech, music only)"
 
 
 def _frames_b64(video: Path, every_s: float, width: int, max_frames: int) -> list[str]:
+    """Frames dense in the hook (every 0.5s for the first 3s), then every `every_s`."""
     from ..classifier.classify import sample_frames
 
     with tempfile.TemporaryDirectory() as d:
-        frames = sample_frames(video, every_s, width, Path(d))
+        fine = sample_frames(video, 0.5, width, Path(d) / "a")[:6]
+        coarse = sample_frames(video, every_s, width, Path(d) / "b")
+        coarse = [f for i, f in enumerate(coarse) if i * every_s >= 3]
+        frames = fine + coarse
         if len(frames) > max_frames:
-            step = len(frames) / max_frames
-            frames = [frames[int(i * step)] for i in range(max_frames)]
+            keep = max_frames - len(fine)
+            step = len(coarse) / max(keep, 1)
+            frames = fine + [coarse[int(i * step)] for i in range(keep)]
         return [
             "data:image/jpeg;base64," + base64.b64encode(f.read_bytes()).decode() for f in frames
         ]
@@ -157,14 +266,13 @@ def watch_sources(
     sources: list[dict],
     cdp_url: str,
     model: str = "gpt-5.4",
-    transcribe_model: str = "gpt-4o-mini-transcribe",
+    transcribe_model: str = "whisper-1",
     every_s: float = 1.5,
-    max_frames: int = 10,
+    max_frames: int = 12,
     clip_s: int = 12,
     client: OpenAI | None = None,
 ) -> FormatSheet:
     """Download what is missing, sample frames, transcribe, and ask the model for the beat sheet."""
-    from ..classifier.classify import transcribe
     from ..config import settings
     from .tiktok_browser import fetch_video_sync
 
@@ -192,10 +300,18 @@ def watch_sources(
         )
         content.append({"type": "input_text", "text": header})
         if path:
+            motion = motion_score(path)
+            s["motion"] = motion
+            s["playback"] = speed_label(motion)
+            s["speech"] = speech(path, client, transcribe_model)
+            content.append(
+                {
+                    "type": "input_text",
+                    "text": f"playback: {s['playback']} (motion {motion})\nspeech: {s['speech']}",
+                }
+            )
             for b64 in _frames_b64(path, every_s, 360, max_frames):
                 content.append({"type": "input_image", "image_url": b64, "detail": "low"})
-            text = transcribe(path, client, transcribe_model)
-            content.append({"type": "input_text", "text": f"transcript: {text or '(no speech)'}"})
     resp = client.responses.parse(
         model=model, input=[{"role": "user", "content": content}], text_format=FormatSheet
     )
@@ -226,6 +342,9 @@ def store_format(
                 "followers": s.get("followers"),
                 "duration": s.get("duration"),
                 "music": s.get("music"),
+                "playback": s.get("playback"),
+                "motion": s.get("motion"),
+                "speech": s.get("speech"),
             }
             for s in sources
         ],
