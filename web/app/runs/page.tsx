@@ -13,7 +13,7 @@ export default async function Page() {
       <div className="mb-4"><RefreshButtons /></div>
       <Card title="Start a run" className="mb-5">
         <form action={startRun} className="flex flex-wrap gap-2">
-          <input name="niche" defaultValue="wearables" className={`${input} w-28`} />
+          <input name="niche" defaultValue={process.env.MKT_NICHE || "wearables"} className={`${input} w-28`} />
           <input name="tags" defaultValue="smartring whoop ouraring" className={`${input} w-56`} title="hashtags" />
           <input name="product" required defaultValue="a smart ring that tracks sleep, stress and recovery" className={`${input} flex-1`} />
           <input name="renders" type="number" min={0} max={3} defaultValue={1} className={`${input} w-20`} title="clips to render" />
