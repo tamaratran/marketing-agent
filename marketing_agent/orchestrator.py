@@ -138,7 +138,8 @@ Then:
 3. Push the db to the API: mkt sync push
 4. Commit the state: cd ../mkt-state && git add -A && git commit -m "state: renders {day}" \
    && git push origin HEAD:{state_branch}
-Never post anything to TikTok and never message anyone; a person posts.
+Never post anything to TikTok and never message anyone; posting is a separate step a person
+approves per clip on the site.
 """
     ref_str += "".join(f' --product-tag "{t}"' for t in product_tags or [])
     return f"""Repo: {repo}. Run one cycle ({day}) of the marketing agent and report on it.

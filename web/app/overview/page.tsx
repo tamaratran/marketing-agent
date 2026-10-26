@@ -44,7 +44,7 @@ export default async function Page() {
             AI video previews of the best scripts, {usd(o.spent_usd)} spent so far.
           </Step>
           <Step n={5} href="/ours" title="Post and learn" value={`${ours.posts.length} post${ours.posts.length === 1 ? "" : "s"}`}>
-            A person posts{account ? ` from @${account}` : ""}. Each post&apos;s views feed back into which format is picked next.
+            A person approves each clip with Post and it goes out{account ? ` from @${account}` : ""}. Each post&apos;s views feed back into which format is picked next.
           </Step>
         </div>
         <Note className="mt-3">
