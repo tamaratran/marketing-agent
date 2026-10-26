@@ -199,7 +199,8 @@ def test_logic_lists_scored_videos_and_picker_constants(client):
     from marketing_agent import policy
 
     out = client.get("/logic").json()
-    assert out["explore_sd"] == policy.EXPLORE_SD and out["format_prior"] == policy.FORMAT_PRIOR
+    assert out["explore_sd"] == policy.EXPLORE_SD and out["format_edge"] == policy.FORMAT_EDGE
+    assert out["format_prior"] is None
     assert isinstance(out["videos"], list)
 
 

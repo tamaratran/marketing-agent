@@ -80,11 +80,11 @@ export default async function How() {
 
       <Section n={3} title="Formats: what to copy">
         <p className="text-sm text-neutral-300">
-          GPT groups videos under 72 hours old into {concepts.length - concepts.filter((c) => c.prior === lg.format_prior).length} reusable formats. Each gets an early traction score:
+          GPT groups videos under 72 hours old into {concepts.filter((c) => c.kind !== "format").length} reusable formats. Each gets an early traction score:
           views per hour, discounted for big accounts, boosted while the video is under 2 days old. One more format,
           the clone, is built from the product&apos;s own best TikToks.
         </p>
-        <Traction rows={concepts.filter((c) => c.prior !== lg.format_prior)} />
+        <Traction rows={concepts.filter((c) => c.kind !== "format")} />
       </Section>
 
       <Section n={4} title="Pick: which format the next scripts use">
@@ -92,11 +92,14 @@ export default async function How() {
           Each format gets a head start from its early traction (the dot). A bit of random noise is added (the line shows
           its usual range) and the highest score wins. The noise is what lets a weaker format win now and then, so the
           agent keeps testing instead of copying the leader forever.
+          {lg.format_edge != null && (
+            <> The clone starts {lg.format_edge} above the best research format: it is the safest bet, so it wins most picks, but the rest still get tested.</>
+          )}
         </p>
         <PickChart rows={ranked} />
         {leader && leader.p > 0.95 && (
           <div className="mt-3 rounded-lg border border-amber-900/60 bg-amber-950/30 p-3 text-sm text-amber-200">
-            Right now {formatName(leader.c.name)} wins {pct(leader.p)} of picks. Its fixed head start of {lg.format_prior} is far
+            Right now {formatName(leader.c.name)} wins {pct(leader.p)} of picks. Its head start of {lg.format_prior} is far
             ahead of the rest, so the other formats effectively never get tested.
           </div>
         )}
