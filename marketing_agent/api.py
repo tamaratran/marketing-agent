@@ -221,6 +221,9 @@ def renders(limit: int = 50, niche: str = DEFAULT_NICHE):
 
 CLIPS_URL = os.environ.get("MKT_CLIPS_URL", "https://mkt-dashboard-eta.vercel.app/renders")
 API_PUBLIC_URL = os.environ.get("MKT_API_URL", "https://mkt-api.fly.dev")
+# A clip handed to the poster session that has no registered post after this long can be handed
+# over again (the login failed, the session died); the poster is told never to post a clip twice.
+POST_RETRY_AFTER_S = 3600
 
 
 def _sound_url(name: str, sound_id: str) -> str:
@@ -240,16 +243,18 @@ def _post_text(hook: str, payload: dict) -> list[str]:
 
 @app.post("/renders/{script_id}/post", dependencies=[Depends(_auth)])
 def post_render(script_id: int):
-    """The Post button: start a Devin session that uploads this script's clean clip from our
-    account through TikTok's web uploader, adds the text with TikTok's text tool, picks the sound
-    and registers the post. One clip per press; a person decided this one is good enough."""
-    from .orchestrator import DEFAULT_REPO, DevinClient, post_prompt
+    """The Post button, and step 5 of a render cycle: hand this script's clean clip to the
+    account's poster session (one long-lived Devin session that stays signed in to TikTok), which
+    uploads it through TikTok's web uploader, adds the text with TikTok's text tool, picks the
+    sound and registers the post. One clip per call, never twice for the same clip."""
+    from .orchestrator import DEFAULT_REPO, DevinClient, post_prompt, poster_session
 
     store = _store()
     store.migrate()
     learnings_migrate(store)
     rows = store.rows(
-        """SELECT r.id, r.post_path, r.post_session_url, r.hold_reason, s.hook, s.payload
+        """SELECT r.id, r.post_path, r.post_session_url, r.post_requested_at, r.hold_reason,
+                  s.hook, s.payload
            FROM renders r JOIN scripts s ON s.id=r.script_id
            WHERE r.script_id=? AND r.final_path IS NOT NULL ORDER BY r.created_at DESC LIMIT 1""",
         (script_id,),
@@ -261,15 +266,24 @@ def post_render(script_id: int):
         raise HTTPException(400, "this clip has no clean copy to post; render it again")
     if r["hold_reason"]:
         raise HTTPException(400, f"clip is on hold: {r['hold_reason']}")
+    now = int(time.time())
     if r["post_session_url"]:
-        return {"ok": True, "url": r["post_session_url"], "already": True}
+        posted = store.rows(
+            "SELECT 1 FROM videos WHERE script_id=? AND ours=1 LIMIT 1", (script_id,)
+        )
+        fresh = (r["post_requested_at"] or 0) > now - POST_RETRY_AFTER_S
+        if posted or fresh:
+            return {"ok": True, "url": r["post_session_url"], "already": True}
     payload = json.loads(r["payload"] or "{}")
     text = _post_text(r["hook"], payload)
     tags = " ".join(
         f"#{t.lstrip('#')}" for t in (CAMPAIGN.product.hashtags + CAMPAIGN.niche.hashtags)[:4]
     )
     caption = " ".join(x for x in (strip_label(r["hook"] or ""), tags) if x)
-    s = DevinClient().create_session(
+    s, reused = poster_session(
+        store,
+        DevinClient(),
+        CAMPAIGN.account.handle,
         post_prompt(
             script_id,
             f"{CLIPS_URL}/s{script_id}_clean.mp4",
@@ -280,12 +294,10 @@ def post_render(script_id: int):
             CAMPAIGN.account.handle,
             API_PUBLIC_URL,
         ),
-        title=f"mkt post s{script_id} @{CAMPAIGN.account.handle}",
         tags=["marketing-agent", "post", "api"],
         repos=[DEFAULT_REPO],
         max_acu_limit=CAMPAIGN.cycle.max_acu,
     )
-    now = int(time.time())
     with store.conn() as c:
         c.execute(
             "UPDATE renders SET post_session_url=?, post_requested_at=? WHERE id=?",
@@ -302,7 +314,7 @@ def post_render(script_id: int):
             "note": f"post s{script_id} from @{CAMPAIGN.account.handle}",
         },
     )
-    return {"ok": True, "url": s["url"], "session_id": s["session_id"]}
+    return {"ok": True, "url": s["url"], "session_id": s["session_id"], "reused": reused}
 
 
 @app.get("/renders/{render_id}/file")

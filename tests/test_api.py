@@ -268,14 +268,27 @@ def test_post_button_starts_one_posting_session(client, monkeypatch):
 
     from marketing_agent import api, orchestrator
 
-    seen = {}
+    seen = {"created": 0, "messages": []}
+    state = {"status": "finished"}
 
     def fake_create(self, prompt, **kw):
         seen["prompt"], seen["kw"] = prompt, kw
+        seen["created"] += 1
         return {"session_id": "devin-p", "url": "https://app.devin.ai/sessions/p"}
+
+    def fake_get(self, session_id):
+        if state["status"] == "gone":
+            raise RuntimeError("Devin API 404")
+        return {"session_id": session_id, "status": state["status"]}
+
+    def fake_message(self, session_id, message):
+        seen["messages"].append((session_id, message))
+        return {}
 
     monkeypatch.setattr(orchestrator.DevinClient, "__init__", lambda self: None)
     monkeypatch.setattr(orchestrator.DevinClient, "create_session", fake_create)
+    monkeypatch.setattr(orchestrator.DevinClient, "get_session", fake_get)
+    monkeypatch.setattr(orchestrator.DevinClient, "send_message", fake_message)
     store = api._store()  # noqa: SLF001
     now = int(time.time())
     cid = store.insert(
@@ -316,7 +329,8 @@ def test_post_button_starts_one_posting_session(client, monkeypatch):
     )
     assert "SUBWAY SURFERS (https://www.tiktok.com/music/x-77)" in p
     assert "/ours/posts" in p and "do not toggle it" in p
-    assert seen["kw"]["title"].startswith(f"mkt post s{sid}")
+    assert seen["kw"]["title"] == "mkt poster @" + api.CAMPAIGN.account.handle
+    assert "poster session" in p and seen["created"] == 1 and seen["messages"] == []
     again = client.post(f"/renders/{sid}/post", headers=AUTH).json()
     assert again["already"] is True and again["url"].endswith("/p")
     rend = next(
@@ -324,6 +338,62 @@ def test_post_button_starts_one_posting_session(client, monkeypatch):
     )
     assert rend["post_session_url"].endswith("/p") and rend["post_requested_at"]
     assert client.get("/runs").json()[0]["note"].startswith(f"post s{sid}")
+
+    def clip(hook):
+        s2 = store.insert(
+            "scripts",
+            {
+                "concept_id": cid,
+                "product": "p",
+                "created_at": now,
+                "hook": hook,
+                "body": "",
+                "demo_score": 5,
+                "payload": "{}",
+            },
+        )
+        store.insert(
+            "renders",
+            {
+                "script_id": s2,
+                "created_at": now,
+                "model": "seedance",
+                "final_path": f"s{s2}.mp4",
+                "post_path": f"s{s2}_clean.mp4",
+            },
+        )
+        return s2
+
+    # The next clip goes to the same poster session as a message: one TikTok login for all posts.
+    s2 = clip("Second clip")
+    r = client.post(f"/renders/{s2}/post", headers=AUTH).json()
+    assert r["reused"] is True and r["session_id"] == "devin-p" and seen["created"] == 1
+    assert len(seen["messages"]) == 1 and f"/s{s2}_clean.mp4" in seen["messages"][0][1]
+
+    # When that session is gone, a new poster session is started and remembered.
+    state["status"] = "gone"
+    s3 = clip("Third clip")
+    r = client.post(f"/renders/{s3}/post", headers=AUTH).json()
+    assert r["reused"] is False and seen["created"] == 2 and len(seen["messages"]) == 1
+    state["status"] = "terminated"
+    s4 = clip("Fourth clip")
+    r = client.post(f"/renders/{s4}/post", headers=AUTH).json()
+    assert r["reused"] is False and seen["created"] == 3
+
+    # A clip whose hand-off is an hour old with no registered post can be handed over again;
+    # one with a registered post cannot.
+    with store.conn() as c:
+        c.execute(
+            "UPDATE renders SET post_requested_at=? WHERE script_id IN (?,?)", (now - 4000, s3, s4)
+        )
+        c.execute(
+            """INSERT INTO videos (id,url,author,ours,script_id,first_seen,create_time)
+               VALUES ('v4','u','a',1,?,?,?)""",
+            (s4, now, now),
+        )
+    state["status"] = "finished"
+    assert client.post(f"/renders/{s3}/post", headers=AUTH).json()["reused"] is True
+    assert client.post(f"/renders/{s4}/post", headers=AUTH).json()["already"] is True
 
 
 def test_concepts_carry_pick_share_and_example_lift(client):

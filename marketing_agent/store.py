@@ -129,6 +129,11 @@ class Store:
             ):
                 if col not in cols:
                     c.execute(f"ALTER TABLE renders ADD COLUMN {col} {typ}")
+            c.execute(
+                """CREATE TABLE IF NOT EXISTS poster_sessions (
+                     handle TEXT PRIMARY KEY, session_id TEXT, url TEXT,
+                     created_at INTEGER, last_used_at INTEGER)"""
+            )
 
     def upsert_video(self, v: dict, observed_at: int | None = None) -> None:
         now = observed_at or int(time.time())
