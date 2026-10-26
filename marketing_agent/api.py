@@ -120,7 +120,20 @@ def logic(niche: str = DEFAULT_NICHE):
 
 @app.get("/concepts")
 def concepts(niche: str = DEFAULT_NICHE):
-    return concept_scores(_store(), niche)
+    """Formats with how often the picker would choose each (pick_share) and, on every example
+    video, its lift against videos of the same age and account size."""
+    from .policy import pick_shares
+    from .scoreboard import build
+
+    store = _store()
+    rows = concept_scores(store, niche)
+    sb = build(store, tags=store.niche_tags(niche) or None)
+    lift = {v["id"]: v.get("reward") for v in sb["videos"]}
+    for c, share in zip(rows, pick_shares(rows), strict=False):
+        c["pick_share"] = round(share, 3)
+        for e in c.get("examples", []):
+            e["reward"] = lift.get(e["id"])
+    return rows
 
 
 @app.get("/scripts")

@@ -324,3 +324,45 @@ def test_post_button_starts_one_posting_session(client, monkeypatch):
     )
     assert rend["post_session_url"].endswith("/p") and rend["post_requested_at"]
     assert client.get("/runs").json()[0]["note"].startswith(f"post s{sid}")
+
+
+def test_concepts_carry_pick_share_and_example_lift(client):
+    import json
+    import time
+
+    from marketing_agent import api
+
+    store = api._store()
+    store.upsert_video(
+        {
+            "id": "v1",
+            "url": "https://www.tiktok.com/@a/video/v1",
+            "author": "a",
+            "followers": 100,
+            "create_time": int(time.time()) - 3600,
+            "duration": 10,
+            "desc": "",
+            "music": "",
+            "hashtags": [],
+            "source_tag": "fitness",
+            "views": 500,
+        }
+    )
+    for name in ("A", "B"):
+        store.insert(
+            "concepts",
+            {
+                "niche": "fitness",
+                "created_at": int(time.time()),
+                "name": name,
+                "description": "d",
+                "video_ids": json.dumps(["v1"]),
+                "early_score": 5.0,
+                "payload": "{}",
+            },
+        )
+    rows = client.get("/concepts?niche=fitness").json()
+    assert abs(sum(c["pick_share"] for c in rows) - 1) < 1e-6
+    ours = [c for c in rows if c["name"] in ("A", "B")]
+    assert len(ours) == 2
+    assert all("reward" in e for c in ours for e in c["examples"])
