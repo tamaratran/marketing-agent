@@ -9,12 +9,11 @@ from pathlib import Path
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from .analysis import analyze, latest_findings, save_findings
 from .cohort import build_features, features, latest_snapshot, repoll
 from .config import settings
-from .creators.ops import add_creator, create_brief, creator_report, payouts, record_post
 from .own import accounts as own_accounts
 from .own import own_posts, own_rewards
 from .policy import concept_scores, winning_traits
@@ -56,7 +55,6 @@ def overview(niche: str = DEFAULT_NICHE):
     store = _store()
     sb = build(store, tags=store.niche_tags(niche) or None)
     spent = sum(r["cost_usd"] or 0 for r in store.rows("SELECT cost_usd FROM renders"))
-    pays = payouts(store)
     return {
         "niche": niche,
         "videos": len(sb["videos"]),
@@ -64,7 +62,6 @@ def overview(niche: str = DEFAULT_NICHE):
         "tagged": sb["n_tagged"],
         "concepts": len(concept_scores(store, niche)),
         "spent_usd": round(spent, 2),
-        "owed_usd": round(sum(p["owed_usd"] for p in pays), 2),
         "winning": winning_traits(store),
         "hooks": sb["hooks"][:8],
         "styles": sb["styles"][:8],
@@ -133,114 +130,6 @@ def render_file(render_id: int):
     if not rows or not rows[0]["final_path"] or not Path(rows[0]["final_path"]).exists():
         raise HTTPException(404, "no file")
     return FileResponse(rows[0]["final_path"], media_type="video/mp4")
-
-
-@app.get("/creators")
-def creators(stall_days: int = 7):
-    return creator_report(_store(), stall_days)
-
-
-class CreatorIn(BaseModel):
-    handle: str
-    channel: str = "discord"
-    rate_per_1k: float = 1.0
-    followers: int | None = None
-    notes: str = ""
-
-
-@app.post("/creators", dependencies=[Depends(_auth)])
-def creators_add(body: CreatorIn):
-    add_creator(_store(), body.handle, body.channel, body.rate_per_1k, body.followers, body.notes)
-    return {"ok": True, "handle": body.handle.lstrip("@")}
-
-
-@app.get("/briefs")
-def briefs():
-    return _store().rows("SELECT * FROM briefs ORDER BY id DESC")
-
-
-class BriefIn(BaseModel):
-    product: str
-    script_ids: list[int] = Field(min_length=1)
-    rate_per_1k: float = 1.0
-    cap_usd: float = 200.0
-    deadline_days: int = 5
-
-
-@app.post("/briefs", dependencies=[Depends(_auth)])
-def briefs_create(body: BriefIn):
-    return create_brief(
-        _store(), body.product, body.script_ids, body.rate_per_1k, body.cap_usd, body.deadline_days
-    )
-
-
-@app.post("/briefs/{brief_id}/status", dependencies=[Depends(_auth)])
-def briefs_status(brief_id: int, status: str):
-    """draft -> approved -> posted; nothing is sent anywhere, this records the human decision."""
-    if status not in {"draft", "approved", "posted", "closed"}:
-        raise HTTPException(400, "status must be draft, approved, posted or closed")
-    with _store().conn() as c:
-        if not c.execute("UPDATE briefs SET status=? WHERE id=?", (status, brief_id)).rowcount:
-            raise HTTPException(404, "no brief")
-    return {"ok": True, "id": brief_id, "status": status}
-
-
-@app.get("/posts")
-def posts():
-    return _store().rows(
-        """SELECT p.*, (SELECT views FROM observations o WHERE o.video_id=p.video_id
-                        ORDER BY observed_at DESC LIMIT 1) views FROM posts p ORDER BY posted_at DESC"""
-    )
-
-
-class PostIn(BaseModel):
-    creator: str
-    url: str
-    brief_id: int | None = None
-    script_id: int | None = None
-
-
-@app.post("/posts", dependencies=[Depends(_auth)])
-def posts_add(body: PostIn):
-    from .research.tiktok_browser import poll_public_stats
-
-    try:
-        stats = poll_public_stats(body.url)
-    except Exception:  # noqa: BLE001 - stats are a nice-to-have at record time
-        stats = None
-    vid = record_post(_store(), body.creator, body.url, body.brief_id, body.script_id, stats)
-    return {"ok": True, "video_id": vid, "polled": bool(stats)}
-
-
-@app.get("/payouts")
-def payouts_list(min_age_days: int = 7):
-    return payouts(_store(), min_age_days)
-
-
-class PaidIn(BaseModel):
-    amount_usd: float
-    views: int | None = None
-
-
-@app.post("/payouts/{video_id}/paid", dependencies=[Depends(_auth)])
-def payouts_paid(video_id: str, body: PaidIn):
-    store = _store()
-    post = store.rows("SELECT creator FROM posts WHERE video_id=?", (video_id,))
-    if not post:
-        raise HTTPException(404, "no post")
-    now = int(time.time())
-    pid = store.insert(
-        "payouts",
-        {
-            "creator": post[0]["creator"],
-            "video_id": video_id,
-            "views": body.views,
-            "amount_usd": body.amount_usd,
-            "computed_at": now,
-            "paid_at": now,
-        },
-    )
-    return {"ok": True, "id": pid}
 
 
 @app.get("/runs")

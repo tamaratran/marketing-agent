@@ -63,7 +63,7 @@ def test_daily_report_writes_markdown_on_empty_store(tmp_path):
     rep = DailyReport("wearables", "a smart ring")
     rep.ok("run", 12.3, "ok")
     rep.fail("render", RuntimeError("FAL_KEY not set"))
-    rep.skip("poll_posts", "nothing tracked")
+    rep.skip("own_research", "nothing to tag")
     out = rep.write(tmp_path / "r" / "today.md", store)
     text = out.read_text()
     assert rep.failed == ["render"]

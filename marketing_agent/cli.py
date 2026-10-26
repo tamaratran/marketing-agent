@@ -1,4 +1,4 @@
-"""`mkt` CLI. Pipeline: scrape -> download -> classify -> concepts -> scripts -> render -> creators -> scoreboard.
+"""`mkt` CLI. Pipeline: scrape -> download -> classify -> concepts -> scripts -> render -> own posts -> scoreboard.
 `run` chains the research half."""
 
 import json
@@ -504,117 +504,28 @@ def _scoreboard_group(tag, top, group):
         console.print(t)
 
 
-@cli.group()
-def creators():
-    """Creator ops: briefs, creator roster, posts, payouts. Drafts only, nothing is sent."""
+@cli.command("compare")
+@click.option("--tag", default=None)
+@click.option("--top", default=20)
+def compare_cmd(tag, top):
+    """Our posts next to the market: each hook, style and concept with its lift on reference
+    videos and on our posts, disagreements first."""
+    from .compare import compare
 
-
-@creators.command("brief")
-@click.argument("product")
-@click.argument("script_ids", nargs=-1, type=int)
-@click.option("--concept", type=int, default=None, help="Use all kept scripts of this concept")
-@click.option("--rate", default=1.0, help="USD per 1k views")
-@click.option("--cap", default=200.0, help="Max USD per video")
-@click.option("--deadline", default=5, help="Days to post")
-def creators_brief(product, script_ids, concept, rate, cap, deadline):
-    """Draft a paid brief from kept scripts; prints the text to paste into Discord/Sideshift."""
-    from .creators.ops import create_brief
-
-    store = _store()
-    ids = list(script_ids)
-    if concept is not None:
-        ids += [
-            r["id"]
-            for r in store.rows(
-                "SELECT id, payload FROM scripts WHERE concept_id=? ORDER BY demo_score DESC",
-                (concept,),
-            )
-            if json.loads(r["payload"]).get("kept", True)
-        ]
-    if not ids:
-        raise click.UsageError("give script ids or --concept")
-    b = create_brief(store, product, ids, rate, cap, deadline)
-    console.print(f"[bold]brief {b['id']} (draft, {len(b['scripts'])} scripts)[/bold]\n")
-    console.print(b["body"])
-
-
-@creators.command("add")
-@click.argument("handle")
-@click.option(
-    "--channel", default="discord", help="Where they came from: discord, sideshift, clipping, dm"
-)
-@click.option("--rate", default=1.0)
-@click.option("--followers", type=int, default=None)
-@click.option("--notes", default="")
-def creators_add(handle, channel, rate, followers, notes):
-    from .creators.ops import add_creator
-
-    add_creator(_store(), handle, channel, rate, followers, notes)
-    console.print(f"added @{handle.lstrip('@')} at ${rate}/1k via {channel}")
-
-
-@creators.command("post")
-@click.argument("handle")
-@click.argument("url")
-@click.option("--brief", type=int, default=None)
-@click.option("--script", type=int, default=None)
-def creators_post(handle, url, brief, script):
-    """Record that a creator posted URL; polls its public stats right away."""
-    from .creators.ops import record_post
-    from .research.tiktok_browser import poll_public_stats
-
-    stats = poll_public_stats(url)
-    vid = record_post(_store(), handle, url, brief, script, stats)
-    console.print(
-        f"post {vid} by @{handle.lstrip('@')}"
-        + (f": {stats['views']} views" if stats else " (stats unavailable, poll later)")
-    )
-
-
-@creators.command("payouts")
-@click.option("--min-age-days", default=7)
-def creators_payouts(min_age_days):
-    """What each post has earned (views/1k x rate, capped). Settled = older than --min-age-days."""
-    from .creators.ops import payouts
-
-    t = Table("creator", "views", "rate", "owed", "paid", "age d", "settled", "url")
-    total = 0.0
-    for p in payouts(_store(), min_age_days):
-        total += p["owed_usd"] if p["settled"] else 0
+    rows = compare(_store(), tag)
+    if not rows:
+        console.print("[dim]nothing scored on either side yet")
+        return
+    t = Table("trait", "value", "market", "n", "ours", "n", "read")
+    for r in rows[:top]:
         t.add_row(
-            p["creator"],
-            str(p["views"]),
-            f"${p['rate_per_1k']:.2f}",
-            f"${p['owed_usd']:.2f}",
-            f"${p['paid_usd']:.2f}",
-            str(p["age_days"]),
-            "yes" if p["settled"] else "",
-            p["url"],
-        )
-    console.print(t)
-    console.print(f"settled and owed: ${total:.2f}")
-
-
-@creators.command("report")
-@click.option("--stall-days", default=7)
-def creators_report(stall_days):
-    """Who posts, who stopped."""
-    from .creators.ops import creator_report
-
-    t = Table(
-        "creator", "channel", "rate", "posts", "median views", "last post", "days since", "status"
-    )
-    for c in creator_report(_store(), stall_days):
-        style = "red" if c["status"] != "active" else ""
-        t.add_row(
-            c["handle"],
-            c["channel"],
-            f"${c['rate_per_1k']:.2f}",
-            str(c["posts"]),
-            str(c["median_views"]),
-            c["last_post"],
-            str(c["days_since"]),
-            f"[{style}]{c['status']}[/{style}]" if style else c["status"],
+            r["trait"],
+            str(r["value"])[:40],
+            "" if r["market"] is None else f"{r['market']:+.2f}",
+            str(r["market_n"]),
+            "" if r["ours"] is None else f"{r['ours']:+.2f}",
+            str(r["ours_n"]),
+            r["verdict"],
         )
     console.print(t)
 
@@ -739,12 +650,11 @@ def daily(
     ctx, niche, tags, product, product_tags, top, renders, resolution, refs, report, dashboard_out
 ):
     """The whole loop in order with a report at the end: run (scrape, classify, concepts, pick,
-    scripts), render, poll creator posts, payouts, scoreboard, policy. A failed stage is recorded
+    scripts), render, our posts, scoreboard, compare (ours vs market), policy. A failed stage is recorded
     and the rest still runs."""
     import os
 
     from .orchestrator import DailyReport
-    from .research.tiktok_browser import poll_public_stats
 
     rep = DailyReport(niche, product)
 
@@ -822,21 +732,9 @@ def daily(
 
         stage("render", render_best)
 
-    def poll_posts():
-        urls = [r["url"] for r in store.rows("SELECT url FROM posts")]
-        n = 0
-        for u in urls:
-            row = poll_public_stats(u)
-            if row:
-                store.upsert_video(row)
-                n += 1
-        return f"{n}/{len(urls)} posts polled"
-
-    stage("poll_posts", poll_posts)
     stage("own_research", lambda: ctx.invoke(own_research, limit=20, model=None))
-    stage("payouts", lambda: ctx.invoke(creators_payouts, min_age_days=7))
-    stage("creators", lambda: ctx.invoke(creators_report, stall_days=7))
     stage("scoreboard", lambda: ctx.invoke(scoreboard, tag=None, top=15, group="both"))
+    stage("compare", lambda: ctx.invoke(compare_cmd, tag=None, top=20))
     stage("policy", lambda: ctx.invoke(policy, niche=niche))
 
     report = (
@@ -857,7 +755,7 @@ def daily(
 )
 @click.option("--no-assets", is_flag=True, help="Do not copy clips next to the page")
 def dashboard(niche, out, no_assets):
-    """Static HTML dashboard from the db: what works, concepts, clips, scripts, creators, payouts."""
+    """Static HTML dashboard from the db: what works, concepts, clips, scripts, our posts."""
     from .dashboard import render as render_dashboard
 
     out = Path(out) if out else settings.data_dir / "site" / "index.html"
