@@ -1,22 +1,28 @@
 import { fmt, get, type Findings, type Level } from "@/lib/api";
-import { Card, H1, Pill, Stat, Table } from "../ui";
+import { Card, H1, Note, Pill, Stat, Table, human, pt } from "../ui";
 import { RefreshButtons } from "../refresh";
 
 export const dynamic = "force-dynamic";
 
 const tone = (v: string) => (v === "better" ? "good" : v === "worse" ? "bad" : v === "thin" ? "warn" : "neutral");
+const verdictText: Record<string, string> = { thin: "too few videos", "no evidence": "no clear difference", reference: "baseline" };
+const outcomeText: Record<string, string> = {
+  lift_72h: "Beat the creator's usual at 3 days",
+  growth_6_24: "Kept growing from 6h to 24h",
+  log_vph_6h: "Fast start (views per hour at 6h)",
+};
 
 function Levels({ levels, minN }: { levels: Level[]; minN: number }) {
   return (
     <Table
-      head={["level", "n", "raw mean", "controlled", "95% interval", "verdict"]}
+      head={["value", "videos", "raw average", "after controls", "likely range", "verdict"]}
       rows={levels.map((l) => [
-        l.level,
-        l.n < minN ? <span key="n" className="text-amber-300">{l.n}</span> : l.n,
+        human(l.level),
+        l.n < minN ? <span key="n" className="text-amber-300" title={`under the ${minN} needed`}>{l.n}</span> : l.n,
         fmt(l.raw_mean),
-        l.reference ? "reference" : (l.coef > 0 ? "+" : "") + fmt(l.coef),
+        l.reference ? "baseline" : (l.coef > 0 ? "+" : "") + fmt(l.coef),
         l.reference ? "" : `${fmt(l.lo)} to ${fmt(l.hi)}`,
-        <span key="v" className="flex gap-1"><Pill tone={tone(l.verdict)}>{l.verdict}</Pill>{l.travels && <Pill tone="good">travels across niches</Pill>}</span>,
+        <span key="v" className="flex gap-1"><Pill tone={tone(l.verdict)}>{verdictText[l.verdict] ?? l.verdict}</Pill>{l.travels && <Pill tone="good">holds across niches</Pill>}</span>,
       ])}
     />
   );
@@ -30,42 +36,56 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ o
   const fits = f.fits[outcome] ? (niche ? f.fits[outcome].per_niche[niche] ?? {} : f.fits[outcome].pooled) : {};
   const st = f.status;
   const minN = f.min_n ?? 20;
+  const fitted = Object.entries(fits).filter(([, fit]) => fit.levels?.length);
+  const empty = Object.entries(fits).filter(([, fit]) => !fit.levels?.length).map(([t]) => t);
   return (
     <>
-      <H1 sub="What videos that beat their creator's baseline have in common, with account size, niche, length and posting hour held fixed. Raw and controlled shown side by side; nothing under the minimum n is a finding.">Findings</H1>
+      <H1 sub="Which video traits (hook, style, length, posting time...) actually go with more views, once you account for account size, niche, length and posting hour. Built from a fixed group of fresh research videos followed over a week.">Findings</H1>
       <div className="mb-4"><RefreshButtons /></div>
-      <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-6">
-        <Stat label="cohort videos" value={st.videos} />
-        <Stat label="tagged" value={st.tagged ?? 0} />
-        <Stat label="with creator baseline" value={st.with_baseline ?? 0} />
-        <Stat label="reached 24h" value={st.reached["24h"] ?? 0} />
-        <Stat label="reached 72h" value={st.reached["72h"] ?? 0} />
-        <Stat label="minimum n per cell" value={minN} />
+      <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-5">
+        <Stat label="videos being followed" value={st.videos} hint="Enrolled when under 6 hours old." />
+        <Stat label="tagged by the classifier" value={st.tagged ?? 0} />
+        <Stat label="with the creator's usual views" value={st.with_baseline ?? 0} hint="Needed to judge a video against its own account." />
+        <Stat label="1 day old" value={st.reached["24h"] ?? 0} />
+        <Stat label="3 days old" value={st.reached["72h"] ?? 0} hint={`Findings need ${minN} per group at 3 days.`} />
       </div>
       {f.collecting && (
         <Card className="mb-4">
           <p className="text-sm text-amber-200">
-            Collecting. {st.reached["72h"] ?? 0} of {st.videos} cohort videos have reached 72h; findings need at least {minN} per cell before anything is called better or worse.
-            {st.eta_72h ? ` The first videos reach 72h around ${new Date(st.eta_72h * 1000).toUTCString()}.` : ""} Tables below are shown for transparency and are all thin.
+            Still collecting, so nothing below is a result yet. {st.reached["72h"] ?? 0} of {st.videos} videos are 3 days old; each group needs {minN} before a trait is called better or worse.
+            {st.eta_72h ? ` The first videos turn 3 days old ${pt(st.eta_72h)}.` : ""}
           </p>
         </Card>
       )}
-      <p className="mb-4 flex flex-wrap gap-2 text-sm">
+      <div className="mb-2 text-xs text-neutral-500">Measure</div>
+      <p className="mb-3 flex flex-wrap gap-2 text-sm">
         {Object.entries(f.outcomes ?? {}).map(([k, label]) => (
-          <a key={k} href={`/findings?outcome=${k}${niche ? `&niche=${niche}` : ""}`} className={`rounded border px-2 py-1 ${k === outcome ? "border-neutral-300 text-white" : "border-neutral-700 text-neutral-400 hover:text-white"}`}>{label}</a>
-        ))}
-        <span className="mx-2 text-neutral-600">|</span>
-        <a href={`/findings?outcome=${outcome}`} className={`rounded border px-2 py-1 ${!niche ? "border-neutral-300 text-white" : "border-neutral-700 text-neutral-400"}`}>pooled (niche as control)</a>
-        {Object.keys(st.niches ?? {}).map((n) => (
-          <a key={n} href={`/findings?outcome=${outcome}&niche=${n}`} className={`rounded border px-2 py-1 ${niche === n ? "border-neutral-300 text-white" : "border-neutral-700 text-neutral-400"}`}>{n} only</a>
+          <a key={k} href={`/findings?outcome=${k}${niche ? `&niche=${niche}` : ""}`} title={label} className={`rounded border px-2 py-1 ${k === outcome ? "border-neutral-300 text-white" : "border-neutral-700 text-neutral-400 hover:text-white"}`}>{outcomeText[k] ?? label}</a>
         ))}
       </p>
-      {Object.entries(fits).map(([trait, fit]) => (
-        <Card key={trait} title={`${trait.replaceAll("_", " ")} · n=${fit.n}${fit.r2 != null ? ` · r²=${fit.r2}` : ""}`} className="mb-4">
-          {fit.levels?.length ? <Levels levels={fit.levels} minN={minN} /> : <p className="text-sm text-neutral-500">Not enough rows to fit.</p>}
+      <div className="mb-2 text-xs text-neutral-500">Videos from</div>
+      <p className="mb-4 flex flex-wrap gap-2 text-sm">
+        <a href={`/findings?outcome=${outcome}`} className={`rounded border px-2 py-1 ${!niche ? "border-neutral-300 text-white" : "border-neutral-700 text-neutral-400"}`}>all niches</a>
+        {Object.entries(st.niches ?? {}).map(([n, c]) => (
+          <a key={n} href={`/findings?outcome=${outcome}&niche=${n}`} className={`rounded border px-2 py-1 ${niche === n ? "border-neutral-300 text-white" : "border-neutral-700 text-neutral-400"}`}>{n} only ({c})</a>
+        ))}
+      </p>
+      {fitted.length > 0 && (
+        <Note className="mb-3">
+          Numbers are on a log10 scale: +0.30 after controls is about 2x the views of the baseline value, +1.00 about 10x. &quot;Likely range&quot; is the 95% interval; if it crosses zero there is no clear difference.
+        </Note>
+      )}
+      {fitted.map(([trait, fit]) => (
+        <Card key={trait} title={`${human(trait)} · ${fit.n} videos`} className="mb-4">
+          <Levels levels={fit.levels} minN={minN} />
         </Card>
       ))}
-      {Object.keys(fits).length === 0 && <p className="text-sm text-neutral-500">No analysis stored yet. The 2-hourly repoll and the daily run both refresh it.</p>}
+      {empty.length > 0 && (
+        <Card className="mb-4">
+          <p className="text-sm text-neutral-400">Not enough 3-day-old videos to compare yet: {empty.map(human).join(", ")}.</p>
+        </Card>
+      )}
+      {Object.keys(fits).length === 0 && <p className="text-sm text-neutral-500">No analysis stored yet. The 2-hourly re-poll and the daily run both refresh it.</p>}
     </>
   );
 }

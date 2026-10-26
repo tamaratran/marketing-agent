@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { get, fmt, type VideoDetail } from "@/lib/api";
-import { Card, H1, Pill, Stat, Table } from "../../ui";
+import { Card, H1, Pill, Stat, Table, human, times } from "../../ui";
 import { Curve } from "../../curve";
 import { Thumb } from "../../thumb";
 import { tiktokEmbed } from "@/lib/api";
@@ -13,7 +13,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
   const v = d.video, f = d.features, t = d.tags?.tags ?? null, run = d.tags?.run;
   const posted = new Date(v.create_time * 1000).toUTCString();
   const tagRows = t
-    ? Object.entries(t).filter(([k]) => !["summary", "quality_issues"].includes(k)).map(([k, val]) => [k, Array.isArray(val) ? val.join(", ") : String(val ?? "")])
+    ? Object.entries(t).filter(([k]) => !["summary", "quality_issues"].includes(k)).map(([k, val]) => [human(k), Array.isArray(val) ? val.join(", ") : human(String(val ?? ""))])
     : [];
   return (
     <>
@@ -30,11 +30,11 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
           {[1, 6, 24, 72, 168].map((a) => (
             <Stat key={a} label={`views at ${a < 24 ? `${a}h` : `${a / 24}d`}`} value={f[`views_${a}h`] != null ? Math.round(f[`views_${a}h`] as number).toLocaleString() : "not yet"} />
           ))}
-          <Stat label="lift at 72h (log10 vs creator)" value={f.lift_72h != null ? fmt(f.lift_72h as number) : f.creator_baseline_log == null ? "no baseline" : "not yet"} />
+          <Stat label="vs creator's usual at 3 days" value={f.lift_72h != null ? `${times(f.lift_72h as number)}` : f.creator_baseline_log == null ? "no baseline" : "not yet"} hint={f.lift_72h != null ? `log10 lift ${fmt(f.lift_72h as number)}` : undefined} />
         </div>
       )}
       <div className="mb-4 grid gap-4 md:grid-cols-[minmax(0,1fr)_340px]">
-        <Card title="View curve (log-log; dashed line is the creator's median)">
+        <Card title="Views over time (orange dashed line is the creator's usual views)">
           <Curve obs={d.observations} createTime={v.create_time} baselineLog={f?.creator_baseline_log as number | null} />
           <p className="mt-2 text-xs text-neutral-500">{d.observations.length} observations, oldest {d.observations[0] ? ((d.observations[0].observed_at - v.create_time) / 3600).toFixed(1) : "-"}h, latest {d.observations.at(-1) ? ((d.observations.at(-1)!.observed_at - v.create_time) / 3600).toFixed(1) : "-"}h after posting.</p>
         </Card>
