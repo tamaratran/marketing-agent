@@ -34,3 +34,19 @@ def test_open_account_is_none(monkeypatch):
 def test_missing_key(monkeypatch):
     monkeypatch.delenv("FAL_KEY", raising=False)
     assert generate.fal_locked() == "FAL_KEY not set"
+
+
+def test_probe_sends_json_body(monkeypatch):
+    """Without a body fal answers 422 'Field required', which read as a locked account."""
+    monkeypatch.setenv("FAL_KEY", "k")
+    seen = {}
+
+    def post(*a, **k):
+        seen.update(k)
+        return (
+            _Resp(200, {"token": "t"}) if "json" in k else _Resp(422, [{"msg": "Field required"}])
+        )
+
+    monkeypatch.setattr(httpx, "post", post)
+    assert generate.fal_locked() is None
+    assert seen["json"] == {}
