@@ -97,11 +97,49 @@ def daily_prompt(
     state_branch: str = STATE_BRANCH,
     refs: list[str] | None = None,
     product_tags: list[str] | None = None,
+    mode: str = "full",
 ) -> str:
-    """What the Devin session is told. Self-contained: the session starts with no history."""
+    """What the Devin session is told. Self-contained: the session starts with no history.
+    mode: "full" (measure, research, scripts, render), "research" (the same with --renders 0, so
+    no fal spend; the site's Research again button) or "render" (only render the best of the
+    latest script batch with `mkt render-latest`; the site's Generate clips button)."""
     day = datetime.now(UTC).strftime("%Y-%m-%d")
     tag_str = " ".join(tags)
     ref_str = "".join(f' --ref "{r}"' for r in refs or [])
+    if mode == "research":
+        renders = 0
+    if mode == "render":
+        return f"""Repo: {repo}. Render the best {renders} clips from the latest script batch ({day}) and report on it.
+
+Setup (in the repo):
+  uv venv && . .venv/bin/activate && uv pip install -e ".[dev]"
+  ffmpeg must be on PATH (apt-get install -y ffmpeg if missing).
+  export OPENAI_API_KEY="$ANSWERSNAP_OPENAI_KEY"
+  FAL_KEY is in your environment; renders cost about $0.22/s at 480p, $0.47/s at 720p, $0.80/s at
+  1080p. Keep to --renders {renders} at {resolution}.
+
+State lives on the `{state_branch}` branch, checked out as a worktree:
+  git fetch origin {state_branch} && git worktree add ../mkt-state {state_branch}
+  export MKT_DB=$PWD/../mkt-state/mkt.sqlite
+  mkt sync pull   (MKT_API_TOKEN is in your env; the API's db is the source of truth)
+
+Run:
+  mkt render-latest --renders {renders} --resolution {resolution}{ref_str}
+  mkt frames --out ../mkt-state/site/frames
+  cp data/renders/*.mp4 ../mkt-state/site/renders/ 2>/dev/null || true
+
+Then:
+1. If a render failed for a missing key, credit ("User is locked", "Exhausted balance") or
+   network reason, do not work around it; record it and say so:
+   mkt stage render failed "<what happened, one line>"
+   Otherwise: mkt stage render ok "<which scripts rendered>"
+2. Watch each clip once. If one must not be posted (wrong game on the TV, a second person, the
+   app icon as a shot), hold it with the reason:  mkt learn hold <script_id> "<reason>"
+3. Push the db to the API: mkt sync push
+4. Commit the state: cd ../mkt-state && git add -A && git commit -m "state: renders {day}" \
+   && git push origin HEAD:{state_branch}
+Never post anything to TikTok and never message anyone; a person posts.
+"""
     ref_str += "".join(f' --product-tag "{t}"' for t in product_tags or [])
     return f"""Repo: {repo}. Run one cycle ({day}) of the marketing agent and report on it.
 
