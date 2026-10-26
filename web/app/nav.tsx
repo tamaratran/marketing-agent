@@ -8,11 +8,16 @@ const pages: [string, string][] = [
   ["/clips", "Clips"], ["/ours", "Our posts"], ["/learnings", "Learnings"], ["/runs", "Runs"],
 ];
 
+const quick: [string, string][] = [["/clips", "Clips"], ["/learnings", "Learnings"], ["/runs", "Runs"]];
+
 export function Nav() {
   const key = usePathname() + useSearchParams().toString();
   return (
     <nav className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 text-sm">
-      <Link href="/" className="font-semibold tracking-tight">mkt</Link>
+      <div className="flex items-center gap-4">
+        <Link href="/" className="font-semibold tracking-tight">mkt</Link>
+        {quick.map(([href, label]) => <Link key={href} href={href} className="text-xs text-neutral-400 hover:text-neutral-100">{label}</Link>)}
+      </div>
       <details key={key} className="relative">
         <summary className="cursor-pointer list-none text-xs text-neutral-500 hover:text-neutral-300">All details</summary>
         <div className="absolute right-0 z-10 mt-2 w-40 rounded-lg border border-neutral-800 bg-neutral-900 py-1 shadow-lg">
