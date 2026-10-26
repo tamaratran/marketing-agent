@@ -25,6 +25,7 @@ MIGRATIONS = [
     "ALTER TABLE videos ADD COLUMN niche TEXT",
     "ALTER TABLE videos ADD COLUMN cohort_at INTEGER",
     "ALTER TABLE videos ADD COLUMN sound_id TEXT",
+    "ALTER TABLE videos ADD COLUMN gone_at INTEGER",
     """CREATE TABLE IF NOT EXISTS creator_snapshots (
          author TEXT, taken_at INTEGER, followers INTEGER, n_posts INTEGER,
          median_views REAL, median_log_views REAL, video_count INTEGER, heart_count INTEGER,
@@ -74,21 +75,30 @@ def cohort_videos(store: Store, max_age_days: float = REPOLL_DAYS, niche: str | 
 
 def repoll(store: Store, max_age_days: float = REPOLL_DAYS, niche: str | None = None) -> dict:
     """Record fresh public stats for every cohort video still inside the window (HTTP only)."""
-    from .research.tiktok_browser import poll_public_stats
+    from .research.tiktok_browser import GONE, public_video
 
-    ok = failed = 0
+    ok = failed = gone = 0
+    now = int(time.time())
     for v in cohort_videos(store, max_age_days, niche):
         try:
-            row = poll_public_stats(v["url"])
+            row, status = public_video(v["url"])
         except Exception:
-            row = None
+            row, status = None, "unknown"
         if not row:
             failed += 1
+            if status == GONE and not v.get("gone_at"):
+                with store.conn() as c:
+                    c.execute("UPDATE videos SET gone_at=? WHERE id=?", (now, v["id"]))
+            if status == GONE:
+                gone += 1
             continue
         row["source_tag"] = v["source_tag"]
         store.upsert_video(row)
+        if v.get("gone_at"):
+            with store.conn() as c:
+                c.execute("UPDATE videos SET gone_at=NULL WHERE id=?", (v["id"],))
         ok += 1
-    return {"polled": ok, "failed": failed}
+    return {"polled": ok, "failed": failed, "gone": gone}
 
 
 def snapshot_creator(

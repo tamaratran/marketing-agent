@@ -12,12 +12,13 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
   const d = await get<VideoDetail>(`/videos/${id}`);
   const v = d.video, f = d.features, t = d.tags?.tags ?? null, run = d.tags?.run;
   const posted = new Date(v.create_time * 1000).toUTCString();
+  const last = d.observations.at(-1);
   const tagRows = t
     ? Object.entries(t).filter(([k]) => !["summary", "quality_issues"].includes(k)).map(([k, val]) => [human(k), Array.isArray(val) ? val.join(", ") : human(String(val ?? ""))])
     : [];
   return (
     <>
-      <H1 sub={`@${v.author} · posted ${posted} · ${v.duration ?? "?"}s · #${v.source_tag}${v.niche ? ` · ${v.niche}` : ""}${v.cohort_at ? " · cohort" : ""}`}>{v.desc || v.id}</H1>
+      <H1 sub={`@${v.author} · posted ${posted} · ${v.duration ?? "?"}s · #${v.source_tag}${v.niche ? ` · ${v.niche}` : ""}${v.cohort_at ? " · cohort" : ""}${v.gone_at ? " · no longer on TikTok" : ""}`}>{v.desc || v.id}</H1>
       <p className="mb-4 text-sm">
         <a href={v.url} target="_blank" className="text-sky-300 hover:underline">open on TikTok</a>
         {" · "}
@@ -39,8 +40,22 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
           <p className="mt-2 text-xs text-neutral-500">{d.observations.length} observations, oldest {d.observations[0] ? ((d.observations[0].observed_at - v.create_time) / 3600).toFixed(1) : "-"}h, latest {d.observations.at(-1) ? ((d.observations.at(-1)!.observed_at - v.create_time) / 3600).toFixed(1) : "-"}h after posting.</p>
         </Card>
         <Card title="Watch">
-          <iframe src={tiktokEmbed(v.id)} title={v.desc || v.id} className="h-[580px] w-full rounded border-0 bg-black" allow="encrypted-media; fullscreen" />
-          <details className="mt-2 text-xs text-neutral-500"><summary className="cursor-pointer">poster frame we classified</summary><div className="mt-2"><Thumb id={v.id} size={160} /></div></details>
+          {v.gone_at ? (
+            <>
+              <Thumb id={v.id} size={200} />
+              <p className="mt-3 text-sm text-neutral-200">No longer on TikTok.</p>
+              <p className="mt-1 text-xs text-neutral-500">
+                The creator deleted it or made it private around {new Date(v.gone_at * 1000).toUTCString().slice(0, 22)}.
+                {last ? <> Last seen with {last.views?.toLocaleString() ?? "?"} views, {((last.observed_at - v.create_time) / 3600).toFixed(1)}h after posting.</> : null}
+                {" "}What the agent saved from it (the frame above, the classifier run below and every view count) still counts.
+              </p>
+            </>
+          ) : (
+            <>
+              <iframe src={tiktokEmbed(v.id)} title={v.desc || v.id} className="h-[580px] w-full rounded border-0 bg-black" allow="encrypted-media; fullscreen" />
+              <details className="mt-2 text-xs text-neutral-500"><summary className="cursor-pointer">poster frame we classified</summary><div className="mt-2"><Thumb id={v.id} size={160} /></div></details>
+            </>
+          )}
         </Card>
       </div>
       <div className="mt-4 grid gap-4 md:grid-cols-2">
