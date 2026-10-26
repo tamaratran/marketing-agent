@@ -112,7 +112,15 @@ class FalSeedance(VideoProvider):
         self.model = model.rstrip("/")
 
     def _url(self, ref: str) -> str:
-        return self.fal.upload_file(ref) if os.path.exists(ref) else ref
+        """Every reference goes up to fal's own storage. fal fetches remote URLs itself and
+        rejects some hosts (App Store mzstatic images: 'not accessible or has expired'), so a URL
+        is downloaded here and uploaded like a local file."""
+        if os.path.exists(ref):
+            return self.fal.upload_file(ref)
+        r = httpx.get(ref, follow_redirects=True, timeout=60)
+        r.raise_for_status()
+        ctype = r.headers.get("content-type", "image/jpeg").split(";")[0]
+        return self.fal.upload(r.content, content_type=ctype)
 
     def generate(self, req: GenRequest, out: Path) -> GenResult:
         duration = "auto" if req.duration_s < 0 else str(max(4, min(req.duration_s, 30)))
