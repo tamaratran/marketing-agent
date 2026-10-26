@@ -154,19 +154,29 @@ def strip_label(text: str) -> str:
 
 
 def captions_from_script(hook: str, lines: list[str], total_s: float) -> list[Caption]:
-    """Hook on screen for the first 2.5s, then the script's on-screen lines spread over the rest.
+    """Hook on screen first, then the script's other on-screen lines spread over the rest.
 
-    Never shows a line for less than MIN_LINE_S, so short clips drop trailing lines
-    instead of flashing all of them.
+    Script lines that are just the hook broken over lines ("POV: I made cardio" + "Subway
+    Surfers") are shown as the hook itself, stacked, not replayed one fragment at a time. With
+    nothing else to show, the hook stays up for half the clip. Never shows a line for less than
+    MIN_LINE_S, so short clips drop trailing lines instead of flashing all of them.
     """
-    caps = [Caption(strip_label(hook), 0, min(HOOK_S, total_s))] if hook.strip() else []
+    hook = strip_label(hook).strip()
     lines = [TIMESTAMP_RE.sub("", ln.strip(" -•")) for ln in lines if ln.strip()][:6]
-    max_lines = int((total_s - HOOK_S) // MIN_LINE_S)
-    lines = lines[:max_lines]
-    if lines:
-        step = (total_s - HOOK_S) / len(lines)
-        for i, ln in enumerate(lines):
-            caps.append(Caption(ln[:60], 2.5 + i * step, 2.5 + (i + 1) * step))
+    hook_parts = [ln for ln in lines if hook and ln.lower() in hook.lower()]
+    extra = [ln for ln in lines if ln not in hook_parts]
+    if hook_parts and " ".join(hook_parts).lower() == hook.lower():
+        hook = "\n".join(hook_parts)
+    caps = []
+    hook_end = min(HOOK_S if extra else total_s / 2, total_s)
+    if hook:
+        caps.append(Caption(hook, 0, hook_end))
+    max_lines = int((total_s - hook_end) // MIN_LINE_S)
+    extra = extra[:max_lines]
+    if extra:
+        step = (total_s - hook_end) / len(extra)
+        for i, ln in enumerate(extra):
+            caps.append(Caption(ln[:60], hook_end + i * step, hook_end + (i + 1) * step))
     return caps
 
 
