@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { fmt, get, type Findings, type Level } from "@/lib/api";
 import { Card, H1, Note, Pill, Stat, Table, human, pt } from "../ui";
 import { RefreshButtons } from "../refresh";
@@ -60,14 +61,14 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ o
       <div className="mb-2 text-xs text-neutral-500">Measure</div>
       <p className="mb-3 flex flex-wrap gap-2 text-sm">
         {Object.entries(f.outcomes ?? {}).map(([k, label]) => (
-          <a key={k} href={`/findings?outcome=${k}${niche ? `&niche=${niche}` : ""}`} title={label} className={`rounded border px-2 py-1 ${k === outcome ? "border-neutral-300 text-white" : "border-neutral-700 text-neutral-400 hover:text-white"}`}>{outcomeText[k] ?? label}</a>
+          <Link key={k} href={`/findings?outcome=${k}${niche ? `&niche=${niche}` : ""}`} title={label} className={`rounded border px-2 py-1 ${k === outcome ? "border-neutral-300 text-white" : "border-neutral-700 text-neutral-400 hover:text-white"}`}>{outcomeText[k] ?? label}</Link>
         ))}
       </p>
       <div className="mb-2 text-xs text-neutral-500">Videos from</div>
       <p className="mb-4 flex flex-wrap gap-2 text-sm">
-        <a href={`/findings?outcome=${outcome}`} className={`rounded border px-2 py-1 ${!niche ? "border-neutral-300 text-white" : "border-neutral-700 text-neutral-400"}`}>all niches</a>
+        <Link href={`/findings?outcome=${outcome}`} className={`rounded border px-2 py-1 ${!niche ? "border-neutral-300 text-white" : "border-neutral-700 text-neutral-400"}`}>all niches</Link>
         {Object.entries(st.niches ?? {}).map(([n, c]) => (
-          <a key={n} href={`/findings?outcome=${outcome}&niche=${n}`} className={`rounded border px-2 py-1 ${niche === n ? "border-neutral-300 text-white" : "border-neutral-700 text-neutral-400"}`}>{n} only ({c})</a>
+          <Link key={n} href={`/findings?outcome=${outcome}&niche=${n}`} className={`rounded border px-2 py-1 ${niche === n ? "border-neutral-300 text-white" : "border-neutral-700 text-neutral-400"}`}>{n} only ({c})</Link>
         ))}
       </p>
       {fitted.length > 0 && (

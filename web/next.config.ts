@@ -1,7 +1,14 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // Served at tamarajtran.com/marketing-agent through a rewrite on the personal site.
+  basePath: "/marketing-agent",
+  async redirects() {
+    return [
+      { source: "/", destination: "/marketing-agent", basePath: false, permanent: false },
+      { source: "/:path((?!marketing-agent(?:/|$)).*)", destination: "/marketing-agent/:path", basePath: false, permanent: false },
+    ];
+  },
   turbopack: {
     rules: {
       "*.css": {
