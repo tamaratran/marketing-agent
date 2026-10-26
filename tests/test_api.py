@@ -319,6 +319,8 @@ def test_post_button_starts_one_posting_session(client, monkeypatch):
     assert seen["kw"]["title"].startswith(f"mkt post s{sid}")
     again = client.post(f"/renders/{sid}/post", headers=AUTH).json()
     assert again["already"] is True and again["url"].endswith("/p")
-    rend = client.get(f"/renders?niche={api.DEFAULT_NICHE}").json()[0]
+    rend = next(
+        r for r in client.get(f"/renders?niche={api.DEFAULT_NICHE}").json() if r["script_id"] == sid
+    )
     assert rend["post_session_url"].endswith("/p") and rend["post_requested_at"]
     assert client.get("/runs").json()[0]["note"].startswith(f"post s{sid}")
