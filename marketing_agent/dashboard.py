@@ -7,7 +7,6 @@ import time
 from datetime import UTC, datetime
 from pathlib import Path
 
-from .creators.ops import creator_report, payouts
 from .policy import concept_scores, winning_traits
 from .scoreboard import build
 from .store import Store
@@ -89,8 +88,6 @@ def render(store: Store, niche: str, out: Path, copy_assets: bool = True) -> Pat
             rel = f"renders/{src.name}"
         if rel:
             clips.append((rel, r))
-    pays = payouts(store)
-    creators = creator_report(store)
     cs = concept_scores(store, niche)
     traits = winning_traits(store)
     spent = sum(r["cost_usd"] or 0 for r in store.rows("SELECT cost_usd FROM renders"))
@@ -102,7 +99,6 @@ def render(store: Store, niche: str, out: Path, copy_assets: bool = True) -> Pat
         (len(cs), "concepts"),
         (len(scripts), "scripts this week"),
         (f"${spent:.2f}", "spent on renders"),
-        (f"${sum(p['owed_usd'] for p in pays):.2f}", "owed to creators"),
     ]
     kpi_html = "".join(f"<div class=kpi><b>{_e(v)}</b><span>{_e(k)}</span></div>" for v, k in kpis)
 
@@ -171,50 +167,6 @@ def render(store: Store, niche: str, out: Path, copy_assets: bool = True) -> Pat
             for v in [x for x in sb["videos"] if x.get("hook_type")][:20]
         ],
     )
-    creators_table = _table(
-        [
-            ("creator", False),
-            ("channel", False),
-            ("rate", True),
-            ("posts", True),
-            ("median views", True),
-            ("last post", False),
-            ("status", False),
-        ],
-        [
-            [
-                _e(c["handle"]),
-                _e(c["channel"]),
-                f"${c['rate_per_1k']:.2f}",
-                str(c["posts"]),
-                str(c["median_views"]),
-                _e(c["last_post"]),
-                f'<span class="{"" if c["status"] == "active" else "neg"}">{_e(c["status"])}</span>',
-            ]
-            for c in creators
-        ],
-    )
-    payouts_table = _table(
-        [
-            ("creator", False),
-            ("views", True),
-            ("owed", True),
-            ("paid", True),
-            ("settled", False),
-            ("post", False),
-        ],
-        [
-            [
-                _e(p["creator"]),
-                f"{p['views']:,}",
-                f"${p['owed_usd']:.2f}",
-                f"${p['paid_usd']:.2f}",
-                "yes" if p["settled"] else f"<span class=mut>day {p['age_days']:.0f} of 7</span>",
-                f'<a href="{_e(p["url"])}" target=_blank rel=noopener>open</a>',
-            ]
-            for p in pays
-        ],
-    )
     stuck = (
         ", ".join(_e(f["author"]) for f in build(store, group="ours")["stuck_accounts"]) or "none"
     )
@@ -232,8 +184,6 @@ def render(store: Store, niche: str, out: Path, copy_assets: bool = True) -> Pat
 <h2>Clips</h2><div class=clips>{clips_html}</div>
 <h2>Scripts this week</h2>{scripts_table}
 <h2>Top tagged videos in the niche</h2>{videos_table}
-<h2>Creators</h2>{creators_table}
-<h2>Payouts</h2>{payouts_table}
 <p class=mut>Possibly throttled accounts: {stuck}</p>
 </main></body></html>"""
     out.write_text(page)

@@ -9,7 +9,7 @@ export default async function Page() {
   const rows = await get<Run[]>("/runs");
   return (
     <>
-      <H1 sub="Each run is a Devin session that scrapes, classifies, picks a concept, writes scripts, renders, polls creator posts and pushes state. The cron does one a day; this starts an extra one.">Runs</H1>
+      <H1 sub="Each run is a Devin session that scrapes, classifies, picks a concept, writes scripts, renders, checks our posts and pushes state. The cron does one a day; this starts an extra one.">Runs</H1>
       <div className="mb-4"><RefreshButtons /></div>
       <Card title="Start a run" className="mb-5">
         <form action={startRun} className="flex flex-wrap gap-2">
