@@ -104,6 +104,31 @@ class ReplicateSeedance(VideoProvider):
         )
 
 
+def fal_locked() -> str | None:
+    """Why fal would refuse a render right now, or None. fal locks the whole account when the
+    balance is exhausted and every call then fails with 403 'User is locked. Reason: Exhausted
+    balance'; the storage token endpoint shows that without rendering (or paying) anything."""
+    key = os.environ.get("FAL_KEY")
+    if not key:
+        return "FAL_KEY not set"
+    try:
+        r = httpx.post(
+            "https://rest.fal.ai/storage/auth/token",
+            params={"storage_type": "fal-cdn-v3"},
+            headers={"Authorization": f"Key {key}"},
+            timeout=30,
+        )
+    except httpx.HTTPError as e:
+        return f"fal unreachable: {e}"
+    if r.status_code < 400:
+        return None
+    try:
+        detail = r.json().get("detail")
+    except ValueError:
+        detail = None
+    return str(detail or f"fal {r.status_code}")
+
+
 class FalSeedance(VideoProvider):
     """Seedance on fal.ai (newest version: 2.5, US-hosted). 4-30 s or auto duration, 480p/720p/1080p,
     9:16, synchronized audio with lip-synced speech. Reference images/videos/audio switch the endpoint

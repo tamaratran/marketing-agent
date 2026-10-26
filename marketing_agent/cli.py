@@ -727,6 +727,11 @@ def daily(
     resolution = resolution or c.cycle.resolution
     rep = DailyReport(niche, product)
 
+    def _fal_locked():
+        from .video.generate import fal_locked
+
+        return fal_locked()
+
     def stage(name, fn):
         t0 = time.time()
         try:
@@ -775,6 +780,8 @@ def daily(
         rep.skip("render", "no scripts written this run")
     elif not os.environ.get("FAL_KEY"):
         rep.skip("render", "FAL_KEY not set")
+    elif (lock := _fal_locked()) is not None:
+        rep.fail("render", RuntimeError(f"needs a top-up at fal.ai/dashboard/billing: {lock}"))
     else:
 
         def render_best():
@@ -796,6 +803,12 @@ def daily(
                     )
                     made.append(sid)
                 except Exception as e:  # noqa: BLE001 - only moderation is skippable
+                    if "Exhausted balance" in str(e) or "User is locked" in str(e):
+                        raise RuntimeError(
+                            f"rendered {', '.join(f's{i}' for i in made) or 'nothing'}; "
+                            f"fal balance ran out, needs a top-up at fal.ai/dashboard/billing "
+                            f"(wanted {renders})"
+                        ) from e
                     if "content_policy_violation" not in str(e):
                         raise
                     rejected.append(sid)
