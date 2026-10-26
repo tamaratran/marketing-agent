@@ -98,6 +98,7 @@ def daily_prompt(
     refs: list[str] | None = None,
     product_tags: list[str] | None = None,
     mode: str = "full",
+    api_url: str = "",
 ) -> str:
     """What the Devin session is told. Self-contained: the session starts with no history.
     mode: "full" (measure, research, scripts, render), "research" (the same with --renders 0, so
@@ -138,8 +139,11 @@ Then:
 3. Push the db to the API: mkt sync push
 4. Commit the state: cd ../mkt-state && git add -A && git commit -m "state: renders {day}" \
    && git push origin HEAD:{state_branch}
-Never post anything to TikTok and never message anyone; posting is a separate step a person
-approves per clip on the site.
+5. Post every clip you rendered and did not hold. The account owner asked for this: each call
+   starts a posting session that uploads the clip from our account and registers the link:
+   curl -sS -X POST {api_url}/renders/<script_id>/post -H "Authorization: Bearer $MKT_API_TOKEN"
+   One call per clip, never twice for the same clip, never for a held clip.
+Never message anyone and never post from any account but ours.
 """
     ref_str += "".join(f' --product-tag "{t}"' for t in product_tags or [])
     return f"""Repo: {repo}. Run one cycle ({day}) of the marketing agent and report on it.

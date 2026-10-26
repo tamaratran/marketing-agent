@@ -19,3 +19,8 @@ def test_render_mode_only_renders_latest_batch():
 def test_full_mode_unchanged():
     p = daily_prompt("fitness", ["a"], "P", renders=5)
     assert "mkt daily fitness a" in p and "--renders 5" in p
+
+
+def test_render_mode_posts_each_kept_clip():
+    p = daily_prompt("fitness", ["a"], "P", renders=2, mode="render", api_url="https://api.example")
+    assert "POST https://api.example/renders/<script_id>/post" in p and "never for a held clip" in p

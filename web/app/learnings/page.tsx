@@ -96,7 +96,7 @@ export default async function Page() {
             </ul>
             <form action={startRenders} className="mt-4 flex flex-wrap items-center gap-3">
               <button className={button} disabled={!!running}>Generate clips</button>
-              <Note>Renders the best {c.cycle.clips} not-yet-rendered scripts above at {c.cycle.resolution}, about ${(c.cycle.clips * (c.cycle.resolution === "1080p" ? 9.6 : c.cycle.resolution === "480p" ? 2.65 : 5.68)).toFixed(0)} on fal. Clips land on the Clips page for you to post; nothing is posted automatically.</Note>
+              <Note>Renders the best {c.cycle.clips} not-yet-rendered scripts above at {c.cycle.resolution}, about ${(c.cycle.clips * (c.cycle.resolution === "1080p" ? 9.6 : c.cycle.resolution === "480p" ? 2.65 : 5.68)).toFixed(0)} on fal. Each finished clip is then posted to our account on its own and its link registered on Our posts, so measurement starts right away. Clips the worker holds (wrong game on screen, a second person) are not posted.</Note>
             </form>
           </>
         )}
