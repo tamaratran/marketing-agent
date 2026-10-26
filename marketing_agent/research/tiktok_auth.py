@@ -25,7 +25,7 @@ def normalize_handle(handle: str) -> str:
 
 def profile_handle(href: str | None) -> str | None:
     path = urlsplit(href or "").path
-    return path[2:].lower() if path.startswith("/@") else None
+    return (path[2:].lower() or None) if path.startswith("/@") else None  # logged out: "/@"
 
 
 async def _identity(page) -> str | None:
