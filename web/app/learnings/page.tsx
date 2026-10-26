@@ -1,6 +1,6 @@
 import { API, get, type Learning } from "@/lib/api";
 import { Markdown } from "../md";
-import { Card, H1, Note, Pill } from "../ui";
+import { Card, H1, Note, Pill, formatName } from "../ui";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +23,7 @@ export default async function Page() {
               <Pill tone={e.kind === "cycle" ? "neutral" : "good"}>{e.kind === "cycle" ? "measured" : "observation"}</Pill>
               <span className="text-xs text-neutral-500">{when(e.created_at)} · {e.niche}</span>
             </div>
-            <Markdown text={e.body} />
+            <Markdown text={formatName(e.body)} />
           </Card>
         ))}
       </div>

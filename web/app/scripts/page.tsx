@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { dateOf, get, type Render, type Script } from "@/lib/api";
-import { Card, H1, Note, Pill } from "../ui";
+import { Card, H1, Note, Pill, formatName } from "../ui";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +17,7 @@ export default async function Page() {
         {rows.map((s) => (
           <Card key={s.id}>
             <div className="mb-1 flex flex-wrap items-center gap-2 text-xs text-neutral-500">
-              <span>#{s.id}</span><span>{dateOf(s.created_at)}</span><Pill>{s.concept}</Pill>
+              <span>#{s.id}</span><span>{dateOf(s.created_at)}</span><Pill>{formatName(s.concept)}</Pill>
               <Pill tone={s.demo_score >= 4 ? "good" : "warn"}>demo {s.demo_score}/5</Pill>
               {rendered.has(s.id) && <Link href={`/clips#s${s.id}`}><Pill tone="good">clip ready</Pill></Link>}
             </div>
