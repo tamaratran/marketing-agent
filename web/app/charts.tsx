@@ -51,7 +51,7 @@ export function Trend({ points, label, fmt }: { points: { t: number; v: number }
         {points.length > 1 && <polyline fill="none" stroke="#a3a3a3" strokeWidth={1.5} points={points.map((p, i) => `${x(i)},${y(p.v)}`).join(" ")} />}
         {points.map((p, i) => <circle key={p.t} cx={x(i)} cy={y(p.v)} r={2.5} fill="#e5e5e5"><title>{`${new Date(p.t * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric" })}: ${fmt(p.v)}`}</title></circle>)}
       </svg>
-      <div className="text-[10px] text-neutral-600">{points.length === 1 ? "1 cycle so far" : `${points.length} cycles, oldest left`}</div>
+      <div className="text-[10px] text-neutral-600">{points.length === 1 ? "1 run so far" : `${points.length} runs`}</div>
     </div>
   );
 }
