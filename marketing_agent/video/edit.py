@@ -23,6 +23,14 @@ def drawable(text: str) -> str:
     return re.sub(r"  +", " ", EMOJI_RE.sub("", text)).strip()
 
 
+def wrap_lines(text: str, width: int) -> str:
+    """Wrap each line of text on its own; explicit breaks stay where the script put them."""
+    out = []
+    for line in text.split("\n"):
+        out += textwrap.wrap(line, width) or ([""] if out else [])
+    return "\n".join(out).strip("\n")
+
+
 @dataclass
 class Caption:
     text: str
@@ -34,11 +42,13 @@ def drawtext_filters(
     captions: list[Caption], workdir: Path, fontsize: int = 64, wrap: int = 24
 ) -> str:
     """One drawtext per caption. Text goes through a file so quotes/colons need no escaping and
-    long hooks wrap onto several centred lines instead of running off the 1080 px frame."""
+    long hooks wrap onto several centred lines instead of running off the 1080 px frame. Line
+    breaks already in the caption (a hook stacked the way the script split it) are kept, so
+    "POV: cardio / finally got fun" is not re-flowed into "POV: cardio finally got / fun"."""
     parts = []
     for i, c in enumerate(captions):
         tf = workdir / f"cap{i}.txt"
-        tf.write_text("\n".join(textwrap.wrap(drawable(c.text), wrap)) or " ")
+        tf.write_text(wrap_lines(drawable(c.text), wrap) or " ")
         parts.append(
             f"drawtext=fontfile={FONT}:textfile={tf}:fontsize={fontsize}:fontcolor=white:"
             f"borderw=4:bordercolor=black:line_spacing=10:x=(w-text_w)/2:y=h*0.68:"
