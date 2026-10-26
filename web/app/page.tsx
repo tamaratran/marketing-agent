@@ -22,7 +22,10 @@ export default async function Page({ searchParams }: { searchParams: Promise<Q> 
   const account = ours.accounts[0]?.handle;
   const posted = new Map(ours.posts.filter((p) => p.script_id).map((p) => [p.script_id as number, p]));
   const clips = renders.filter((r, i) => renders.findIndex((x) => x.script_id === r.script_id) === i);
-  const clip = clips.find((r) => String(r.script_id) === q.clip) ?? clips.find((r) => !posted.has(r.script_id)) ?? clips[0];
+  const clip = clips.find((r) => String(r.script_id) === q.clip)
+    ?? clips.find((r) => !posted.has(r.script_id) && !r.hold_reason)
+    ?? clips.find((r) => !r.hold_reason)
+    ?? clips[0];
   const script = scripts.find((s) => s.id === clip?.script_id) ?? scripts[0];
   const concept = concepts.find((c) => c.name === script?.concept) ?? concepts[0];
   const scored = o.top_videos.filter((v) => v.reward != null && v.reward > 0);
@@ -87,9 +90,10 @@ export default async function Page({ searchParams }: { searchParams: Promise<Q> 
         <Screen title="The clip" lead="An AI preview of the script, captions included.">
           <video key={clip.script_id} poster={frameUrl(`s${clip.script_id}`)} controls playsInline preload="metadata" className="mx-auto aspect-[9/16] h-[55vh] max-h-[560px] rounded-lg bg-black" src={`${CLIPS}/s${clip.script_id}.mp4`} />
           <div className="mt-3 flex items-center justify-center gap-3 text-sm">
-            {posted.has(clip.script_id) ? <Pill tone="good">already posted</Pill> : <Pill tone="warn">not posted yet</Pill>}
+            {posted.has(clip.script_id) ? <Pill tone="good">already posted</Pill> : clip.hold_reason ? <Pill tone="bad">on hold</Pill> : <Pill tone="warn">not posted yet</Pill>}
             {clip.post_path ? <Download src={`${CLIPS}/s${clip.script_id}_clean.mp4`}>Download clean clip to post</Download> : <Download src={`${CLIPS}/s${clip.script_id}.mp4`} />}
           </div>
+          {clip.hold_reason && <Aside>On hold, do not post this one: {clip.hold_reason}</Aside>}
           {clip.post_path && clip.post_text.length > 0 && (
             <div className="mx-auto mt-3 max-w-sm rounded border border-neutral-800 p-2 text-center">
               <p className="text-[11px] uppercase tracking-wide text-neutral-500">text to add in TikTok</p>
@@ -191,7 +195,7 @@ function Others({ clips, current, step, posted }: { clips: Render[]; current?: n
       <div className="mt-2 flex flex-wrap gap-2">
         {clips.map((c) => (
           <Link key={c.script_id} href={`/?step=${step}&clip=${c.script_id}`} className={`rounded border px-2 py-1 text-xs ${c.script_id === current ? "border-neutral-300 text-white" : "border-neutral-800 text-neutral-400 hover:border-neutral-600"}`}>
-            {c.hook}{posted.has(c.script_id) ? " (posted)" : ""}
+            {c.hook}{posted.has(c.script_id) ? " (posted)" : c.hold_reason ? " (on hold)" : ""}
           </Link>
         ))}
       </div>

@@ -25,10 +25,12 @@ CASTING = (
 
 
 def video_prompt(req: "GenRequest") -> str:
-    """The model prompt: the script's beats, a casting note (attractive but natural; polished
-    AI-looking people underperform) and a standing ban on generated text, because the editor
-    burns the real captions in and generated text comes out as gibberish."""
-    return req.prompt.rstrip() + CASTING + NO_TEXT
+    """The model prompt: the script's beats, the standing rules from clip review (what must or
+    must not happen on screen), a casting note (attractive but natural; polished AI-looking
+    people underperform) and a standing ban on generated text, because the editor burns the real
+    captions in and generated text comes out as gibberish."""
+    rules = "".join(f" {r.rstrip('.')}." for r in req.rules if r.strip())
+    return req.prompt.rstrip() + rules + CASTING + NO_TEXT
 
 
 @dataclass
@@ -39,6 +41,7 @@ class GenRequest:
     resolution: str = "720p"
     reference_images: list[str] = field(default_factory=list)  # URLs or local paths
     generate_audio: bool = True
+    rules: list[str] = field(default_factory=list)  # standing rules from review, plain sentences
 
 
 @dataclass

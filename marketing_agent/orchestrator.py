@@ -141,6 +141,10 @@ Then:
    entry is already written by `mkt daily`; this is your reading of it): what the source videos
    actually do that the scripts should copy, what came out wrong and why, what you changed.
    2 to 8 sentences, no filler:  mkt learn add "<short title>" --body "<markdown>"
+   If a clip must not be posted (wrong game on the TV, a second person, the app icon as a shot),
+   hold it with the reason:  mkt learn hold <script_id> "<reason>"
+   If you learned something every future script or clip must obey, make it a rule in one plain
+   sentence; it goes into every script and video prompt from then on:  mkt learn rule "<sentence>"
 3. Push the finished db to the API: mkt sync push
 4. Commit the state: cd ../mkt-state && git add -A && git commit -m "state: {day}" \\
    && git push origin HEAD:{state_branch}

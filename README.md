@@ -163,6 +163,19 @@ leaned on, how our posts did against the market, and what changed since the last
 session adds its own reading with `mkt learn add "title" --body "..."`. The API serves them as
 `GET /learnings` and as one file, `GET /learnings.md`; the site shows them on Learnings.
 
+
+Two more kinds of entry, both written by the person or session reviewing clips:
+
+- `mkt learn rule "<one plain sentence>"`: a standing rule ("The TV shows our game for the whole
+  clip"). From then on it is in every script prompt (first, under "Standing rules from review") and
+  appended to every video prompt.
+- `mkt learn hold <script_id> "<reason>"` / `mkt learn release <script_id>`: keep a clip off the
+  ready-to-post list and out of the walkthrough; the reason shows on Clips, and its hook drops out
+  of the "hooks we have already rendered" list the writer sees. The Clips page has the same buttons.
+
+What the writer is told about our own results (`policy.verdicts`) carries the evidence behind each
+line: measured formats with n, formats never posted, trait scores with their post counts, and hooks
+marked measured or untested, plus a warning while fewer than 3 posts are measured.
 ## campaign.toml
 
 One file says what the loop is for; the API (`GET /campaign`, shown on Runs), the CLI (`mkt

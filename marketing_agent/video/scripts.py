@@ -137,7 +137,7 @@ def write_scripts(
                 "role": "user",
                 "content": prompt
                 + (
-                    f"\n\nWhat has worked so far on this account (reward is log10 views vs baseline):\n{context}\nLean on the winners, avoid the losers, but keep 2-3 scripts that try something else."
+                    f"\n\nWhat has worked so far on this account (scores are log10 views against niche videos of the same age and account size; +1 is 10x):\n{context}\nLean on the winners, avoid the losers, but keep 2-3 scripts that try something else."
                     if context
                     else ""
                 ),

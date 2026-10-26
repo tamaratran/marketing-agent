@@ -24,11 +24,60 @@ SCHEMA = """CREATE TABLE IF NOT EXISTS learnings (
 
 CYCLE = "cycle"
 NOTE = "note"
+RULE = "rule"  # a standing do/don't the writer and the video prompt must follow
+
+MIGRATIONS = ["ALTER TABLE renders ADD COLUMN hold_reason TEXT"]
 
 
 def migrate(store: Store) -> None:
+    import sqlite3
+
     with store.conn() as c:
         c.execute(SCHEMA)
+        for m in MIGRATIONS:
+            try:
+                c.execute(m)
+            except sqlite3.OperationalError:
+                pass
+
+
+def add_rule(store: Store, niche: str, product: str, text: str) -> int:
+    """A standing rule in plain words ("the TV must show our game for the whole clip"). Rules go
+    into every script prompt and every video prompt from now on; notes are what happened once."""
+    return add(store, niche, product, text.strip().split("\n")[0][:80], text, kind=RULE)
+
+
+def rules(store: Store, niche: str | None = None) -> list[str]:
+    """Standing rules, oldest first, so the writer reads them in the order they were learned."""
+    return [
+        e["body"].strip() for e in reversed(entries(store, niche, limit=500)) if e["kind"] == RULE
+    ]
+
+
+def rules_text(store: Store, niche: str | None = None) -> str:
+    rs = rules(store, niche)
+    if not rs:
+        return ""
+    return "Standing rules from review (always apply):\n" + "\n".join(f"- {r}" for r in rs)
+
+
+def hold(store: Store, script_id: int, reason: str) -> int:
+    """Keep a clip out of the walkthrough and off the ready-to-post list, with the reason shown
+    on Clips. Returns how many renders it touched."""
+    migrate(store)
+    with store.conn() as c:
+        return c.execute(
+            "UPDATE renders SET hold_reason=? WHERE script_id=?",
+            (reason.strip() or "on hold", script_id),
+        ).rowcount
+
+
+def release(store: Store, script_id: int) -> int:
+    migrate(store)
+    with store.conn() as c:
+        return c.execute(
+            "UPDATE renders SET hold_reason=NULL WHERE script_id=?", (script_id,)
+        ).rowcount
 
 
 def add(
