@@ -1,3 +1,5 @@
+import { notFound } from "next/navigation";
+
 export const API = (process.env.NEXT_PUBLIC_API_URL ?? "https://mkt-api.fly.dev").replace(/\/$/, "");
 
 // Clips live next to the static dashboard (the daily run copies them there); the API only has the db.
@@ -9,6 +11,7 @@ export const tiktokEmbed = (id: string) => `https://www.tiktok.com/embed/v2/${id
 
 export async function get<T>(path: string): Promise<T> {
   const r = await fetch(`${API}${path}`, { cache: "no-store" });
+  if (r.status === 404) notFound();
   if (!r.ok) throw new Error(`${path}: ${r.status}`);
   return r.json();
 }
