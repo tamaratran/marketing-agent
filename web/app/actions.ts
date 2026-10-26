@@ -46,6 +46,13 @@ export async function addPost(formData: FormData) {
   revalidatePath("/ours");
 }
 
+export async function postClip(formData: FormData) {
+  const id = Number(formData.get("script_id"));
+  await post(`/renders/${id}/post`);
+  revalidatePath("/clips");
+  revalidatePath("/");
+}
+
 export async function holdClip(formData: FormData) {
   const id = Number(formData.get("script_id"));
   await post(`/renders/${id}/hold`, { reason: String(formData.get("reason") ?? "") });

@@ -225,6 +225,67 @@ def record_stage(store: Store, niche: str, name: str, status: str, note: str = "
     return rows[0]["id"]
 
 
+def post_prompt(
+    script_id: int,
+    clip_url: str,
+    text_lines: list[str],
+    caption: str,
+    sound: str,
+    sound_url: str,
+    handle: str,
+    api_url: str,
+    repo: str = DEFAULT_REPO,
+) -> str:
+    """What the Devin session that posts one clip is told. A person pressed Post on the site for
+    exactly this clip; the session uploads it from our account through TikTok's own web uploader,
+    adds the text with TikTok's text tool (so TikTok reads it as text, not pixels), picks the
+    sound, posts, and registers the post so measurement starts. Nothing else."""
+    lines = "\n".join(f"  {i + 1}. {ln}" for i, ln in enumerate(text_lines)) or "  (none)"
+    sound_line = (
+        f"{sound} ({sound_url})"
+        if sound and sound_url
+        else sound or "none picked: leave the sound off"
+    )
+    return f"""Repo: {repo}. Post ONE clip to TikTok from our account @{handle} and register it. A person
+on the site pressed Post for exactly this clip; do not post anything else.
+
+The clip (script #{script_id}), a clean export with no text burned in: {clip_url}
+Download it with curl. Do not re-encode it.
+
+Text to add with TikTok's own text tool in the web uploader (the "Text" button), one text box per
+line, white bold, lower third of the frame, visible for the whole clip:
+{lines}
+
+Description (caption field): {caption}
+Sound to add with the uploader's "Sounds" button: {sound_line}
+If that exact sound cannot be found, search its title; if still missing, post with the clip's own
+audio and say so in your summary.
+
+Setup (in the repo): uv venv && . .venv/bin/activate && uv pip install -e ".[dev]"
+The uploader runs in the Chrome already open in your VM at http://localhost:29229 (Playwright over
+CDP). It must be signed in as @{handle}: `mkt own login` reuses a verified login or submits
+TIKTOK_POST_HANDLE and TIKTOK_POST_PASSWORD from protected environment secrets. Never print them,
+put them in prompts, export cookies or copy them anywhere. If TikTok asks for a verification code
+or a CAPTCHA you cannot solve, or the browser is signed into a different account, stop and report;
+do not post from another account.
+
+Uploader notes: https://www.tiktok.com/tiktokstudio/upload has one hidden input[type=file]; set the
+file on it. Click Cancel on the "automatic content checks" dialog and let the tour finish (never
+remove its DOM nodes, the page breaks). Leave every setting TikTok chooses as it is, including its
+AI-generated content label: do not toggle it on or off. Check the preview shows the text, then Post.
+
+Then:
+1. Open https://www.tiktok.com/@{handle} and copy the new post's URL (it can take a minute).
+2. Register it so views start counting toward the script:
+   curl -sS -X POST {api_url}/ours/posts -H "Authorization: Bearer $MKT_API_TOKEN" \\
+     -H "content-type: application/json" -d '{{"url": "<post url>", "caption": "<description>"}}'
+3. Reply with: the post URL, the text lines as added, the sound used, and anything TikTok changed
+   or refused. Attach a screenshot of the posted video page.
+
+Rules: one post, this clip only. Never message anyone, no bot accounts, no purchases, no account,
+password or security changes. Do not edit the repo, open PRs or merge. Do not commit secrets."""
+
+
 class DailyReport:
     """Collects stage outcomes during `mkt daily` and renders the markdown report."""
 

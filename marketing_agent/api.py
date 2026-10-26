@@ -188,7 +188,7 @@ def renders(limit: int = 50, niche: str = DEFAULT_NICHE):
     learnings_migrate(store)
     rows = store.rows(
         """SELECT r.id, r.script_id, r.created_at, r.model, r.cost_usd, r.final_path, r.post_path,
-                  r.hold_reason, s.hook, s.payload
+                  r.post_session_url, r.post_requested_at, r.hold_reason, s.hook, s.payload
            FROM renders r JOIN scripts s ON s.id=r.script_id JOIN concepts c ON c.id=s.concept_id
            WHERE r.final_path IS NOT NULL AND r.model!='stub' AND c.niche=?
            ORDER BY r.created_at DESC LIMIT ?""",
@@ -196,14 +196,91 @@ def renders(limit: int = 50, niche: str = DEFAULT_NICHE):
     )
     for r in rows:
         payload = json.loads(r.pop("payload") or "{}")
-        r["hook"] = strip_label(r["hook"] or "")
-        hook = r["hook"] if payload.get("hook_on_screen", True) else ""
-        caps = [ln.strip() for ln in payload.get("captions") or [] if ln.strip()]
         # Scripts often list the hook again as caption fragments ("POV: cardio" + "finally got
         # fun"); the poster types the hook once, so those fragments are not repeated.
-        caps = [ln for ln in caps if not (hook and ln.lower() in hook.lower())]
-        r["post_text"] = ([hook] if hook else []) + caps
+        r["post_text"] = _post_text(r["hook"], payload)
+        r["hook"] = strip_label(r["hook"] or "")
     return rows
+
+
+CLIPS_URL = os.environ.get("MKT_CLIPS_URL", "https://mkt-dashboard-eta.vercel.app/renders")
+API_PUBLIC_URL = os.environ.get("MKT_API_URL", "https://mkt-api.fly.dev")
+
+
+def _post_text(hook: str, payload: dict) -> list[str]:
+    hook = strip_label(hook or "") if payload.get("hook_on_screen", True) else ""
+    caps = [ln.strip() for ln in payload.get("captions") or [] if ln.strip()]
+    caps = [ln for ln in caps if not (hook and ln.lower() in hook.lower())]
+    return ([hook] if hook else []) + caps
+
+
+@app.post("/renders/{script_id}/post", dependencies=[Depends(_auth)])
+def post_render(script_id: int):
+    """The Post button: start a Devin session that uploads this script's clean clip from our
+    account through TikTok's web uploader, adds the text with TikTok's text tool, picks the sound
+    and registers the post. One clip per press; a person decided this one is good enough."""
+    from .orchestrator import DEFAULT_REPO, DevinClient, post_prompt
+
+    store = _store()
+    store.migrate()
+    learnings_migrate(store)
+    rows = store.rows(
+        """SELECT r.id, r.post_path, r.post_session_url, r.hold_reason, s.hook, s.payload
+           FROM renders r JOIN scripts s ON s.id=r.script_id
+           WHERE r.script_id=? AND r.final_path IS NOT NULL ORDER BY r.created_at DESC LIMIT 1""",
+        (script_id,),
+    )
+    if not rows:
+        raise HTTPException(404, "no clip for that script")
+    r = rows[0]
+    if not r["post_path"]:
+        raise HTTPException(400, "this clip has no clean copy to post; render it again")
+    if r["hold_reason"]:
+        raise HTTPException(400, f"clip is on hold: {r['hold_reason']}")
+    if r["post_session_url"]:
+        return {"ok": True, "url": r["post_session_url"], "already": True}
+    payload = json.loads(r["payload"] or "{}")
+    text = _post_text(r["hook"], payload)
+    tags = " ".join(
+        f"#{t.lstrip('#')}" for t in (CAMPAIGN.product.hashtags + CAMPAIGN.niche.hashtags)[:4]
+    )
+    caption = " ".join(x for x in (strip_label(r["hook"] or ""), tags) if x)
+    s = DevinClient().create_session(
+        post_prompt(
+            script_id,
+            f"{CLIPS_URL}/s{script_id}_clean.mp4",
+            text,
+            caption,
+            payload.get("sound") or "",
+            f"https://www.tiktok.com/music/x-{payload['sound_id']}"
+            if payload.get("sound_id")
+            else "",
+            CAMPAIGN.account.handle,
+            API_PUBLIC_URL,
+        ),
+        title=f"mkt post s{script_id} @{CAMPAIGN.account.handle}",
+        tags=["marketing-agent", "post", "api"],
+        repos=[DEFAULT_REPO],
+        max_acu_limit=CAMPAIGN.cycle.max_acu,
+    )
+    now = int(time.time())
+    with store.conn() as c:
+        c.execute(
+            "UPDATE renders SET post_session_url=?, post_requested_at=? WHERE id=?",
+            (s["url"], now, r["id"]),
+        )
+    store.insert(
+        "runs",
+        {
+            "created_at": now,
+            "session_id": s["session_id"],
+            "url": s["url"],
+            "niche": DEFAULT_NICHE,
+            "product": CAMPAIGN.product.description,
+            "note": f"post s{script_id} from @{CAMPAIGN.account.handle}",
+        },
+    )
+    return {"ok": True, "url": s["url"], "session_id": s["session_id"]}
 
 
 @app.get("/renders/{render_id}/file")
