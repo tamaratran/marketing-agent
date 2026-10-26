@@ -118,10 +118,9 @@ CREATE TABLE IF NOT EXISTS payouts (
 """
 
 
-# Videos from our side: posts by our registered accounts (campaign and historical) and posts by
-# creators we briefed. Everything else is a reference video scraped for research.
-OURS_SQL = """(v.ours=1 OR lower(v.author) IN (SELECT handle FROM own_accounts)
-               OR v.id IN (SELECT video_id FROM posts))"""
+# Our videos: posts by our registered accounts, campaign and historical. Everything else is a
+# reference video scraped for research.
+OURS_SQL = "(v.ours=1 OR lower(v.author) IN (SELECT handle FROM own_accounts))"
 GROUPS = ("reference", "ours")
 
 
@@ -196,7 +195,7 @@ class Store:
         self, tag: str | None = None, limit: int = 500, group: str | None = None
     ) -> list[dict]:
         """Videos with their most recent observation, newest-first. `group` is "reference"
-        (scraped for research), "ours" (our accounts and briefed creators) or None for both."""
+        (scraped for research), "ours" (our registered accounts) or None for both."""
         q = """SELECT v.*, o.views, o.likes, o.comments, o.shares, o.saves, o.observed_at
                FROM videos v JOIN observations o ON o.video_id=v.id
                WHERE o.observed_at = (SELECT MAX(observed_at) FROM observations WHERE video_id=v.id)"""
