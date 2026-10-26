@@ -50,7 +50,7 @@ export async function Formats() {
 
   return (
     <>
-      <H1 sub={`What is working in ${o.niche} on TikTok right now, grouped into formats we can copy. Each cycle the picker chooses one and writes scripts in it.`}>Formats</H1>
+      <H1 sub={`What is working in ${o.niche} on TikTok, grouped into formats we can copy.`}>Formats</H1>
 
       <section className="mb-8 rounded-lg border border-neutral-800 p-4">
         <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
