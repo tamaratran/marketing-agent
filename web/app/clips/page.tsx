@@ -2,7 +2,7 @@ import Link from "next/link";
 import { CLIPS, dateOf, get, usd, type Render, type Script, frameUrl } from "@/lib/api";
 import type { Ours } from "@/lib/ours";
 import { Download } from "../download";
-import { Card, H1, Note, Pill } from "../ui";
+import { Card, H1, Note, Pill, formatName } from "../ui";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +17,7 @@ export default async function Page() {
     <>
       <H1 sub={`AI preview clips (Seedance) of the best scripts, captions burned in. A person posts them${account ? ` from @${account}` : ""}; nothing is posted automatically.`}>Clips</H1>
       <Note className="mb-4">
-        To post one: download it, upload it to TikTok, and add the sound listed under the clip from TikTok&apos;s sound library (if none is listed, use a trending sound from the concept&apos;s research videos). The next sync matches the post to its script by caption, and its views start counting toward that concept.
+        To post one: download it, upload it to TikTok, and add the sound listed under the clip from TikTok&apos;s sound library (if none is listed, use a trending sound from the format&apos;s research videos). The next sync matches the post to its script by caption, and its views start counting toward that format.
       </Note>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {rows.map((r) => {
@@ -31,7 +31,7 @@ export default async function Page() {
                 <Download src={src} className="text-xs text-sky-300 hover:underline">download</Download>
               </div>
               <p className="mt-2 text-sm font-medium">{r.hook}</p>
-              {s?.concept && <p className="text-xs text-neutral-400">concept: {s.concept}</p>}
+              {s?.concept && <p className="text-xs text-neutral-400">format: {formatName(s.concept)}</p>}
               <p className="text-xs text-neutral-400">sound: {s?.sound ? (s.sound_url ? <a className="underline" href={s.sound_url} target="_blank">{s.sound}</a> : s.sound) : <span className="text-neutral-600">none picked, use a trending one</span>}</p>
               <p className="mt-1 text-xs text-neutral-500"><Link href="/scripts" className="hover:underline">script #{r.script_id}</Link> · {dateOf(r.created_at)} · {usd(r.cost_usd)}</p>
             </Card>

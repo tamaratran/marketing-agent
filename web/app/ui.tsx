@@ -74,7 +74,7 @@ export const reward = (r: number | null | undefined, empty = "not scored yet") =
   );
 
 /** Concept names without the research agent's "Clone:" prefix. */
-export const formatName = (n: string) => n.replace(/^Clone:\s*/, "");
+export const formatName = (n: string) => n.replace(/\bClone:\s*/g, "");
 
 /** snake_case classifier labels as words. */
 export const human = (s: string | null | undefined) => (s ? s.replaceAll("_", " ") : "");

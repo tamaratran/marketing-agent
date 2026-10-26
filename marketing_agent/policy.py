@@ -1,7 +1,8 @@
 """Closes the loop: the scoreboard's rewards decide which concept gets scripted next and what the
 script writer is told has worked. Thompson-style sampling over concepts (mean reward with a prior
-from the radar's early score) keeps roughly a quarter of picks exploring instead of always taking
-the current leader."""
+from the radar's early score) keeps exploring instead of always taking the current leader. The
+product's own cloned format starts FORMAT_EDGE above the best market format, so it wins about 3 in
+4 picks and the rest test market formats."""
 
 import json
 import math
@@ -11,7 +12,7 @@ from .scoreboard import build
 from .store import Store
 
 EXPLORE_SD = 0.35
-FORMAT_PRIOR = 3.0  # market priors top out near 1.0; 4 sd above them with EXPLORE_SD noise
+FORMAT_EDGE = 0.65  # clone wins ~75% of picks against 7 market formats with EXPLORE_SD noise
 
 
 def controlled_traits(store: Store, outcome: str = "lift_72h") -> str:
@@ -166,6 +167,12 @@ def concept_scores(store: Store, niche: str, tag: str | None = None) -> list[dic
         "SELECT id, name, description, early_score, payload FROM concepts WHERE niche=? ORDER BY created_at DESC",
         (niche,),
     )
+    # Each research run stores a fresh row per concept, so our posts can point at an older row of
+    # the same name; pool them by name so their results reach the row the picker uses.
+    by_name: dict[str, list[dict]] = {}
+    for c in rows:
+        if c["id"] in ours:
+            by_name.setdefault(c["name"], []).append(ours[c["id"]])
     seen, out = set(), []
     for c in rows:
         if c["name"] in seen:
@@ -176,11 +183,13 @@ def concept_scores(store: Store, niche: str, tag: str | None = None) -> list[dic
         except ValueError:
             kind = ""
         prior = math.log10((c["early_score"] or 0) + 1) / 3  # ~0..1 for 1..1000 early score
-        if kind == "format":
-            # A beat sheet of the product's own proven videos beats any fresh-niche cluster until
-            # our posts say otherwise: sits above the market range plus the exploration noise.
-            prior = FORMAT_PRIOR
-        obs = ours.get(c["id"])
+        hits = by_name.get(c["name"], [])
+        n = sum(h["n"] for h in hits)
+        obs = (
+            {"mean_reward": round(sum(h["mean_reward"] * h["n"] for h in hits) / n, 3), "n": n}
+            if n
+            else None
+        )
         out.append(
             {
                 **c,
@@ -190,6 +199,12 @@ def concept_scores(store: Store, niche: str, tag: str | None = None) -> list[dic
                 "n": obs["n"] if obs else 0,
             }
         )
+    # A beat sheet of the product's own proven videos is the safest bet, so it leads the best
+    # market format by FORMAT_EDGE: favoured, but close enough that the noise still tests others.
+    market = [c["prior"] for c in out if c["kind"] != "format"]
+    for c in out:
+        if c["kind"] == "format":
+            c["prior"] = round(max(market, default=0.0) + FORMAT_EDGE, 3)
     return out
 
 

@@ -1,6 +1,8 @@
 import json
 import time
 
+import pytest
+
 from marketing_agent.own import accounts, add_account, match_script, own_posts, own_rewards
 from marketing_agent.policy import concept_scores
 from marketing_agent.store import Store
@@ -184,3 +186,45 @@ def test_script_matching_filters_future_and_other_product_niche(tmp_path):
         )[0]
         is None
     )
+
+
+def test_add_post_links_script_before_public(tmp_path, monkeypatch):
+    from marketing_agent import own
+    from marketing_agent.research import tiktok_browser
+
+    store = Store(tmp_path / "t.sqlite")
+    add_account(store, "@kriscaroll", "", "app")
+    cid = store.insert("concepts", {"name": "tv demo", "niche": "fitness"})
+    sid = store.insert(
+        "scripts",
+        {
+            "concept_id": cid,
+            "product": "app",
+            "created_at": int(time.time()) - 60,
+            "hook": "POV: cardio finally got fun",
+            "body": "",
+            "demo_score": 5,
+            "payload": json.dumps({"captions": ["POV: cardio finally got fun"]}),
+        },
+    )
+    monkeypatch.setattr(tiktok_browser, "poll_public_stats", lambda url: None)
+    url = "https://www.tiktok.com/@kriscaroll/video/7700861920710036749"
+    res = own.add_post(store, url, "POV: cardio finally got fun #immersiveworkout", niche="fitness")
+    assert res["script_id"] == sid and res["public"] is False
+    post = own_posts(store)[0]
+    assert post["id"] == "7700861920710036749" and post["script_id"] == sid
+    assert post["views_now"] is None and post["n_obs"] == 0
+    # once public, the poll fills in the numbers and keeps the link
+    monkeypatch.setattr(
+        tiktok_browser,
+        "poll_public_stats",
+        lambda url: {
+            **_video("7700861920710036749", "kriscaroll", 1, 2000),
+            "desc": "POV: cardio finally got fun",
+        },
+    )
+    res = own.add_post(store, url, niche="fitness")
+    assert res["public"] is True and own_posts(store)[0]["views_now"] == 2000
+    monkeypatch.setattr(tiktok_browser, "poll_public_stats", lambda url: None)
+    with pytest.raises(ValueError):
+        own.add_post(store, "https://www.tiktok.com/@someoneelse/video/1", niche="fitness")

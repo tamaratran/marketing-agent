@@ -82,12 +82,14 @@ def logic(niche: str = DEFAULT_NICHE):
     usual (both log10, as scored) and the picker's constants, so the page never hardcodes them."""
     store = _store()
     sb = build(store, tags=store.niche_tags(niche) or None)
+    clone = next((c for c in policy.concept_scores(store, niche) if c["kind"] == "format"), None)
     keys = ("id", "author", "views", "followers", "create_time", "log_views", "baseline", "reward")
     return {
         "niche": niche,
         "videos": [{k: v.get(k) for k in keys} for v in sb["videos"]],
         "explore_sd": policy.EXPLORE_SD,
-        "format_prior": policy.FORMAT_PRIOR,
+        "format_edge": policy.FORMAT_EDGE,
+        "format_prior": clone["prior"] if clone else None,
         "min_age_h": scoreboard.MIN_AGE_H_FOR_JUDGEMENT,
         "winsor_pct": scoreboard.WINSOR_PCT,
     }
@@ -339,6 +341,25 @@ def analyze_now(niche: str | None = None):
     res = analyze(store, [niche] if niche else None)
     save_findings(store, res)
     return res["status"]
+
+
+class PostIn(BaseModel):
+    """A post a person made from one of our accounts: its TikTok link and, ideally, the caption
+    used, so it links to its script even before TikTok makes it public."""
+
+    url: str
+    caption: str = ""
+
+
+@app.post("/ours/posts", dependencies=[Depends(_auth)])
+def ours_add_post(body: PostIn):
+    """Register a post we made so the re-poll tracks its views and the picker learns from it."""
+    from .own import add_post
+
+    try:
+        return add_post(_store(), body.url, body.caption, niche=DEFAULT_NICHE)
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
 
 
 @app.get("/ours")

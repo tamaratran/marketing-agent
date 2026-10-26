@@ -237,6 +237,21 @@ def own_add(handle, tag, product):
     console.print("Account registered for profile discovery. Historical posts are baseline only.")
 
 
+@own.command("post")
+@click.argument("url")
+@click.option("--caption", default="", help="The caption used, so the post links to its script now")
+@click.option("--niche", default=None)
+def own_post(url, caption, niche):
+    """Register a post a person made from one of our accounts by its TikTok link."""
+    from .own import add_post
+
+    try:
+        res = add_post(_store(), url, caption, niche=_niche(niche))
+    except ValueError as e:
+        raise click.ClickException(str(e)) from e
+    console.print(res)
+
+
 @own.command("sync")
 @click.argument("niche", required=False)
 @click.argument("tags", nargs=-1)
