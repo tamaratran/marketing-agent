@@ -1,5 +1,5 @@
 import { get, type Concept, type Script } from "@/lib/api";
-import { H1, Note, Table, reward } from "../ui";
+import { H1, Note, Table, formatName, reward } from "../ui";
 
 export const dynamic = "force-dynamic";
 
@@ -9,7 +9,7 @@ export default async function Page() {
   for (const s of scripts) used.set(s.concept, (used.get(s.concept) ?? 0) + 1);
   return (
     <>
-      <H1 sub="Reusable video formats the research agent found in other accounts' videos. Each day the picker chooses one to write scripts from.">Concepts</H1>
+      <H1 sub="Reusable video formats the research agent found in other accounts' videos. Each day the picker chooses one to write scripts from.">Formats</H1>
       <Note className="mb-4">
         <b className="text-neutral-400">Early traction</b>: how fast videos in this format gained views, discounted for big accounts.{" "}
         <b className="text-neutral-400">Pick weight</b>: the starting chance of being picked (1.00 is average); it shifts once our own posts have results.{" "}
@@ -18,7 +18,7 @@ export default async function Page() {
       <Table
         head={["concept", "what it is", "early traction", "pick weight", "scripts (14d)", "our results"]}
         rows={rows.map((c) => [
-          <b key={c.id}>{c.name}</b>,
+          <b key={c.id}>{formatName(c.name)}</b>,
           <span key="d" className="text-neutral-400">{c.description}</span>,
           Math.round(c.early_score),
           c.prior.toFixed(2),

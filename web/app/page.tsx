@@ -2,8 +2,9 @@ import Link from "next/link";
 import { CLIPS, frameUrl, get, usd, type Concept, type Findings, type Overview, type Render, type Script } from "@/lib/api";
 import type { Ours } from "@/lib/ours";
 import { startRun } from "./actions";
+import { Download } from "./download";
 import { Thumb } from "./thumb";
-import { button, Pill, human, pt, reward, times } from "./ui";
+import { button, formatName, Pill, human, pt, reward, times } from "./ui";
 
 export const dynamic = "force-dynamic";
 
@@ -30,12 +31,12 @@ export default async function Page({ searchParams }: { searchParams: Promise<Q> 
 
   return (
     <div className="mx-auto max-w-2xl">
-      <ol className="mb-6 flex gap-1">
+      <ol className="mb-4 flex gap-1">
         {STEPS.map((s, i) => (
           <li key={s} className="flex-1">
-            <Link href={href(i + 1)} className="block">
+            <Link href={href(i + 1)} className="block py-2" aria-label={`Step ${i + 1}: ${s}`}>
               <div className={`h-1 rounded ${i + 1 <= step ? "bg-neutral-100" : "bg-neutral-800"}`} />
-              <div className={`mt-1 hidden text-[11px] sm:block ${i + 1 === step ? "text-neutral-100" : "text-neutral-500"}`}>{s}</div>
+              <div className={`mt-1 text-[11px] ${i + 1 === step ? "text-neutral-100" : "text-neutral-500"}`}><span className="sm:hidden">{i + 1}</span><span className="hidden sm:inline">{s}</span></div>
             </Link>
           </li>
         ))}
@@ -44,7 +45,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<Q> 
       <div className="text-xs text-neutral-500">Step {step} of {STEPS.length}</div>
 
       {step === 1 && (
-        <Screen title="What's working on TikTok" lead={`We watch ${o.videos} recent ${o.niche} videos from other accounts and track their views. These beat their creator's usual views by the most.`}>
+        <Screen title="What's working on TikTok" lead={`We watch ${o.videos} recent ${o.niche} videos from other accounts and track their views. ${scored.length ? "These beat their creator's usual views by the most" : "None are old enough to compare yet"}${scored.length && top.length > scored.length ? ", plus the newest ones, which are too new to compare yet" : ""}.`}>
           <div className="space-y-3">
             {top.map((v) => (
               <a key={v.id} href={v.url} target="_blank" className="flex gap-3 rounded-lg border border-neutral-800 p-3 hover:border-neutral-600">
@@ -62,11 +63,11 @@ export default async function Page({ searchParams }: { searchParams: Promise<Q> 
       )}
 
       {step === 2 && concept && (
-        <Screen title={concept.name} lead="The agent groups videos like these into reusable formats. This is the format behind the clip you are about to see.">
+        <Screen title={formatName(concept.name)} lead="The agent groups videos like these into reusable formats. This is the format behind the clip you are about to see.">
           <p className="text-sm leading-relaxed text-neutral-300">{concept.description}</p>
           <div className="mt-5 text-xs text-neutral-500">Other formats it found</div>
           <ul className="mt-2 space-y-1 text-sm text-neutral-400">
-            {concepts.filter((c) => c.id !== concept.id).slice(0, 4).map((c) => <li key={c.id}>{c.name}</li>)}
+            {concepts.filter((c) => c.id !== concept.id).slice(0, 4).map((c) => <li key={c.id}>{formatName(c.name)}</li>)}
           </ul>
           <Aside>Formats with more early views get picked more often. Once our own posts have results, the ones that work for us get picked more.</Aside>
         </Screen>
@@ -84,10 +85,10 @@ export default async function Page({ searchParams }: { searchParams: Promise<Q> 
 
       {step === 4 && (clip ? (
         <Screen title="The clip" lead="An AI preview of the script, captions included.">
-          <video key={clip.script_id} poster={frameUrl(`s${clip.script_id}`)} controls playsInline preload="metadata" className="mx-auto aspect-[9/16] w-full max-w-xs rounded-lg bg-black" src={`${CLIPS}/s${clip.script_id}.mp4`} />
+          <video key={clip.script_id} poster={frameUrl(`s${clip.script_id}`)} controls playsInline preload="metadata" className="mx-auto aspect-[9/16] h-[55vh] max-h-[560px] rounded-lg bg-black" src={`${CLIPS}/s${clip.script_id}.mp4`} />
           <div className="mt-3 flex items-center justify-center gap-3 text-sm">
             {posted.has(clip.script_id) ? <Pill tone="good">already posted</Pill> : <Pill tone="warn">not posted yet</Pill>}
-            <a href={`${CLIPS}/s${clip.script_id}.mp4`} download className="text-sky-300 hover:underline">Download</a>
+            <Download src={`${CLIPS}/s${clip.script_id}.mp4`} />
           </div>
           {clips.length > 1 && <Others clips={clips} current={clip.script_id} step={4} posted={posted} />}
         </Screen>
@@ -98,7 +99,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<Q> 
       {step === 5 && (
         <Screen title="Post it" lead={`Nothing is posted automatically. Post it yourself${account ? ` from @${account}` : ""}.`}>
           <ol className="space-y-3 text-sm text-neutral-300">
-            <Li n={1}>Download the clip{clip ? <> (<a href={`${CLIPS}/s${clip.script_id}.mp4`} download className="text-sky-300 hover:underline">here</a>)</> : null} and upload it in TikTok.</Li>
+            <Li n={1}>Download the clip{clip ? <> (<Download src={`${CLIPS}/s${clip.script_id}.mp4`}>here</Download>)</> : null} and upload it in TikTok.</Li>
             <Li n={2}>
               Add the sound:{" "}
               {script?.sound ? (script.sound_url ? <a href={script.sound_url} target="_blank" className="text-sky-300 hover:underline">{script.sound}</a> : <b>{script.sound}</b>) : "none was picked, so use one that is trending in this format."}
@@ -136,7 +137,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<Q> 
         </Screen>
       )}
 
-      <div className="mt-8 flex items-center justify-between">
+      <div className="sticky bottom-0 -mx-4 mt-8 flex items-center justify-between border-t border-neutral-900 bg-neutral-950/95 px-4 py-3 backdrop-blur sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:px-0 sm:py-0">
         {step > 1 ? <Link href={href(step - 1)} className="rounded border border-neutral-700 px-4 py-2 text-sm hover:bg-neutral-800">Back</Link> : <span />}
         {step < STEPS.length
           ? <Link href={href(step + 1)} className="rounded bg-neutral-100 px-5 py-2 text-sm font-medium text-neutral-900 hover:bg-white">Next: {STEPS[step]}</Link>
