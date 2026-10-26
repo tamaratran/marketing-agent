@@ -40,14 +40,14 @@ export async function startRenders() {
 
 export async function repollNow() {
   const r = await post("/repoll");
-  revalidatePath("/findings");
+  revalidatePath("/how");
   revalidatePath("/");
   return r;
 }
 
 export async function analyzeNow() {
   const r = await post("/analyze");
-  revalidatePath("/findings");
+  revalidatePath("/how");
   revalidatePath("/");
   return r;
 }

@@ -6,7 +6,7 @@ import { STEPS } from "./ui";
 
 const pages: [string, string][] = [
   ["/how", "How it decides"],
-  ["/overview", "Overview"], ["/findings", "Findings"], ["/scripts", "Scripts"], ["/runs", "Runs"],
+  ["/overview", "Overview"], ["/scripts", "Scripts"], ["/runs", "Runs"],
 ];
 
 export function Nav() {

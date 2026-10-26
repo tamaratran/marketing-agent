@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { get, type Concept, type TraitDetail, type Findings, type Logic, type Overview, type Render, type Script } from "@/lib/api";
+import { fmt, get, type Concept, type TraitDetail, type Findings, type Level, type Logic, type Overview, type Render, type Script } from "@/lib/api";
 import type { Ours } from "@/lib/ours";
-import { H1, Note, formatName, times } from "../ui";
+import { Card, H1, Note, Pill, Stat, Table, formatName, human, times } from "../ui";
+import { RefreshButtons } from "../refresh";
 
 export const dynamic = "force-dynamic";
 
@@ -32,7 +33,8 @@ function pickChances(rows: { mean: number; sd: number }[]) {
 
 const pct = (p: number) => (p >= 0.995 ? ">99%" : p < 0.005 ? "<1%" : `${Math.round(p * 100)}%`);
 
-export default async function How() {
+export default async function How({ searchParams }: { searchParams: Promise<{ outcome?: string; niche?: string }> }) {
+  const sp = await searchParams;
   const [lg, concepts, ours, fs, o, scripts, renders] = await Promise.all([
     get<Logic>("/logic"), get<Concept[]>("/concepts"), get<Ours>("/ours"), get<Findings>("/findings"),
     get<Overview>("/overview"), get<Script[]>("/scripts?days=60&limit=500"), get<Render[]>("/renders"),
@@ -66,7 +68,7 @@ export default async function How() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-12">
-      <H1 sub="The actual rules the agent follows to decide what the next video looks like, drawn from live data.">How it decides</H1>
+      <H1 sub="The actual rules the agent follows to decide what the next video looks like, drawn from live data, and what the niche's numbers say so far.">How it decides</H1>
 
       <Section n={1} title="The loop">
         <Loop steps={[
@@ -154,26 +156,23 @@ export default async function How() {
         <pre className="mt-3 max-h-72 overflow-auto whitespace-pre-wrap rounded-lg border border-neutral-800 bg-neutral-900/60 p-3 text-xs leading-relaxed text-neutral-400">{o.winning || "Nothing scored yet, so the writer only gets the format."}</pre>
       </Section>
 
-      <Section n={6} title="Check: is a pattern real or luck?">
+      <Section n={6} title="Check: is a pattern real or luck?" id="check">
         <p className="text-sm text-neutral-300">
           The summary above is raw averages, which mix up the trait with account size, video length and posting time.
-          A separate analysis follows fresh videos in this niche and compares like with like, using the same &quot;videos like it&quot; score as step 2,
+          A separate analysis follows a fixed group of fresh videos in this niche for a week and compares like with like, using the same &quot;videos like it&quot; score as step 2,
           once at least {fs.min_n ?? 20} of them are a day old and scored. Views are only checked when a cycle runs, so this fills in with cycles, not with time.
         </p>
         <Progress done={fs.status.reached["scored"] ?? 0} need={fs.min_n ?? 20} tracked={fs.status.videos} />
-        <Note className="mt-2">
-          {fs.collecting
-            ? "Still collecting. Until then the writer gets the raw version."
-            : <>Ready. See <Link href="/findings" className="text-sky-300 hover:underline">Findings</Link>.</>}
-        </Note>
+        <div className="mt-4"><RefreshButtons /></div>
+        <FindingsTables f={fs} sp={sp} />
       </Section>
     </div>
   );
 }
 
-function Section({ n, title, children }: { n: number; title: string; children: React.ReactNode }) {
+function Section({ n, title, id, children }: { n: number; title: string; id?: string; children: React.ReactNode }) {
   return (
-    <section>
+    <section id={id} className="scroll-mt-4">
       <div className="mb-3 flex items-baseline gap-2">
         <span className="text-xs tabular-nums text-neutral-500">{n}</span>
         <h2 className="text-base font-semibold">{title}</h2>
@@ -298,6 +297,91 @@ function Progress({ done, need, tracked }: { done: number; need: number; tracked
       <div className="h-2 rounded bg-neutral-800"><div className="h-2 rounded bg-sky-400/70" style={{ width: `${Math.min(1, done / need) * 100}%` }} /></div>
       <span className="text-right tabular-nums text-neutral-400">{done} of {need} needed</span>
       <Note className="col-span-2">Videos at least 3 days old, out of {tracked} being followed.</Note>
+    </div>
+  );
+}
+
+const tone = (v: string) => (v === "better" ? "good" : v === "worse" ? "bad" : v === "thin" ? "warn" : "neutral");
+const verdictText: Record<string, string> = { thin: "too few videos", "no evidence": "no clear difference", reference: "baseline" };
+const outcomeText: Record<string, string> = {
+  lift_now: "Beat videos like it (same age, same account size), latest check",
+  lift_72h: "Beat the creator's usual at 3 days",
+  growth_6_24: "Kept growing from 6h to 24h",
+  log_vph_6h: "Fast start (views per hour at 6h)",
+};
+
+function Levels({ levels, minN }: { levels: Level[]; minN: number }) {
+  return (
+    <Table
+      head={["value", "videos", "raw average", "after controls", "likely range", "verdict"]}
+      rows={levels.map((l) => [
+        human(l.level),
+        l.n < minN ? <span key="n" className="text-amber-300" title={`under the ${minN} needed`}>{l.n}</span> : l.n,
+        fmt(l.raw_mean),
+        l.reference ? "baseline" : (l.coef > 0 ? "+" : "") + fmt(l.coef),
+        l.reference ? "" : `${fmt(l.lo)} to ${fmt(l.hi)}`,
+        <span key="v" className="flex gap-1"><Pill tone={tone(l.verdict)}>{verdictText[l.verdict] ?? l.verdict}</Pill>{l.travels && <Pill tone="good">holds across niches</Pill>}</span>,
+      ])}
+    />
+  );
+}
+
+/** The trait results, once the Findings page: which hook, style, length and posting time go with more
+ *  views after controls. Lives under step 6 so the numbers sit next to the rule that uses them. */
+function FindingsTables({ f, sp }: { f: Findings; sp: { outcome?: string; niche?: string } }) {
+  const outcome = sp.outcome && f.fits[sp.outcome] ? sp.outcome : f.fits.lift_now ? "lift_now" : "lift_72h";
+  const niche = sp.niche;
+  const fits = f.fits[outcome] ? (niche ? f.fits[outcome].per_niche[niche] ?? {} : f.fits[outcome].pooled) : {};
+  const st = f.status;
+  const minN = f.min_n ?? 20;
+  const fitted = Object.entries(fits).filter(([, fit]) => fit.levels?.length);
+  const empty = Object.entries(fits).filter(([, fit]) => !fit.levels?.length).map(([t]) => t);
+  const link = (q: string) => `/how?${q}#check`;
+  return (
+    <div className="mt-5">
+      <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-5">
+        <Stat label="videos being followed" value={st.videos} hint="Enrolled when under 6 hours old." />
+        <Stat label="tagged by the classifier" value={st.tagged ?? 0} />
+        <Stat label="with the creator's usual views" value={st.with_baseline ?? 0} hint="Needed to judge a video against its own account." />
+        <Stat label="scored" value={st.reached["scored"] ?? 0} hint={`A day old with a view count, judged against videos like them. Findings need ${minN}.`} />
+        <Stat label="3 days old" value={st.reached["72h"] ?? 0} hint="For the slower 3-day measures." />
+      </div>
+      {f.collecting && (
+        <Card className="mb-4">
+          <p className="text-sm text-amber-200">
+            Still collecting, so nothing below is a result yet. {st.reached["scored"] ?? 0} of {st.videos} videos are scored (a day old, with a view count); {minN} are needed before a trait is called better or worse. Until then the writer gets the raw version from step 5.
+          </p>
+        </Card>
+      )}
+      <div className="mb-2 text-xs text-neutral-500">Measure</div>
+      <p className="mb-3 flex flex-wrap gap-2 text-sm">
+        {Object.entries(f.outcomes ?? {}).map(([k, label]) => (
+          <Link key={k} href={link(`outcome=${k}${niche ? `&niche=${niche}` : ""}`)} title={label} className={`rounded border px-2 py-1 ${k === outcome ? "border-neutral-300 text-white" : "border-neutral-700 text-neutral-400 hover:text-white"}`}>{outcomeText[k] ?? label}</Link>
+        ))}
+      </p>
+      <div className="mb-2 text-xs text-neutral-500">Videos from</div>
+      <p className="mb-4 flex flex-wrap gap-2 text-sm">
+        <Link href={link(`outcome=${outcome}`)} className={`rounded border px-2 py-1 ${!niche ? "border-neutral-300 text-white" : "border-neutral-700 text-neutral-400"}`}>all niches</Link>
+        {Object.entries(st.niches ?? {}).map(([n, c]) => (
+          <Link key={n} href={link(`outcome=${outcome}&niche=${n}`)} className={`rounded border px-2 py-1 ${niche === n ? "border-neutral-300 text-white" : "border-neutral-700 text-neutral-400"}`}>{n} only ({c})</Link>
+        ))}
+      </p>
+      {fitted.length > 0 && (
+        <Note className="mb-3">
+          Numbers are on a log10 scale: +0.30 after controls is about 2x the views of the baseline value, +1.00 about 10x. &quot;Likely range&quot; is the 95% interval; if it crosses zero there is no clear difference.
+        </Note>
+      )}
+      {fitted.map(([trait, fit]) => (
+        <Card key={trait} title={`${human(trait)} · ${fit.n} videos`} className="mb-4">
+          <Levels levels={fit.levels} minN={minN} />
+        </Card>
+      ))}
+      {empty.length > 0 && (
+        <Card className="mb-4">
+          <p className="text-sm text-neutral-400">Not enough scored videos to compare yet: {empty.map(human).join(", ")}.</p>
+        </Card>
+      )}
+      {Object.keys(fits).length === 0 && <p className="text-sm text-neutral-500">No analysis stored yet. Start a run cycle or choose &quot;Check post performance&quot; to refresh it.</p>}
     </div>
   );
 }
