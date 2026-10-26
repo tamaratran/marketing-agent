@@ -615,12 +615,15 @@ def run(ctx, niche, tags, product, top):
 @click.option("--top", default=8)
 @click.option("--renders", default=1, help="Render the N best scripts written this run (0 = skip)")
 @click.option("--resolution", default="480p")
+@click.option(
+    "--ref", "refs", multiple=True, help="Reference image URL/path (product shots) for renders"
+)
 @click.option("--report", type=click.Path(), default=None, help="Markdown report path")
 @click.option(
     "--dashboard", "dashboard_out", type=click.Path(), default=None, help="index.html path"
 )
 @click.pass_context
-def daily(ctx, niche, tags, product, top, renders, resolution, report, dashboard_out):
+def daily(ctx, niche, tags, product, top, renders, resolution, refs, report, dashboard_out):
     """The whole loop in order with a report at the end: run (scrape, classify, concepts, pick,
     scripts), render, poll creator posts, payouts, scoreboard, policy. A failed stage is recorded
     and the rest still runs."""
@@ -683,7 +686,7 @@ def daily(ctx, niche, tags, product, top, renders, resolution, report, dashboard
                         duration=12,
                         resolution=resolution,
                         sound=None,
-                        ref=(),
+                        ref=tuple(refs),
                     )
                     made.append(sid)
                 except Exception as e:  # noqa: BLE001 - only moderation is skippable

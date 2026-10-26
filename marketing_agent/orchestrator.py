@@ -95,10 +95,12 @@ def daily_prompt(
     resolution: str = "480p",
     repo: str = DEFAULT_REPO,
     state_branch: str = STATE_BRANCH,
+    refs: list[str] | None = None,
 ) -> str:
     """What the Devin session is told. Self-contained: the session starts with no history."""
     day = datetime.now(UTC).strftime("%Y-%m-%d")
     tag_str = " ".join(tags)
+    ref_str = "".join(f' --ref "{r}"' for r in refs or [])
     return f"""Repo: {repo}. Run today's ({day}) loop of the marketing agent and report on it.
 
 Setup (in the repo):
@@ -124,7 +126,7 @@ Before running, take the API's db if it has one (it is the source of truth betwe
 dashboard reads its data there): mkt sync pull   (MKT_API_TOKEN is in your env)
 
 Run:
-  mkt daily {niche} {tag_str} --product "{product}" --renders {renders} --resolution {resolution} \\
+  mkt daily {niche} {tag_str} --product "{product}" --renders {renders} --resolution {resolution}{ref_str} \\
     --report ../mkt-state/reports/{day}.md --dashboard ../mkt-state/site/index.html
 
 Then:
