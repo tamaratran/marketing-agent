@@ -193,6 +193,11 @@ def pacing_bucket(cuts_per_10s) -> str | None:
     return PACING_LABELS[-1]
 
 
+# A trait value needs this many scored, classified videos before it gets a bar. Below it a
+# single outlier makes the bar (5.7x on 2 videos), so the row is withheld rather than shown.
+TRAIT_MIN_N = 5
+
+
 def rank_by(rows: list[dict], key: str, min_n: int = 2) -> list[dict]:
     """Mean reward per value of `key` (e.g. hook_type, concept), with n and a 1-sigma error."""
     groups: dict[str, list[float]] = defaultdict(list)
@@ -286,12 +291,13 @@ def build(
     return {
         "curve": reference_curve(rows),
         "videos": sorted(scored, key=lambda r: -(r["reward"] if r["reward"] is not None else -9)),
-        "hooks": rank_by(scored, "hook_type"),
+        "hooks": rank_by(scored, "hook_type", min_n=TRAIT_MIN_N),
         "concepts": rank_by(scored, "concept"),
-        "styles": rank_by(scored, "visual_style"),
-        "pacing": rank_by(scored, "pacing_bucket"),
-        "sound": rank_by(scored, "music_role"),
-        "product_early": rank_by(scored, "product_on_screen_by_5s"),
+        "styles": rank_by(scored, "visual_style", min_n=TRAIT_MIN_N),
+        "pacing": rank_by(scored, "pacing_bucket", min_n=TRAIT_MIN_N),
+        "sound": rank_by(scored, "music_role", min_n=TRAIT_MIN_N),
+        "product_early": rank_by(scored, "product_on_screen_by_5s", min_n=TRAIT_MIN_N),
+        "trait_min_n": TRAIT_MIN_N,
         "stuck_accounts": shadowban_flags(scored),
         "n_scored": sum(1 for r in scored if r["reward"] is not None),
         "n_tagged": sum(1 for r in scored if r["hook_type"]),

@@ -169,7 +169,9 @@ standard error, over the niche's scored research videos), what the picker leaned
 each format would win its draw, how our posts did against the market, and what changed since the
 last cycle. Those numbers are stored with the entry as `facts`, so the Learnings page draws its
 trait bars and cycle-to-cycle trends from the same figures the text was written from. `mkt daily`
-classifies up to `--classify-panel` (40) scored research videos a run so the tables fill; the
+classifies every scored research video that has no tags yet (`--classify-panel N` caps it), so
+after the first full pass each run only has the cycle's new videos to do; a trait value needs
+`TRAIT_MIN_N` (5) scored, classified videos before it gets a bar. The
 Devin session adds its own reading with `mkt learn add "title" --body "..."`. The API serves them
 as `GET /learnings` and as one file, `GET /learnings.md`; the site shows them on Learnings.
 

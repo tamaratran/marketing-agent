@@ -57,7 +57,7 @@ export async function Formats() {
         <p className="mt-1 mb-4 text-xs leading-relaxed text-neutral-500">
           {o.videos} recent {o.niche} videos from other accounts tracked, {o.scored} scored against {o.niche} videos of the same age from accounts the same size, {o.tagged} classified by the vision model.
           Each bar is the mean lift of videos with that trait: 1x means the same views as videos like it, 10x ten times more. The number after the dot is how many scored videos the bar rests on; the white tick is one standard error.
-          {o.tagged < 40 && ` With ${o.tagged} classified so far these are early reads, not verdicts; each cycle classifies more.`}
+          {o.tagged < 40 && ` With ${o.tagged} classified so far these are early reads, not verdicts; a trait value needs ${o.trait_min_n ?? 5} videos before it gets a bar, and Research again classifies every scored video that has none.`}
         </p>
         {tables.length ? (
           <>
@@ -81,7 +81,7 @@ export async function Formats() {
             </Fold>
           </>
         ) : (
-          <p className="text-sm text-neutral-500">No scored videos have been classified yet. The next cycle classifies the first batch.</p>
+          <p className="text-sm text-neutral-500">No trait value has {o.trait_min_n ?? 5} scored, classified videos yet. Research again on Learnings classifies every scored video that has no tags.</p>
         )}
         <p className="mt-4 text-xs text-neutral-500">Cycle by cycle, with our own posts: <Link href="/learnings" className="text-sky-300 hover:underline">Learnings</Link>. How the picker turns this into a choice: <Link href="/how" className="text-sky-300 hover:underline">How it decides</Link>.</p>
       </section>

@@ -20,7 +20,7 @@ export const dateOf = (ts: number) => new Date(ts * 1000).toISOString().slice(0,
 export const usd = (n: number) => `$${(n ?? 0).toFixed(2)}`;
 
 export type Overview = {
-  niche: string; videos: number; scored: number; tagged: number; concepts: number;
+  niche: string; videos: number; scored: number; tagged: number; trait_min_n?: number; concepts: number;
   spent_usd: number; winning: string;
   hooks: { hook_type: string; n: number; mean_reward: number; win_rate: number }[];
   styles: { visual_style: string; n: number; mean_reward: number; win_rate: number }[];

@@ -61,7 +61,7 @@ export default async function Page() {
           {nTagged < 30 && <> With {nTagged} classified so far these are early reads, not verdicts; they firm up as each cycle classifies more.</>}
         </Note>
         {tables.length === 0 ? (
-          <Note className="mt-3">No trait has two scored, classified videos yet. The bars appear once a cycle classifies videos that are a day old.</Note>
+          <Note className="mt-3">No trait has {o.trait_min_n ?? 5} scored, classified videos yet; fewer than that and one outlier makes the bar. Research again classifies every scored video that has no tags, so the bars appear after it runs.</Note>
         ) : (
           <div className="mt-4 grid gap-6 sm:grid-cols-2">
             {tables.map((t) => <TraitBars key={t.key} rows={t.rows} column={t.col} title={t.title} />)}
