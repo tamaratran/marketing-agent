@@ -24,6 +24,20 @@ export async function startRun() {
   revalidatePath("/runs");
 }
 
+/** Re-measure our posts and re-scrape the market, no renders, no fal spend. */
+export async function startResearch() {
+  await post("/runs", { mode: "research" });
+  revalidatePath("/runs");
+  revalidatePath("/learnings");
+}
+
+/** Render the best scripts of the latest batch. */
+export async function startRenders() {
+  await post("/runs", { mode: "render" });
+  revalidatePath("/runs");
+  revalidatePath("/learnings");
+}
+
 export async function repollNow() {
   const r = await post("/repoll");
   revalidatePath("/findings");
