@@ -4,7 +4,8 @@ Deploy once:   modal deploy deploy/modal_cron.py
 Dry run:       modal run deploy/modal_cron.py --dry-run
 Secrets:       modal secret create mkt-devin DEVIN_API_KEY=... DEVIN_ORG_ID=org-...
 Config lives in env on the Modal secret too (optional): MKT_NICHE, MKT_TAGS (space separated),
-MKT_PRODUCT, MKT_RENDERS, MKT_REFS (space separated image URLs), MKT_REPO. The function is a single HTTP call, so it costs nothing to
+MKT_PRODUCT, MKT_PRODUCT_TAGS (space separated hashtags of the product's own TikToks, the format to
+clone), MKT_RENDERS, MKT_REFS (space separated image URLs), MKT_REPO. The function is a single HTTP call, so it costs nothing to
 speak of; the Devin session it starts is where the ACUs go.
 """
 
@@ -33,7 +34,10 @@ def kickoff(dry_run: bool = False) -> str:
     renders = int(os.environ.get("MKT_RENDERS", "1"))
     repo = os.environ.get("MKT_REPO", DEFAULT_REPO)
     refs = os.environ.get("MKT_REFS", "").split()
-    prompt = daily_prompt(niche, tags, product, renders=renders, repo=repo, refs=refs)
+    product_tags = os.environ.get("MKT_PRODUCT_TAGS", "").split()
+    prompt = daily_prompt(
+        niche, tags, product, renders=renders, repo=repo, refs=refs, product_tags=product_tags
+    )
     if dry_run:
         print(prompt)
         return "dry run"

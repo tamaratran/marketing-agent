@@ -587,15 +587,25 @@ def policy(niche):
 @click.argument("niche")
 @click.argument("tags", nargs=-1, required=True)
 @click.option("--product", default=None, help="If set, also write scripts for the top concept")
+@click.option(
+    "--product-tag",
+    "product_tags",
+    multiple=True,
+    help="Hashtags/keywords that identify the product's own TikToks; their top videos become the"
+    " format to clone (any age), ahead of the fresh niche concepts",
+)
 @click.option("--top", default=8)
 @click.pass_context
-def run(ctx, niche, tags, product, top):
-    """Daily loop: scrape -> download top -> classify -> concepts -> pick by reward -> scripts."""
+def run(ctx, niche, tags, product, product_tags, top):
+    """Daily loop: scrape -> download top -> classify -> concepts -> format of the product's own
+    best videos -> pick by reward -> scripts."""
     _store().set_niche_tags(niche, list(tags))
     ctx.invoke(scrape, tags=tags, scrolls=3)
     ctx.invoke(download, tag=None, top=top, max_age_h=72)
     ctx.invoke(classify, limit=top, model=None)
     ctx.invoke(concepts, niche=niche, tag=None, max_age_h=72, limit=40)
+    if product_tags:
+        ctx.invoke(format_cmd, niche=niche, product_tags=product_tags, limit=5)
     if product:
         from .policy import pick_concept
 
@@ -608,10 +618,55 @@ def run(ctx, niche, tags, product, top):
             ctx.invoke(scripts, concept_id=best["id"], product=product, n=12, min_score=3)
 
 
+@cli.command("format")
+@click.argument("niche")
+@click.option("--product-tag", "product_tags", multiple=True, required=True)
+@click.option("--limit", default=5, help="How many source videos to watch")
+def format_cmd(niche, product_tags, limit):
+    """Watch the product's best TikToks in the db (frames + transcript) and store their beat sheet
+    as a 'format' concept: hook shot, shot order and timings, pacing, text budget, sound."""
+    from .research.format import build_format, product_sources
+
+    store = _store()
+    srcs = product_sources(store, list(product_tags), limit=limit)
+    if not srcs:
+        console.print("[yellow]no product videos in the db yet; niche concepts are the fallback")
+        return
+    t = Table("id", "author", "followers", "views", "dur", "sound", "caption")
+    for s in srcs:
+        t.add_row(
+            s["id"],
+            s["author"],
+            str(s.get("followers")),
+            str(s.get("views")),
+            f"{s.get('duration')}s",
+            (s.get("music") or "")[:30],
+            (s.get("desc") or "")[:50],
+        )
+    console.print(t)
+    out = build_format(
+        store, niche, list(product_tags), settings.cdp_url, settings.openai_model, limit
+    )
+    sheet = out["beat_sheet"]
+    console.print(
+        f"format concept {out['id']} '{out['name']}': hook {sheet['hook_delivery']} | "
+        f"{sheet['on_screen_text_lines']} text line(s) <= {sheet['text_budget_words']} words | "
+        f"pacing {sheet['pacing']} | sound {out['sound'] or 'original'}"
+    )
+    for b in sheet["beats"]:
+        console.print(f"  {b['start_s']:.0f}-{b['end_s']:.0f}s {b['shot']}")
+
+
 @cli.command()
 @click.argument("niche")
 @click.argument("tags", nargs=-1, required=True)
 @click.option("--product", required=True)
+@click.option(
+    "--product-tag",
+    "product_tags",
+    multiple=True,
+    help="Hashtags/keywords of the product's own TikToks; the format to clone comes from them",
+)
 @click.option("--top", default=8)
 @click.option("--renders", default=1, help="Render the N best scripts written this run (0 = skip)")
 @click.option("--resolution", default="480p")
@@ -623,7 +678,9 @@ def run(ctx, niche, tags, product, top):
     "--dashboard", "dashboard_out", type=click.Path(), default=None, help="index.html path"
 )
 @click.pass_context
-def daily(ctx, niche, tags, product, top, renders, resolution, refs, report, dashboard_out):
+def daily(
+    ctx, niche, tags, product, product_tags, top, renders, resolution, refs, report, dashboard_out
+):
     """The whole loop in order with a report at the end: run (scrape, classify, concepts, pick,
     scripts), render, poll creator posts, payouts, scoreboard, policy. A failed stage is recorded
     and the rest still runs."""
@@ -644,7 +701,12 @@ def daily(ctx, niche, tags, product, top, renders, resolution, refs, report, das
             console.print(f"[red]{name} failed: {e!r}")
 
     stage("own", lambda: ctx.invoke(own_sync, niche=niche, tags=tags))
-    stage("run", lambda: ctx.invoke(run, niche=niche, tags=tags, product=product, top=top))
+    stage(
+        "run",
+        lambda: ctx.invoke(
+            run, niche=niche, tags=tags, product=product, product_tags=product_tags, top=top
+        ),
+    )
     stage(
         "cohort",
         lambda: ctx.invoke(cohort, niche=niche, tags=tags, scrolls=6, max_classify=100),

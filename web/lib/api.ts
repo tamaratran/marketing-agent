@@ -25,7 +25,7 @@ export type Overview = {
   top_videos: { id: string; url: string; author: string; views: number; reward: number; hook_type: string; visual_style: string; desc: string }[];
 };
 export type Concept = { id: number; name: string; description: string; early_score: number; prior: number; mean_reward: number | null; n: number };
-export type Script = { id: number; concept: string; product: string; created_at: number; hook: string; demo_score: number; captions: string[]; body: string };
+export type Script = { id: number; concept: string; product: string; created_at: number; hook: string; demo_score: number; captions: string[]; body: string; spoken?: string; hook_on_screen?: boolean; sound?: string; sound_url?: string };
 export type Render = { id: number; script_id: number; created_at: number; model: string; cost_usd: number; hook: string };
 export type Creator = { handle: string; channel: string; rate_per_1k: number; posts: number; median_views: number | null; last_post: string | null; days_since: number | null; status: string };
 export type Brief = { id: number; created_at: number; product: string; script_ids: string; rate_per_1k: number; cap_usd: number; deadline_days: number; body: string; status: string };

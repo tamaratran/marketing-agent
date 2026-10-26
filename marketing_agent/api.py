@@ -97,7 +97,18 @@ def scripts(
     for r in _store().rows(sql, tuple(args)):
         payload = json.loads(r.pop("payload") or "{}")
         r["hook"] = strip_label(r["hook"] or "")
-        out.append({**r, "captions": payload.get("captions"), "body": payload.get("body")})
+        sound_id = payload.get("sound_id") or ""
+        out.append(
+            {
+                **r,
+                "captions": payload.get("captions"),
+                "body": payload.get("body"),
+                "spoken": payload.get("spoken", ""),
+                "hook_on_screen": payload.get("hook_on_screen", True),
+                "sound": payload.get("sound", ""),
+                "sound_url": f"https://www.tiktok.com/music/x-{sound_id}" if sound_id else "",
+            }
+        )
     return out
 
 

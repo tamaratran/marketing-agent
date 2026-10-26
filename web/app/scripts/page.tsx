@@ -15,8 +15,10 @@ export default async function Page() {
               <span>#{s.id}</span><span>{dateOf(s.created_at)}</span><Pill>{s.concept}</Pill>
               <Pill tone={s.demo_score >= 4 ? "good" : "warn"}>demo {s.demo_score}/5</Pill>
             </div>
-            <p className="font-medium">{s.hook}</p>
-            <p className="mt-1 text-sm text-neutral-400">{s.captions?.join(" / ")}</p>
+            <p className="font-medium">{s.hook_on_screen === false ? <span className="text-neutral-500">says: </span> : null}{s.hook}</p>
+            {s.spoken && s.spoken !== s.hook && <p className="mt-1 text-sm text-neutral-300">{s.spoken}</p>}
+            <p className="mt-1 text-sm text-neutral-400">{s.captions?.length ? <>on screen: {s.captions.join(" / ")}</> : "no on-screen text"}</p>
+            {s.sound && <p className="mt-1 text-xs text-neutral-500">sound: {s.sound_url ? <a className="underline" href={s.sound_url} target="_blank">{s.sound}</a> : s.sound}</p>}
             <details className="mt-2 text-sm text-neutral-400"><summary className="cursor-pointer text-xs text-neutral-500">shot list</summary><p className="mt-1 whitespace-pre-wrap">{s.body}</p></details>
           </Card>
         ))}

@@ -96,11 +96,13 @@ def daily_prompt(
     repo: str = DEFAULT_REPO,
     state_branch: str = STATE_BRANCH,
     refs: list[str] | None = None,
+    product_tags: list[str] | None = None,
 ) -> str:
     """What the Devin session is told. Self-contained: the session starts with no history."""
     day = datetime.now(UTC).strftime("%Y-%m-%d")
     tag_str = " ".join(tags)
     ref_str = "".join(f' --ref "{r}"' for r in refs or [])
+    ref_str += "".join(f' --product-tag "{t}"' for t in product_tags or [])
     return f"""Repo: {repo}. Run today's ({day}) loop of the marketing agent and report on it.
 
 Setup (in the repo):
