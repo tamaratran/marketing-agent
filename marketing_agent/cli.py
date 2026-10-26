@@ -341,7 +341,7 @@ def frames(out):
 def repoll(max_age_days, niche):
     """Re-record public stats for every tracked video (our posts and the cohort) still inside the
     window, then rebuild features. No browser needed; the cycle runs this first, and the site's
-    "Update view counts now" button runs it on demand."""
+    "Check post performance" button runs it on demand."""
     from .cohort import build_features
     from .cohort import repoll as do_repoll
 
