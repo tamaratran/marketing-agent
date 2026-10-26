@@ -111,17 +111,27 @@ def download(tag, top, max_age_h):
 @cli.command()
 @click.option("--limit", default=20)
 @click.option("--model", default=None)
-def classify(limit, model):
-    """Tag downloaded, untagged videos with the multimodal classifier."""
+@click.option(
+    "--niche",
+    default=None,
+    help="Instead of whatever is downloaded, classify the niche's scored research videos that"
+    " have no tags yet (newest first), downloading each one first",
+)
+def classify(limit, model, niche):
+    """Tag downloaded, untagged videos with the multimodal classifier. With --niche, work through
+    the scored research panel instead, so trait tables rest on the videos that have a score."""
     from .classifier.classify import classify as run_classify
     from .research.tiktok_browser import fetch_video_sync
 
     store = _store()
     model = model or settings.openai_model
-    for v in store.untagged(limit):
-        path = Path(v["local_path"])
-        if not path.exists():
-            # local_path can come from another machine's db (mkt sync pull)
+    rows = store.untagged(limit) if niche is None else panel_untagged(store, _niche(niche), limit)
+    done = 0
+    for v in rows:
+        path = Path(v["local_path"] or "")
+        if not v["local_path"] or not path.exists():
+            # local_path can come from another machine's db (mkt sync pull), or be unset for a
+            # panel video that was only ever observed
             path = settings.videos_dir / f"{v['id']}.mp4"
             try:
                 fetch_video_sync(v["url"], path, settings.cdp_url)
@@ -132,11 +142,24 @@ def classify(limit, model):
         v["hashtags"] = json.loads(v["hashtags"] or "[]")
         res = run_classify(path, v, model=model, transcribe_model=settings.transcribe_model)
         store.save_tags(v["id"], model, res)
+        done += 1
         tg = res["tags"]
         console.print(
             f"{v['id']} {res['run']['latency_s']}s  {tg['hook_type']:>15} | {tg['visual_style']:>18} | "
             f"demo {tg['demo_score_1_5']} | {tg['concept'][:70]}"
         )
+    return f"{done} classified"
+
+
+def panel_untagged(store, niche: str, limit: int) -> list[dict]:
+    """The niche's scored research videos (a day old, so they have a lift) without tags, newest
+    first: the ones whose score a classification would turn into a trait lesson."""
+    from .scoreboard import build
+
+    sb = build(store, tags=store.niche_tags(niche) or None)
+    scored = [v for v in sb["videos"] if v.get("reward") is not None and not v.get("hook_type")]
+    scored.sort(key=lambda v: -(v.get("create_time") or 0))
+    return scored[:limit]
 
 
 @cli.command()
@@ -718,6 +741,11 @@ def format_cmd(niche, product_tags, limit):
     help="Hashtags/keywords of the product's own TikToks; the format to clone comes from them",
 )
 @click.option("--top", default=8)
+@click.option(
+    "--classify-panel",
+    default=40,
+    help="Scored research videos without tags to download and classify this run",
+)
 @click.option("--renders", default=None, type=int, help="Clips to render (default campaign.toml)")
 @click.option("--resolution", default=None, help="480p, 720p or 1080p (default campaign.toml)")
 @click.option(
@@ -729,7 +757,18 @@ def format_cmd(niche, product_tags, limit):
 )
 @click.pass_context
 def daily(
-    ctx, niche, tags, product, product_tags, top, renders, resolution, refs, report, dashboard_out
+    ctx,
+    niche,
+    tags,
+    product,
+    product_tags,
+    top,
+    classify_panel,
+    renders,
+    resolution,
+    refs,
+    report,
+    dashboard_out,
 ):
     """One cycle, every stage in order with a report at the end: our account, measure (re-poll
     our posts and the cohort so the picker learns from fresh numbers), own sync, run (scrape,
@@ -801,6 +840,10 @@ def daily(
     stage(
         "cohort",
         lambda: ctx.invoke(cohort, niche=niche, tags=tags, scrolls=6, max_classify=100),
+    )
+    stage(
+        "classify_panel",
+        lambda: ctx.invoke(classify, limit=classify_panel, model=None, niche=niche),
     )
     stage("analyze", lambda: ctx.invoke(analyze, niche=()))
     store = _store()

@@ -51,6 +51,7 @@ mkt scrape tanning selftanner         # ~30 videos per hashtag per scroll, newes
 mkt radar --max-age-h 72              # rank by early score (views/h, discounted by follower count)
 mkt download --top 8                  # fetch the top videos through the browser
 mkt classify                          # tag them (hook, style, concept, demo score)
+mkt classify --niche tanning --limit 40  # tag the scored research panel instead, newest first
 mkt concepts tanning                  # cluster into 3-8 reusable formats, flag early ones
 mkt scripts <concept_id> "Glow, ..."  # 12 scripts, keep demo_score >= 3
 mkt render <script_id> --duration 10  # Seedance clip + captions -> data/renders/s<id>.mp4
@@ -161,10 +162,15 @@ button does the same on demand.
 ## Learnings
 
 After every cycle `mkt daily` writes an entry to the `learnings` table (`mkt learn write` does it
-by hand): what the source videos measured as (speed, speech, sound, text budget), what the picker
-leaned on, how our posts did against the market, and what changed since the last cycle. The Devin
-session adds its own reading with `mkt learn add "title" --body "..."`. The API serves them as
-`GET /learnings` and as one file, `GET /learnings.md`; the site shows them on Learnings.
+by hand): what the source videos measured as (speed, speech, sound, text budget), what the data
+says (mean lift per hook type, visual style, pacing, sound and product timing, each with n and a
+standard error, over the niche's scored research videos), what the picker leaned on and how often
+each format would win its draw, how our posts did against the market, and what changed since the
+last cycle. Those numbers are stored with the entry as `facts`, so the Learnings page draws its
+trait bars and cycle-to-cycle trends from the same figures the text was written from. `mkt daily`
+classifies up to `--classify-panel` (40) scored research videos a run so the tables fill; the
+Devin session adds its own reading with `mkt learn add "title" --body "..."`. The API serves them
+as `GET /learnings` and as one file, `GET /learnings.md`; the site shows them on Learnings.
 
 
 Two more kinds of entry, both written by the person or session reviewing clips:

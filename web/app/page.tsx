@@ -4,7 +4,8 @@ import type { Ours } from "@/lib/ours";
 import { startRun } from "./actions";
 import { Download } from "./download";
 import { Thumb } from "./thumb";
-import { button, formatName, Pill, human, reward, times } from "./ui";
+import { TraitBars, type RankRow } from "./charts";
+import { button, formatName, Note, Pill, human, reward } from "./ui";
 
 export const dynamic = "force-dynamic";
 
@@ -28,8 +29,12 @@ export default async function Page({ searchParams }: { searchParams: Promise<Q> 
     ?? clips[0];
   const script = scripts.find((s) => s.id === clip?.script_id) ?? scripts[0];
   const concept = concepts.find((c) => c.name === script?.concept) ?? concepts[0];
-  const scored = o.top_videos.filter((v) => v.reward != null && v.reward > 0);
-  const top = [...scored, ...o.top_videos.filter((v) => v.reward == null)].slice(0, 3);
+  const traitTables = ([
+    ["hooks", "hook_type", "Hook type", o.hooks], ["styles", "visual_style", "Visual style", o.styles],
+    ["pacing", "pacing_bucket", "Pacing (cuts per 10s)", o.pacing], ["sound", "music_role", "Sound", o.sound],
+  ] as [string, string, string, RankRow[]][]).map(([key, col, title, rows]) => ({ key, col, title, rows })).filter((t) => t.rows.length);
+  const bestHook = o.hooks[0]?.hook_type, bestStyle = o.styles[0]?.visual_style;
+  const examples = o.top_videos.filter((v) => v.reward != null && v.reward > 0 && (v.hook_type === bestHook || v.visual_style === bestStyle)).slice(0, 4);
   const href = (n: number, c = clip?.script_id) => `/?step=${n}${c ? `&clip=${c}` : ""}`;
 
   return (
@@ -48,22 +53,35 @@ export default async function Page({ searchParams }: { searchParams: Promise<Q> 
       <div className="text-xs text-neutral-500">Step {step} of {STEPS.length}</div>
 
       {step === 1 && (
-        <Screen title="What's working on TikTok" lead={`We watch ${o.videos} recent ${o.niche} videos from other accounts and track their views. ${scored.length ? "These beat their creator's usual views by the most" : "None are old enough to compare yet"}${scored.length && top.length > scored.length ? ", plus the newest ones, which are too new to compare yet" : ""}.`}>
-          <div className="space-y-3">
-            {top.map((v) => (
-              <a key={v.id} href={v.url} target="_blank" className="flex gap-3 rounded-lg border border-neutral-800 p-3 hover:border-neutral-600">
-                <Thumb id={v.id} size={48} />
-                <div className="min-w-0 text-sm">
-                  <div className="truncate">{v.desc || v.id}</div>
-                  <div className="mt-1 text-xs text-neutral-400">@{v.author} · {v.views.toLocaleString()} views · {reward(v.reward, "too new to compare")}</div>
-                  <div className="mt-1 text-xs text-neutral-500">{human(v.hook_type)} hook, {human(v.visual_style)}</div>
-                </div>
-              </a>
-            ))}
-          </div>
-          <Aside>{scored[0]?.reward != null && <>&quot;{times(scored[0].reward)} usual&quot; means {times(scored[0].reward).replace("x", "")} times the views that account normally gets. </>} These are other people&apos;s videos; we only learn from them.</Aside>
+        <Screen title="What's working on TikTok" lead={`We track ${o.videos} recent ${o.niche} videos from other accounts. ${o.scored} are scored: their views against ${o.niche} videos of the same age from accounts the same size. ${o.tagged} have been watched by the vision model and classified, so we can ask which traits the winners share.`}>
+          {traitTables.length === 0 ? (
+            <Note>No trait has two scored, classified videos yet. The first cycle that classifies videos a day old fills this in.</Note>
+          ) : (
+            <div className="grid gap-5 sm:grid-cols-2">
+              {traitTables.map((t) => <TraitBars key={t.key} rows={t.rows} column={t.col} title={t.title} max={5} />)}
+            </div>
+          )}
+          {examples.length > 0 && (
+            <div className="mt-6">
+              <div className="mb-2 text-xs text-neutral-500">Examples with the top-scoring traits</div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {examples.map((v) => (
+                  <a key={v.id} href={v.url} target="_blank" className="flex gap-3 rounded-lg border border-neutral-800 p-3 hover:border-neutral-600">
+                    <Thumb id={v.id} size={48} />
+                    <div className="min-w-0 text-sm">
+                      <div className="truncate">{v.desc || v.id}</div>
+                      <div className="mt-1 text-xs text-neutral-400">@{v.author} · {v.views.toLocaleString()} views · {reward(v.reward, "too new to compare", "videos like it")}</div>
+                      <div className="mt-1 text-xs text-neutral-500">{human(v.hook_type)} hook, {human(v.visual_style)}</div>
+                    </div>
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
+          <Aside>A bar at 10x means videos with that trait got ten times the views of {o.niche} videos the same age from accounts the same size; 1x means no different. The number after the dot is how many scored videos the bar rests on, and the white tick is one standard error. These are other people&apos;s videos; we only learn from them. <Link href="/learnings" className="text-sky-300 hover:underline">All the numbers, cycle by cycle</Link>.</Aside>
         </Screen>
       )}
+
 
       {step === 2 && concept && (
         <Screen title={formatName(concept.name)} lead="The agent groups videos like these into reusable formats. This is the format behind the clip you are about to see.">

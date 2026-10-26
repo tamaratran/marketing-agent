@@ -24,6 +24,9 @@ export type Overview = {
   spent_usd: number; winning: string;
   hooks: { hook_type: string; n: number; mean_reward: number; win_rate: number }[];
   styles: { visual_style: string; n: number; mean_reward: number; win_rate: number }[];
+  pacing: { pacing_bucket: string; n: number; mean_reward: number; stderr: number; win_rate: number }[];
+  sound: { music_role: string; n: number; mean_reward: number; stderr: number; win_rate: number }[];
+  product_early: { product_on_screen_by_5s: string; n: number; mean_reward: number; stderr: number; win_rate: number }[];
   stuck_accounts: { author: string; n?: number; median_views?: number }[];
   top_videos: { id: string; url: string; author: string; views: number; reward: number | null; hook_type: string; visual_style: string; desc: string; source_tag?: string; create_time?: number }[];
 };
@@ -41,7 +44,13 @@ export type Campaign = {
   cycle: { clips: number; resolution: string; max_acu: number };
   path: string;
 };
-export type Learning = { id: number; created_at: number; niche: string; product: string; kind: string; title: string; body: string };
+export type CycleFacts = {
+  n_videos?: number; n_scored?: number; n_tagged?: number; own_posts?: number; own_mean_lift?: number | null; top_concept?: string;
+  traits?: Record<string, { n: number; mean_reward: number; stderr?: number; win_rate: number }[] & Record<string, unknown>[]>;
+  picks?: { name: string; share: number; n: number }[];
+  own?: { url: string; concept: string | null; age_h: number; views: number | null; lift: number | null; engagement_per_1k: number | null }[];
+};
+export type Learning = { id: number; created_at: number; niche: string; product: string; kind: string; title: string; body: string; facts: CycleFacts };
 export type Run = { id: number; created_at: number; session_id: string; url: string; niche: string; product: string; note: string; status?: string | null; stages?: string | null; finished_at?: number | null };
 export type RunStage = { stage: string; status: string; seconds: number; note: string };
 
