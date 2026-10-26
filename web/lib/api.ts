@@ -73,7 +73,7 @@ export const fmt = (n: number | null | undefined, d = 2) => (n === null || n ===
 
 export type Logic = {
   niche: string;
-  videos: { id: string; author: string; views: number | null; followers: number | null; create_time: number; observed_at: number | null; log_views: number; expected: number; creator_offset: number; baseline: number; reward: number | null }[];
-  explore_sd: number; format_edge?: number; shrink_k?: number; market_trait_weight?: number; format_prior: number | null; min_age_h: number; min_age_h_own?: number; winsor_pct: number;
+  videos: { id: string; author: string; views: number | null; followers: number | null; create_time: number; observed_at: number | null; log_views: number; expected: number; creator_offset: number; baseline: number; reward: number | null; engagement_per_1k?: number; engagement_lift?: number | null; reward_total?: number | null }[];
+  explore_sd: number; format_edge?: number; shrink_k?: number; market_trait_weight?: number; format_prior: number | null; min_age_h: number; min_age_h_own?: number; winsor_pct: number; engagement_weight?: number;
   curve: { a: number; b: number; c: number; n: number; sd: number; followers_fill: number } | null;
 };

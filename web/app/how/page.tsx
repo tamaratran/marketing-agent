@@ -90,6 +90,11 @@ export default async function How() {
           When we have 3 or more videos from the same creator, their own track record against that curve is added, so the bar is the creator&apos;s usual, age-matched.
           Each square is one video. Right of the dashed line did better than videos like it, left did worse.
         </p>
+        <p className="mt-2 text-sm text-neutral-300">
+          Views alone are mostly luck with the For You feed. Shares and saves per 1k views say whether people kept what they saw, so a video&apos;s
+          final score is its view score plus {lg.engagement_weight != null ? `${Math.round(lg.engagement_weight * 100)}%` : "half"} of how its shares+saves rate compares with the niche median (log10).
+          Both are shown separately on Our posts.
+        </p>
         <Histogram videos={scored} />
         <Note className="mt-2">
           {big} of {scored.length} did 10x or more. {withRecord} have a creator track record folded in; the rest are judged on age and account size alone.

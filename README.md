@@ -113,7 +113,10 @@ Our posts are judged two ways. "vs our usual" is the account's median views over
 reference only. The picker learns from the age-matched lift: views against what a niche video of the
 same age from an account of the same size typically has (a curve fitted on the reference videos,
 `scoreboard.fit_curve`), plus the account's own track record once it has 3 posts from the last 180
-days. Posts under 6 hours old do not move the picker; after that they count partly until 72 hours.
+days. Shares and saves per 1k views (the closest public TikTok gets to "people kept this") count
+half: the reward is the view lift plus 0.5 times the log10 lift of that rate over the niche median,
+and both are shown separately on Our posts. Posts under 6 hours old do not move the picker; after
+that they count partly until 72 hours.
 Hashtag discovery remains an explicit fallback:
 `mkt own add @youraccount --tag yourtag`, then `mkt own sync --source hashtag`.
 Without profile access, that fallback can miss posts without those hashtags.
