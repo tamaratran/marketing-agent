@@ -88,8 +88,15 @@ export default async function Page({ searchParams }: { searchParams: Promise<Q> 
           <video key={clip.script_id} poster={frameUrl(`s${clip.script_id}`)} controls playsInline preload="metadata" className="mx-auto aspect-[9/16] h-[55vh] max-h-[560px] rounded-lg bg-black" src={`${CLIPS}/s${clip.script_id}.mp4`} />
           <div className="mt-3 flex items-center justify-center gap-3 text-sm">
             {posted.has(clip.script_id) ? <Pill tone="good">already posted</Pill> : <Pill tone="warn">not posted yet</Pill>}
-            <Download src={`${CLIPS}/s${clip.script_id}.mp4`} />
+            {clip.post_path ? <Download src={`${CLIPS}/s${clip.script_id}_clean.mp4`}>Download clean clip to post</Download> : <Download src={`${CLIPS}/s${clip.script_id}.mp4`} />}
           </div>
+          {clip.post_path && clip.post_text.length > 0 && (
+            <div className="mx-auto mt-3 max-w-sm rounded border border-neutral-800 p-2 text-center">
+              <p className="text-[11px] uppercase tracking-wide text-neutral-500">text to add in TikTok</p>
+              {clip.post_text.map((ln, i) => <p key={i} className="text-sm font-medium">{ln}</p>)}
+            </div>
+          )}
+          <p className="mt-3 text-center text-xs text-neutral-500">Every clip, with its text and sound: <Link href="/clips" className="text-sky-300 hover:underline">Clips</Link></p>
           {clips.length > 1 && <Others clips={clips} current={clip.script_id} step={4} posted={posted} />}
         </Screen>
       ) : (
