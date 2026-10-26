@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { API, get, type Campaign, type CycleFacts, type Learning, type Render, type Run, type Script } from "@/lib/api";
+import { API, get, type Campaign, type CycleFacts, type Findings, type Learning, type Render, type Run, type Script } from "@/lib/api";
 import { startRenders, startResearch } from "../actions";
 import { Trend, traitValue, type RankRow } from "../charts";
 import { Markdown } from "../md";
@@ -21,10 +21,12 @@ const TABLES: [keyof NonNullable<CycleFacts["traits"]>, string, string][] = [
 ];
 
 export default async function Page() {
-  const [rows, scripts, renders, runs, c] = await Promise.all([
+  const [rows, scripts, renders, runs, c, fs] = await Promise.all([
     get<Learning[]>("/learnings?limit=100"),
     get<Script[]>("/scripts?days=14&limit=200"), get<Render[]>("/renders"), get<Run[]>("/runs?limit=5"), get<Campaign>("/campaign"),
+    get<Findings>("/findings"),
   ]);
+  const minN = fs.min_n ?? 20;
   const newest = scripts.reduce((m, s) => Math.max(m, s.created_at), 0);
   const lift = (s: Script) => s.why?.expected_lift ?? 0;
   const batch = scripts.filter((s) => s.created_at >= newest - 20 * 60).sort((a, b) => lift(b) - lift(a) || b.demo_score - a.demo_score || a.id - b.id);
@@ -35,7 +37,6 @@ export default async function Page() {
   const cycles = rows.filter((e) => e.kind === "cycle" && e.facts).sort((a, b) => a.created_at - b.created_at);
   const latest = cycles[cycles.length - 1]?.facts;
   const prev = cycles[cycles.length - 2]?.facts;
-  const moves = prev ? traitMoves(latest, prev) : [];
   const scoredPts = cycles.filter((c) => c.facts.n_scored != null).map((c) => ({ t: c.created_at, v: c.facts.n_scored as number }));
   const taggedPts = cycles.filter((c) => c.facts.n_tagged != null).map((c) => ({ t: c.created_at, v: c.facts.n_tagged as number }));
   const ownPts = cycles.filter((c) => c.facts.own_mean_lift != null).map((c) => ({ t: c.created_at, v: c.facts.own_mean_lift as number }));
@@ -54,55 +55,27 @@ export default async function Page() {
         </form>
       </Card>
 
-      <Card title="What changed since last cycle">
+      <Card title="What the data says">
         <Note>
-          {prev && latest ? <>{when(cycles[cycles.length - 2].created_at)} to {when(cycles[cycles.length - 1].created_at)}. What wins now is on <Link href="/" className="text-sky-300 hover:underline">Formats</Link>.</> : <>What wins now is on <Link href="/" className="text-sky-300 hover:underline">Formats</Link>.</>}
+          {latest ? <>From the cycle of {when(cycles[cycles.length - 1].created_at)}: {latest.n_scored ?? 0} research videos scored against videos of the same age and account size, {latest.n_tagged ?? 0} of them classified by trait. </> : null}
+          What wins now is on <Link href="/" className="text-sky-300 hover:underline">Formats</Link>.
         </Note>
         {!latest ? (
           <Note className="mt-3">No cycle entry yet. Research again writes the first one.</Note>
-        ) : !prev ? (
-          <Note className="mt-3">One cycle so far, nothing to compare to yet. The second Research again fills this in.</Note>
         ) : (
           <>
-            <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-5">
-              <Delta label="Videos scored" was={prev.n_scored} now={latest.n_scored} fmt={(v) => String(Math.round(v))} />
-              <Delta label="Videos classified" was={prev.n_tagged} now={latest.n_tagged} fmt={(v) => String(Math.round(v))} />
-              <Delta label="Our posts measured" was={prev.own_posts} now={latest.own_posts} fmt={(v) => String(Math.round(v))} />
-              <Delta label="Our posts, mean lift" was={prev.own_mean_lift} now={latest.own_mean_lift} fmt={(v) => `${times(v)} videos like them`} />
-              <Delta label="Clone format's pick share" was={cloneShare(prev)} now={cloneShare(latest)} fmt={(v) => `${Math.round(v * 100)}%`} />
-            </dl>
-            <h3 className="mt-5 text-sm font-medium text-neutral-200">Trait evidence that moved</h3>
-            {moves.length === 0 ? (
-              <Note className="mt-1">Nothing moved.</Note>
-            ) : (
-              <ul className="mt-2 space-y-2 text-sm">
-                {moves.map((m) => (
-                  <li key={`${m.table}:${m.value}`}>
-                    <Fold summary={
-                      <span className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                        <span className="text-xs text-neutral-500">{m.title}</span>
-                        <span className="font-medium text-neutral-100">{traitValue(m.value)}</span>
-                        {m.now && m.was ? (
-                          <span className={`text-xs ${m.now.mean_reward >= m.was.mean_reward ? "text-emerald-300" : "text-red-300"}`}>{times(m.was.mean_reward)} to {times(m.now.mean_reward)}</span>
-                        ) : m.now ? (
-                          <span className="text-xs text-emerald-300">new bar, {times(m.now.mean_reward)}</span>
-                        ) : (
-                          <span className="text-xs text-neutral-500">bar withdrawn</span>
-                        )}
-                        <span className="text-xs text-neutral-500">n {m.was?.n ?? 0} to {m.now?.n ?? 0}</span>
-                      </span>
-                    }>
-                      <p className="text-sm text-neutral-300">
-                        {m.now && m.was
-                          ? `Mean lift went from ${m.was.mean_reward >= 0 ? "+" : ""}${m.was.mean_reward.toFixed(2)} (${times(m.was.mean_reward)}, ${m.was.n} videos, won ${Math.round(m.was.win_rate * 100)}%) to ${m.now.mean_reward >= 0 ? "+" : ""}${m.now.mean_reward.toFixed(2)} (${times(m.now.mean_reward)}, ${m.now.n} videos, won ${Math.round(m.now.win_rate * 100)}%). Lift is log10 against videos of the same age and account size; +1 is 10x.`
-                          : m.now
-                            ? `This value has enough scored, classified videos for a bar now: ${m.now.n}, mean lift ${times(m.now.mean_reward)}, won ${Math.round(m.now.win_rate * 100)}%.`
-                            : `This value had ${m.was?.n ?? 0} videos last cycle and no longer meets the minimum, so its bar is withheld rather than shown on too few videos.`}
-                      </p>
-                    </Fold>
-                  </li>
-                ))}
-              </ul>
+            <TraitSentences latest={latest} prev={prev} minN={minN} />
+            {prev && (
+              <>
+                <h3 className="mt-5 text-sm font-medium text-neutral-200">Since the cycle of {when(cycles[cycles.length - 2].created_at)}</h3>
+                <dl className="mt-2 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-5">
+                  <Delta label="Videos scored" was={prev.n_scored} now={latest.n_scored} fmt={(v) => String(Math.round(v))} />
+                  <Delta label="Videos classified" was={prev.n_tagged} now={latest.n_tagged} fmt={(v) => String(Math.round(v))} />
+                  <Delta label="Our posts measured" was={prev.own_posts} now={latest.own_posts} fmt={(v) => String(Math.round(v))} />
+                  <Delta label="Our posts, mean lift" was={prev.own_mean_lift} now={latest.own_mean_lift} fmt={(v) => `${times(v)} videos like them`} />
+                  <Delta label="Clone format's pick share" was={cloneShare(prev)} now={cloneShare(latest)} fmt={(v) => `${Math.round(v * 100)}%`} />
+                </dl>
+              </>
             )}
           </>
         )}
@@ -229,21 +202,52 @@ function Delta({ label, was, now, fmt }: { label: string; was?: number | null; n
   );
 }
 
-type Move = { table: string; title: string; value: string; now: RankRow | null; was: RankRow | null };
+type Row = RankRow & Record<string, unknown>;
 
-/** Trait values whose evidence moved between two cycles: a bar appeared or was withheld, the mean
- * lift moved by 0.1 or more (about 25%), or videos were added. Biggest move first. */
-function traitMoves(latest: CycleFacts, prev: CycleFacts): Move[] {
-  const out: Move[] = [];
-  for (const [key, col, title] of TABLES) {
-    const now = new Map(((latest.traits?.[key] as RankRow[] | undefined) ?? []).map((r) => [String(r[col]), r]));
-    const was = new Map(((prev.traits?.[key] as RankRow[] | undefined) ?? []).map((r) => [String(r[col]), r]));
-    for (const value of new Set([...now.keys(), ...was.keys()])) {
-      const a = was.get(value) ?? null, b = now.get(value) ?? null;
-      if (a && b && Math.abs(b.mean_reward - a.mean_reward) < 0.1 && b.n === a.n) continue;
-      out.push({ table: key, title, value, now: b, was: a });
-    }
-  }
-  const size = (m: Move) => (m.now && m.was ? Math.abs(m.now.mean_reward - m.was.mean_reward) : 1);
-  return out.sort((x, y) => size(y) - size(x));
+/** One plain paragraph per trait: the values ranked by how many times the views of videos like them
+ *  they got, with the video count, values under the minimum set aside as too few, and a change since
+ *  the previous cycle only where the previous cycle measured that value and it moved by 0.1 (about 25%). */
+function TraitSentences({ latest, prev, minN }: { latest: CycleFacts; prev?: CycleFacts; minN: number }) {
+  const blocks = TABLES.flatMap(([key, col, title]) => {
+    const rows = ((latest.traits?.[key] as Row[] | undefined) ?? []).slice().sort((a, b) => b.mean_reward - a.mean_reward);
+    if (!rows.length) return [];
+    const was = new Map(((prev?.traits?.[key] as Row[] | undefined) ?? []).map((r) => [String(r[col]), r]));
+    const solid = rows.filter((r) => r.n >= minN), thin = rows.filter((r) => r.n < minN);
+    const change = (r: Row) => {
+      const w = was.get(String(r[col]));
+      if (!w || Math.abs(r.mean_reward - w.mean_reward) < 0.1) return null;
+      return <span className={r.mean_reward > w.mean_reward ? "text-emerald-300" : "text-red-300"}> (was {times(w.mean_reward)} last cycle)</span>;
+    };
+    return [(
+      <div key={key} className="text-sm text-neutral-300">
+        <span className="text-neutral-500">{title}: </span>
+        {solid.length === 0 ? (
+          <span>no value has {minN} videos yet.</span>
+        ) : (
+          <>
+            {solid.map((r, i) => (
+              <span key={String(r[col])}>
+                {i > 0 && (i === solid.length - 1 ? " and " : ", ")}
+                <span className={i === 0 && r.mean_reward > 0 ? "font-medium text-neutral-100" : ""}>{traitValue(r[col])}</span>{" "}
+                <span className={r.mean_reward >= 0 ? "text-emerald-300" : "text-red-300"}>{times(r.mean_reward)}</span>
+                <span className="text-neutral-500"> ({r.n} videos{r.win_rate != null ? `, ${Math.round(r.win_rate * 100)}% beat their match` : ""})</span>
+                {change(r)}
+              </span>
+            ))}
+            .
+          </>
+        )}
+        {thin.length > 0 && (
+          <span className="text-neutral-500"> Too few to trust yet: {thin.map((r) => `${traitValue(r[col])} ${times(r.mean_reward)} on ${r.n}`).join(", ")}.</span>
+        )}
+      </div>
+    )];
+  });
+  if (!blocks.length) return <Note className="mt-3">This cycle did not record trait counts; the next Research again will.</Note>;
+  return (
+    <div className="mt-3 space-y-2">
+      {blocks}
+      <Note>&quot;1.9x&quot; means those videos got 1.9 times the views of videos of the same age from accounts of the same size. A value needs {minN} videos before it counts as evidence; the step 6 check on <Link href="/how#check" className="text-sky-300 hover:underline">How it decides</Link> also controls for length and posting hour.</Note>
+    </div>
+  );
 }
