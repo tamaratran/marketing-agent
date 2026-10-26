@@ -58,5 +58,5 @@ export function Markdown({ text }: { text: string }) {
     }
     out.push(<p key={i} className="my-1">{inline(l, i)}</p>);
   }
-  return <div className="text-sm leading-relaxed text-neutral-300">{out}</div>;
+  return <div className="text-sm leading-relaxed text-neutral-300 [overflow-wrap:anywhere]">{out}</div>;
 }
