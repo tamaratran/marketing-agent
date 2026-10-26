@@ -99,7 +99,7 @@ def test_scripts_api_returns_why(tmp_path, monkeypatch):
             "payload": "{}",
         },
     )
-    store.insert(
+    sid = store.insert(
         "scripts",
         {
             "concept_id": cid,
@@ -112,5 +112,5 @@ def test_scripts_api_returns_why(tmp_path, monkeypatch):
         },
     )
     rows = client.get("/scripts?niche=fitness").json()
-    assert rows, api._store().path if hasattr(api._store(), "path") else str(api.settings.db_path)
-    assert rows[0]["why"] == {"pick_share": 0.3, "expected_lift": 0.1}
+    mine = next(r for r in rows if r["id"] == sid)
+    assert mine["why"] == {"pick_share": 0.3, "expected_lift": 0.1}
