@@ -30,7 +30,10 @@ def test_remote_reference_is_downloaded_and_uploaded(monkeypatch, tmp_path):
         generate.httpx,
         "get",
         lambda url, **kw: httpx.Response(
-            200, content=b"\xff\xd8jpg", headers={"content-type": "image/jpeg; charset=binary"}
+            200,
+            content=b"\xff\xd8jpg",
+            headers={"content-type": "image/jpeg; charset=binary"},
+            request=httpx.Request("GET", url),
         ),
     )
     prov = generate.FalSeedance()
