@@ -17,10 +17,18 @@ NO_TEXT = (
 )
 
 
+CASTING = (
+    " The person is good-looking in a real, everyday way: fit, natural skin texture, a few stray"
+    " hairs, ordinary clothes, phone-camera light; not a flawless model, not airbrushed, nothing"
+    " that reads as AI-generated."
+)
+
+
 def video_prompt(req: "GenRequest") -> str:
-    """The model prompt: the script's beats plus a standing ban on generated text, because the
-    editor burns the real captions in and generated text comes out as gibberish."""
-    return req.prompt.rstrip() + NO_TEXT
+    """The model prompt: the script's beats, a casting note (attractive but natural; polished
+    AI-looking people underperform) and a standing ban on generated text, because the editor
+    burns the real captions in and generated text comes out as gibberish."""
+    return req.prompt.rstrip() + CASTING + NO_TEXT
 
 
 @dataclass
