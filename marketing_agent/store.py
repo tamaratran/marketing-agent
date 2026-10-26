@@ -126,6 +126,7 @@ class Store:
                 ("post_path", "TEXT"),
                 ("post_session_url", "TEXT"),
                 ("post_requested_at", "INTEGER"),
+                ("post_attempts", "INTEGER DEFAULT 0"),
             ):
                 if col not in cols:
                     c.execute(f"ALTER TABLE renders ADD COLUMN {col} {typ}")

@@ -395,6 +395,26 @@ def test_post_button_starts_one_posting_session(client, monkeypatch):
     assert client.post(f"/renders/{s3}/post", headers=AUTH).json()["reused"] is True
     assert client.post(f"/renders/{s4}/post", headers=AUTH).json()["already"] is True
 
+    # The API hands stale clips back on its own, at most MAX_POST_ATTEMPTS times each; a person
+    # pressing Post is not capped. The posted clip (s4) and fresh hand-offs are left alone.
+    n_msgs = len(seen["messages"])
+    with store.conn() as c:
+        c.execute(
+            "UPDATE renders SET post_requested_at=?, post_attempts=? WHERE script_id=?",
+            (now - 4000, 1, s3),
+        )
+        c.execute(
+            "UPDATE renders SET post_requested_at=?, post_attempts=? WHERE script_id=?",
+            (now - 4000, api.MAX_POST_ATTEMPTS, s2),
+        )
+    r = client.post("/renders/retry", headers=AUTH).json()
+    assert r["retried"] == [s3] and len(seen["messages"]) == n_msgs + 1
+    assert client.post("/renders/retry", headers=AUTH).json()["retried"] == []
+    rend = {x["script_id"]: x for x in client.get(f"/renders?niche={api.DEFAULT_NICHE}").json()}
+    assert rend[s3]["post_attempts"] == 2 and rend[s2]["post_attempts"] == api.MAX_POST_ATTEMPTS
+    by_hand = client.post(f"/renders/{s2}/post", headers=AUTH).json()
+    assert by_hand["reused"] is True and by_hand["attempt"] == api.MAX_POST_ATTEMPTS + 1
+
 
 def test_concepts_carry_pick_share_and_example_lift(client):
     import json

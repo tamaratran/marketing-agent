@@ -1,9 +1,12 @@
 """HTTP backend over the same SQLite the CLI uses. Reads are open; writes need
 `Authorization: Bearer $MKT_API_TOKEN`. Run: uvicorn marketing_agent.api:app --port 8080."""
 
+import asyncio
 import json
+import logging
 import os
 import time
+from contextlib import asynccontextmanager
 from pathlib import Path
 from urllib.parse import quote_plus
 
@@ -45,7 +48,33 @@ def _auth(authorization: str | None = Header(default=None)) -> None:
         raise HTTPException(401, "bad token")
 
 
-app = FastAPI(title="marketing-agent", version="0.1")
+log = logging.getLogger("mkt.api")
+
+
+async def _post_retry_loop() -> None:
+    while True:
+        await asyncio.sleep(POST_RETRY_EVERY_S)
+        try:
+            again = await asyncio.to_thread(retry_stale_posts, _store())
+            if again:
+                log.info("handed back to the poster session: %s", again)
+        except Exception:  # noqa: BLE001
+            log.exception("post retry failed")
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    """The retry of stale clip hand-offs lives in the API, not in anyone's reminders. Off when
+    the API cannot reach Devin anyway, or with MKT_POST_RETRY=0."""
+    task = None
+    if os.environ.get("MKT_POST_RETRY", "1") != "0" and os.environ.get("DEVIN_API_KEY"):
+        task = asyncio.create_task(_post_retry_loop())
+    yield
+    if task:
+        task.cancel()
+
+
+app = FastAPI(title="marketing-agent", version="0.1", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=os.environ.get("MKT_CORS_ORIGINS", "*").split(","),
@@ -204,7 +233,8 @@ def renders(limit: int = 50, niche: str = DEFAULT_NICHE):
     learnings_migrate(store)
     rows = store.rows(
         """SELECT r.id, r.script_id, r.created_at, r.model, r.cost_usd, r.final_path, r.post_path,
-                  r.post_session_url, r.post_requested_at, r.hold_reason, s.hook, s.payload
+                  r.post_session_url, r.post_requested_at, COALESCE(r.post_attempts, 0) post_attempts,
+                  r.hold_reason, s.hook, s.payload
            FROM renders r JOIN scripts s ON s.id=r.script_id JOIN concepts c ON c.id=s.concept_id
            WHERE r.final_path IS NOT NULL AND r.model!='stub' AND c.niche=?
            ORDER BY r.created_at DESC LIMIT ?""",
@@ -224,6 +254,8 @@ API_PUBLIC_URL = os.environ.get("MKT_API_URL", "https://mkt-api.fly.dev")
 # A clip handed to the poster session that has no registered post after this long can be handed
 # over again (the login failed, the session died); the poster is told never to post a clip twice.
 POST_RETRY_AFTER_S = 3600
+MAX_POST_ATTEMPTS = 4  # automatic hand-backs per clip; a person pressing Post is never capped
+POST_RETRY_EVERY_S = 1800
 
 
 def _sound_url(name: str, sound_id: str) -> str:
@@ -247,14 +279,49 @@ def post_render(script_id: int):
     account's poster session (one long-lived Devin session that stays signed in to TikTok), which
     uploads it through TikTok's web uploader, adds the text with TikTok's text tool, picks the
     sound and registers the post. One clip per call, never twice for the same clip."""
+    return _hand_off(_store(), script_id, by_hand=True)
+
+
+@app.post("/renders/retry", dependencies=[Depends(_auth)])
+def retry_posts():
+    """What the API does on its own every POST_RETRY_EVERY_S; here for the cycle and for tests."""
+    return {"retried": retry_stale_posts(_store())}
+
+
+def retry_stale_posts(store: Store) -> list[int]:
+    """Clips handed to the poster session more than POST_RETRY_AFTER_S ago with no registered
+    post go back to it (a TikTok lockout or a dead session only delays the post), at most
+    MAX_POST_ATTEMPTS times each. Returns the script ids handed back."""
+    store.migrate()
+    rows = store.rows(
+        """SELECT DISTINCT r.script_id FROM renders r
+           WHERE r.post_session_url IS NOT NULL AND r.post_requested_at < ?
+             AND COALESCE(r.post_attempts, 0) < ? AND r.hold_reason IS NULL
+             AND r.final_path IS NOT NULL AND r.post_path IS NOT NULL
+             AND NOT EXISTS (SELECT 1 FROM videos v WHERE v.script_id=r.script_id AND v.ours=1)
+           ORDER BY r.script_id""",
+        (int(time.time()) - POST_RETRY_AFTER_S, MAX_POST_ATTEMPTS),
+    )
+    again = []
+    for row in rows:
+        try:
+            res = _hand_off(store, row["script_id"], by_hand=False)
+        except (HTTPException, RuntimeError) as e:
+            log.warning("s%s not handed back: %s", row["script_id"], e)
+            continue
+        if not res.get("already"):
+            again.append(row["script_id"])
+    return again
+
+
+def _hand_off(store: Store, script_id: int, by_hand: bool) -> dict:
     from .orchestrator import DEFAULT_REPO, DevinClient, post_prompt, poster_session
 
-    store = _store()
     store.migrate()
     learnings_migrate(store)
     rows = store.rows(
         """SELECT r.id, r.post_path, r.post_session_url, r.post_requested_at, r.hold_reason,
-                  s.hook, s.payload
+                  COALESCE(r.post_attempts, 0) post_attempts, s.hook, s.payload
            FROM renders r JOIN scripts s ON s.id=r.script_id
            WHERE r.script_id=? AND r.final_path IS NOT NULL ORDER BY r.created_at DESC LIMIT 1""",
         (script_id,),
@@ -272,7 +339,8 @@ def post_render(script_id: int):
             "SELECT 1 FROM videos WHERE script_id=? AND ours=1 LIMIT 1", (script_id,)
         )
         fresh = (r["post_requested_at"] or 0) > now - POST_RETRY_AFTER_S
-        if posted or fresh:
+        capped = not by_hand and r["post_attempts"] >= MAX_POST_ATTEMPTS
+        if posted or fresh or capped:
             return {"ok": True, "url": r["post_session_url"], "already": True}
     payload = json.loads(r["payload"] or "{}")
     text = _post_text(r["hook"], payload)
@@ -300,7 +368,8 @@ def post_render(script_id: int):
     )
     with store.conn() as c:
         c.execute(
-            "UPDATE renders SET post_session_url=?, post_requested_at=? WHERE id=?",
+            """UPDATE renders SET post_session_url=?, post_requested_at=?,
+                                  post_attempts=COALESCE(post_attempts, 0) + 1 WHERE id=?""",
             (s["url"], now, r["id"]),
         )
     store.insert(
@@ -311,10 +380,17 @@ def post_render(script_id: int):
             "url": s["url"],
             "niche": DEFAULT_NICHE,
             "product": CAMPAIGN.product.description,
-            "note": f"post s{script_id} from @{CAMPAIGN.account.handle}",
+            "note": f"post s{script_id} from @{CAMPAIGN.account.handle}"
+            + ("" if r["post_attempts"] == 0 else f" (try {r['post_attempts'] + 1})"),
         },
     )
-    return {"ok": True, "url": s["url"], "session_id": s["session_id"], "reused": reused}
+    return {
+        "ok": True,
+        "url": s["url"],
+        "session_id": s["session_id"],
+        "reused": reused,
+        "attempt": r["post_attempts"] + 1,
+    }
 
 
 @app.get("/renders/{render_id}/file")
