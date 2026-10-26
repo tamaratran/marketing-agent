@@ -64,7 +64,7 @@ export default async function Page() {
           <Note className="mt-3">No cycle entry yet. Research again writes the first one.</Note>
         ) : (
           <>
-            <TraitSentences latest={latest} prev={prev} minN={minN} />
+            <TraitTables latest={latest} prev={prev} minN={minN} />
             {prev && (
               <>
                 <h3 className="mt-5 text-sm font-medium text-neutral-200">Since the cycle of {when(cycles[cycles.length - 2].created_at)}</h3>
@@ -204,50 +204,84 @@ function Delta({ label, was, now, fmt }: { label: string; was?: number | null; n
 
 type Row = RankRow & Record<string, unknown>;
 
-/** One plain paragraph per trait: the values ranked by how many times the views of videos like them
- *  they got, with the video count, values under the minimum set aside as too few, and a change since
- *  the previous cycle only where the previous cycle measured that value and it moved by 0.1 (about 25%). */
-function TraitSentences({ latest, prev, minN }: { latest: CycleFacts; prev?: CycleFacts; minN: number }) {
-  const blocks = TABLES.flatMap(([key, col, title]) => {
+/** Lift in words a non-statistician reads at a glance: "+90%" or "-46%" views against videos like it; "3.2x" past +200%. */
+const pct = (r: number) => {
+  const x = 10 ** r;
+  if (x >= 3) return `${x.toFixed(1)}x`;
+  const d = Math.round((x - 1) * 100);
+  return d === 0 ? "same" : `${d > 0 ? "+" : ""}${d}%`;
+};
+const tone = (r: number) => (10 ** r >= 1.1 ? "text-emerald-300" : 10 ** r <= 0.9 ? "text-red-300" : "text-neutral-300");
+
+/** One table per trait: each value, its views against videos like it as a percent, how many videos that
+ *  rests on, and whether that is enough (min_n) to count. A one-line takeaway sits above each table,
+ *  and the best solid value per trait is pulled into a "best bets" line at the top. */
+function TraitTables({ latest, prev, minN }: { latest: CycleFacts; prev?: CycleFacts; minN: number }) {
+  const traits = TABLES.flatMap(([key, col, title]) => {
     const rows = ((latest.traits?.[key] as Row[] | undefined) ?? []).slice().sort((a, b) => b.mean_reward - a.mean_reward);
     if (!rows.length) return [];
     const was = new Map(((prev?.traits?.[key] as Row[] | undefined) ?? []).map((r) => [String(r[col]), r]));
-    const solid = rows.filter((r) => r.n >= minN), thin = rows.filter((r) => r.n < minN);
-    const change = (r: Row) => {
-      const w = was.get(String(r[col]));
-      if (!w || Math.abs(r.mean_reward - w.mean_reward) < 0.1) return null;
-      return <span className={r.mean_reward > w.mean_reward ? "text-emerald-300" : "text-red-300"}> (was {times(w.mean_reward)} last cycle)</span>;
-    };
-    return [(
-      <div key={key} className="text-sm text-neutral-300">
-        <span className="text-neutral-500">{title}: </span>
-        {solid.length === 0 ? (
-          <span>no value has {minN} videos yet.</span>
-        ) : (
-          <>
-            {solid.map((r, i) => (
-              <span key={String(r[col])}>
-                {i > 0 && (i === solid.length - 1 ? " and " : ", ")}
-                <span className={i === 0 && r.mean_reward > 0 ? "font-medium text-neutral-100" : ""}>{traitValue(r[col])}</span>{" "}
-                <span className={r.mean_reward >= 0 ? "text-emerald-300" : "text-red-300"}>{times(r.mean_reward)}</span>
-                <span className="text-neutral-500"> ({r.n} videos{r.win_rate != null ? `, ${Math.round(r.win_rate * 100)}% beat their match` : ""})</span>
-                {change(r)}
-              </span>
-            ))}
-            .
-          </>
-        )}
-        {thin.length > 0 && (
-          <span className="text-neutral-500"> Too few to trust yet: {thin.map((r) => `${traitValue(r[col])} ${times(r.mean_reward)} on ${r.n}`).join(", ")}.</span>
-        )}
-      </div>
-    )];
+    const solid = rows.filter((r) => r.n >= minN);
+    return [{ key, col, title, rows, solid, was }];
   });
-  if (!blocks.length) return <Note className="mt-3">This cycle did not record trait counts; the next Research again will.</Note>;
+  if (!traits.length) return <Note className="mt-3">This cycle did not record trait counts; the next Research again will.</Note>;
+  const bets = traits.filter((t) => t.solid.length && 10 ** t.solid[0].mean_reward >= 1.1).map((t) => `${t.title.replace(/ \(.*\)/, "").toLowerCase()}: ${traitValue(t.solid[0][t.col])} (${pct(t.solid[0].mean_reward)})`);
   return (
-    <div className="mt-3 space-y-2">
-      {blocks}
-      <Note>&quot;1.9x&quot; means those videos got 1.9 times the views of videos of the same age from accounts of the same size. A value needs {minN} videos before it counts as evidence; the step 6 check on <Link href="/how#check" className="text-sky-300 hover:underline">How it decides</Link> also controls for length and posting hour.</Note>
+    <div className="mt-4 space-y-5">
+      {bets.length > 0 && (
+        <p className="text-sm text-neutral-200">
+          <span className="text-neutral-500">Best bets right now, from values with {minN}+ videos: </span>{bets.join("; ")}.
+        </p>
+      )}
+      {traits.map((t) => {
+        const best = t.solid[0], worst = t.solid[t.solid.length - 1];
+        const take = !best
+          ? `No value has ${minN} videos yet, so nothing to go on.`
+          : t.solid.length === 1
+            ? `Only "${traitValue(best[t.col])}" has enough videos; it gets ${pct(best.mean_reward)} views against videos like it.`
+            : `${traitValue(best[t.col])} does best (${pct(best.mean_reward)} views against videos like it), ${traitValue(worst[t.col])} worst (${pct(worst.mean_reward)}).`;
+        return (
+          <div key={t.key}>
+            <h3 className="text-sm font-medium text-neutral-100">{t.title}</h3>
+            <p className="mb-2 mt-0.5 text-sm text-neutral-400">{take}</p>
+            <div className="overflow-x-auto">
+              <table className="w-full max-w-2xl text-sm">
+                <thead>
+                  <tr className="text-left text-xs text-neutral-500">
+                    <th className="pb-1.5 pr-4 font-medium">Value</th>
+                    <th className="pb-1.5 pr-4 font-medium">Views vs videos like it</th>
+                    <th className="pb-1.5 pr-4 font-medium">Beat their match</th>
+                    <th className="pb-1.5 pr-4 font-medium">Videos</th>
+                    <th className="pb-1.5 font-medium">Enough to count?</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {t.rows.map((r) => {
+                    const thin = r.n < minN, w = t.was.get(String(r[t.col]));
+                    const moved = w && Math.abs(r.mean_reward - w.mean_reward) >= 0.1 ? w : null;
+                    return (
+                      <tr key={String(r[t.col])} className={`border-t border-neutral-800/80 ${thin ? "text-neutral-500" : ""}`}>
+                        <td className="py-1.5 pr-4">{traitValue(r[t.col])}</td>
+                        <td className={`py-1.5 pr-4 tabular-nums ${thin ? "" : tone(r.mean_reward)}`}>
+                          {pct(r.mean_reward)}
+                          {moved && <span className="text-xs text-neutral-500"> (was {pct(moved.mean_reward)} last cycle)</span>}
+                        </td>
+                        <td className="py-1.5 pr-4 tabular-nums">{r.win_rate != null ? `${Math.round(r.win_rate * 100)}%` : ""}</td>
+                        <td className="py-1.5 pr-4 tabular-nums">{r.n}</td>
+                        <td className="py-1.5">{thin ? `no, under ${minN}` : "yes"}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        );
+      })}
+      <Note>
+        &quot;+90%&quot; means those videos got 90% more views than videos of the same age from accounts of the same size; &quot;beat their match&quot; is how many of them did better than that comparison at all.
+        A value needs {minN} videos before it counts. These are raw averages; the step 6 check on <Link href="/how#check" className="text-sky-300 hover:underline">How it decides</Link> also holds length and posting hour fixed.
+      </Note>
     </div>
   );
 }
