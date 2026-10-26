@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { get, fmt, type VideoDetail } from "@/lib/api";
+import { get, fmt, type VideoDetail, frameUrl } from "@/lib/api";
 import { Card, H1, Pill, Stat, Table, human, times } from "../../ui";
 import { Curve } from "../../curve";
 import { Thumb } from "../../thumb";
@@ -13,6 +13,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
   const v = d.video, f = d.features, t = d.tags?.tags ?? null, run = d.tags?.run;
   const posted = new Date(v.create_time * 1000).toUTCString();
   const last = d.observations.at(-1);
+  const hasFrame = v.gone_at ? await fetch(frameUrl(v.id), { method: "HEAD", cache: "no-store" }).then((r) => r.ok, () => false) : true;
   const tagRows = t
     ? Object.entries(t).filter(([k]) => !["summary", "quality_issues"].includes(k)).map(([k, val]) => [human(k), Array.isArray(val) ? val.join(", ") : human(String(val ?? ""))])
     : [];
@@ -47,7 +48,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
               <p className="mt-1 text-xs text-neutral-500">
                 The creator deleted it or made it private around {new Date(v.gone_at * 1000).toUTCString().slice(0, 22)}.
                 {last ? <> Last seen with {last.views?.toLocaleString() ?? "?"} views, {((last.observed_at - v.create_time) / 3600).toFixed(1)}h after posting.</> : null}
-                {" "}What the agent saved from it (the frame above, the classifier run below and every view count) still counts.
+                {" "}What the agent saved from it ({hasFrame ? "the frame above, " : ""}the classifier run below and every view count) still counts.{hasFrame ? "" : " Its frame was never published, so there is no preview."}
               </p>
             </>
           ) : (
