@@ -51,34 +51,81 @@ def controlled_traits(store: Store, outcome: str = "lift_72h") -> str:
     )
 
 
-def our_traits(store: Store, top: int = 3) -> str:
-    """What our own posts have shown so far: concepts and hooks by lift over our accounts'
-    baselines. Empty until a post has a reward."""
-    from .own import own_posts
+def verdicts(store: Store, niche: str, top: int = 4) -> str:
+    """What our own posts have proven, with how much evidence sits behind each line, so the
+    writer cannot mistake one post for a pattern. Formats first (measured, then never posted),
+    then traits, then the hooks we already used, each marked measured or untested."""
+    from .own import own_post_rewards
 
-    by_concept: dict[str, list[float]] = {}
-    for p in own_posts(store):
-        r = p["lift_72h"] if p["lift_72h"] is not None else p["lift_now"]
-        if r is not None and p["concept"]:
-            by_concept.setdefault(p["concept"], []).append(r)
-    parts = []
-    if by_concept:
-        ranked = sorted(by_concept.items(), key=lambda kv: -sum(kv[1]) / len(kv[1]))
-        parts.append(
-            "concepts: "
-            + "; ".join(f"{k} ({sum(v) / len(v):+.2f}, n={len(v)})" for k, v in ranked[:top])
-        )
-    hooks = build(store, group="ours")["hooks"]
-    if hooks:
-        parts.append(
-            "hooks: "
-            + "; ".join(
-                f"{h['hook_type']} ({h['mean_reward']:+.2f}, n={h['n']})" for h in hooks[:top]
-            )
-        )
-    if not parts:
+    cands = concept_scores(store, niche)
+    if not cands:
         return ""
-    return "Our own posts, lift over our accounts' usual views:\n" + "\n".join(parts)
+    measured = sorted((c for c in cands if c["n"]), key=lambda c: -c["mean_reward"])
+    lines = []
+    if measured:
+        lines.append("Our formats, measured against niche videos of the same age and account size:")
+        for c in measured:
+            tag = "weak evidence, one post" if c["n"] == 1 else f"{c['n']} posts"
+            lines.append(
+                f"- {c['name']}: {c['mean_reward']:+.2f} ({tag}); the picker now scores it "
+                f"{c['learned']:+.2f} after what its traits earned elsewhere"
+            )
+    untested = [c["name"] for c in cands if not c["n"]]
+    if untested:
+        lines.append("Never posted: " + ", ".join(untested[: top * 2]) + ".")
+    traits: dict[tuple[str, object], dict] = {}
+    for c in cands:
+        for d in c.get("trait_detail", []):
+            if d["ours_n"]:
+                traits[(d["trait"], d["value"])] = d
+    if traits:
+        lines.append("Traits of our posts so far (score shrinks toward 0 with few posts):")
+        for d in sorted(traits.values(), key=lambda d: -abs(d["ours"]))[:top]:
+            lines.append(
+                f"- {d['trait']}={d['value']}: {d['ours']:+.2f} over {d['ours_n']} post(s)"
+            )
+    posted = {p["video_id"]: p["reward"] for p in own_post_rewards(store)}
+    hooks = _our_hooks(store, posted)
+    if hooks:
+        lines.append(
+            "Hooks we have already rendered (measured where a post exists, otherwise untested, so frequency means nothing):"
+        )
+        lines += hooks[:top]
+    if not lines:
+        return ""
+    if len(posted) < 3:
+        lines.append(
+            f"Only {len(posted)} post(s) measured so far: treat every line above as a lead to test, not a rule."
+        )
+    return "\n".join(lines)
+
+
+def _our_hooks(store: Store, posted: dict[str, float]) -> list[str]:
+    from .learnings import migrate
+
+    migrate(store)  # renders.hold_reason exists on every db from here on
+    rows = store.rows(
+        "SELECT s.id, s.hook, v.id video_id FROM renders r JOIN scripts s ON s.id=r.script_id "
+        "LEFT JOIN videos v ON v.script_id=s.id AND v.ours=1 "
+        "WHERE r.hold_reason IS NULL ORDER BY r.created_at DESC LIMIT 40"
+    )
+    seen: dict[str, dict] = {}
+    for r in rows:
+        hook = (r["hook"] or "").strip()
+        if not hook:
+            continue
+        e = seen.setdefault(hook.lower(), {"hook": hook, "n": 0, "rewards": []})
+        e["n"] += 1
+        if r["video_id"] in posted:
+            e["rewards"].append(posted[r["video_id"]])
+    out = []
+    for e in seen.values():
+        if e["rewards"]:
+            m = sum(e["rewards"]) / len(e["rewards"])
+            out.append(f'- "{e["hook"]}": measured {m:+.2f} over {len(e["rewards"])} post(s)')
+        else:
+            out.append(f'- "{e["hook"]}": untested (rendered {e["n"]}x)')
+    return out
 
 
 def reference_traits(store: Store, tag: str | None = None, top: int = 3) -> str:
@@ -116,46 +163,19 @@ def reference_traits(store: Store, tag: str | None = None, top: int = 3) -> str:
     return "\n".join(parts)
 
 
-def our_clip_hooks(store: Store, top: int = 6) -> str:
-    """Hooks of the clips we have already rendered, newest first, each with how often we used it.
-    Not a reward: these are unposted or unmeasured, so the writer carries forward what we keep
-    making rather than what the market or our posts have proven."""
-    rows = store.rows(
-        "SELECT s.hook, s.payload FROM renders r JOIN scripts s ON s.id=r.script_id "
-        "ORDER BY r.created_at DESC LIMIT 40"
-    )
-    seen: dict[str, dict] = {}
-    for r in rows:
-        hook = (r["hook"] or "").strip()
-        if not hook:
-            continue
-        try:
-            body = json.loads(r["payload"] or "{}").get("body", "")
-        except ValueError:
-            body = ""
-        entry = seen.setdefault(hook.lower(), {"hook": hook, "n": 0, "open": body.split(". ")[0]})
-        entry["n"] += 1
-    if not seen:
-        return ""
-    lines = [
-        f'- "{e["hook"]}" (used {e["n"]}x): {e["open"][:140]}'
-        if e["open"]
-        else f'- "{e["hook"]}" (used {e["n"]}x)'
-        for e in list(seen.values())[:top]
-    ]
-    return "our clips so far (rendered, not yet measured):\n" + "\n".join(lines)
-
-
 def winning_traits(store: Store, tag: str | None = None, top: int = 3) -> str:
-    """Short text for the script prompt: our own posts first, then the reference videos, then
-    where the two disagree, each labelled so the writer knows which is which. In between, the hooks
-    of our own rendered clips so the writer builds on them before any post is measured. Empty when
-    nothing is scored or rendered."""
+    """Short text for the script prompt: standing rules from review first, then what our own
+    posts have proven (with the evidence behind each line), then the reference videos, then where
+    the two disagree, each labelled so the writer knows which is which. Empty when nothing is
+    scored, rendered or ruled."""
+    from . import campaign as campaign_cfg
     from .compare import compare_text
+    from .learnings import rules_text
 
+    niche = campaign_cfg.load().niche.name
     parts = (
-        our_traits(store, top),
-        our_clip_hooks(store),
+        rules_text(store, niche),
+        verdicts(store, niche, top),
         reference_traits(store, tag, top),
         compare_text(store, tag),
     )

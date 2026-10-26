@@ -430,11 +430,14 @@ def render(script_ids, provider, duration, resolution, sound, ref):
     """Generate a clip per script with Seedance and cut two 1080x1920 videos: the captioned preview
     (s<id>.mp4) and a clean copy with no text (s<id>_clean.mp4) that is the one to post, with the
     hook typed into TikTok's own text tool so TikTok reads it as text, not pixels."""
+    from . import campaign as campaign_cfg
+    from .learnings import rules as review_rules
     from .video.edit import assemble, captions_from_script, probe_duration
     from .video.generate import GenRequest, get_provider
 
     store = _store()
     prov = get_provider(provider)
+    rules = review_rules(store, campaign_cfg.load().niche.name)
     for sid in script_ids:
         rows = store.rows("SELECT * FROM scripts WHERE id=?", (sid,))
         if not rows:
@@ -451,6 +454,7 @@ def render(script_ids, provider, duration, resolution, sound, ref):
                 duration_s=duration,
                 resolution=resolution,
                 reference_images=list(ref),
+                rules=rules,
             ),
             raw,
         )
@@ -1015,6 +1019,47 @@ def learn_add(title, body, niche):
     body = body if body is not None else sys.stdin.read()
     lid = add(_store(), niche or c.niche.name, c.product.description, title, body)
     console.print(f"learnings entry {lid}")
+
+
+@learn.command("rule")
+@click.argument("text")
+@click.argument("niche", required=False)
+def learn_rule(text, niche):
+    """A standing rule in plain words, e.g. "The TV shows our flappy-bird game for the whole
+    clip, never another game". From now on every script prompt and every video prompt carries it,
+    and it shows on the Learnings page."""
+    from . import campaign as campaign_cfg
+    from .learnings import add_rule
+
+    c = campaign_cfg.load()
+    lid = add_rule(_store(), niche or c.niche.name, c.product.description, text)
+    console.print(f"rule {lid}")
+
+
+@learn.command("hold")
+@click.argument("script_id", type=int)
+@click.argument("reason")
+def learn_hold(script_id, reason):
+    """Keep a clip off the ready-to-post list and out of the walkthrough, with the reason shown on
+    Clips (e.g. "TV switches to a game that is not ours at 4s")."""
+    from .learnings import hold
+
+    n = hold(_store(), script_id, reason)
+    console.print(
+        f"s{script_id}: {n} render(s) on hold" if n else f"[red]no render for s{script_id}"
+    )
+
+
+@learn.command("release")
+@click.argument("script_id", type=int)
+def learn_release(script_id):
+    """Take a clip off hold."""
+    from .learnings import release
+
+    n = release(_store(), script_id)
+    console.print(
+        f"s{script_id}: released {n} render(s)" if n else f"[red]no render for s{script_id}"
+    )
 
 
 @learn.command("show")

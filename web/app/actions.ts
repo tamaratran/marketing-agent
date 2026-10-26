@@ -45,3 +45,17 @@ export async function addPost(formData: FormData) {
   await post("/ours/posts", { url, caption });
   revalidatePath("/ours");
 }
+
+export async function holdClip(formData: FormData) {
+  const id = Number(formData.get("script_id"));
+  await post(`/renders/${id}/hold`, { reason: String(formData.get("reason") ?? "") });
+  revalidatePath("/clips");
+  revalidatePath("/");
+}
+
+export async function releaseClip(formData: FormData) {
+  const id = Number(formData.get("script_id"));
+  await post(`/renders/${id}/release`);
+  revalidatePath("/clips");
+  revalidatePath("/");
+}

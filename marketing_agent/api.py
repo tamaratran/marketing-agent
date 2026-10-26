@@ -18,6 +18,9 @@ from .cohort import build_features, features, latest_snapshot, repoll
 from .config import settings
 from .learnings import document as learnings_doc
 from .learnings import entries as learnings_entries
+from .learnings import hold as learnings_hold
+from .learnings import migrate as learnings_migrate
+from .learnings import release as learnings_release
 from .own import accounts as own_accounts
 from .own import own_posts, own_rewards
 from .policy import concept_scores, winning_traits
@@ -149,14 +152,39 @@ def scripts(
     return out
 
 
+class HoldIn(BaseModel):
+    reason: str = ""
+
+
+@app.post("/renders/{script_id}/hold", dependencies=[Depends(_auth)])
+def hold_render(script_id: int, body: HoldIn):
+    """Keep a clip off the ready-to-post list and out of the walkthrough; the reason shows on
+    Clips. The Clips page's Hold button and `mkt learn hold` call this."""
+    n = learnings_hold(_store(), script_id, body.reason)
+    if not n:
+        raise HTTPException(404, f"no render for s{script_id}")
+    return {"script_id": script_id, "hold_reason": body.reason or "on hold"}
+
+
+@app.post("/renders/{script_id}/release", dependencies=[Depends(_auth)])
+def release_render(script_id: int):
+    n = learnings_release(_store(), script_id)
+    if not n:
+        raise HTTPException(404, f"no render for s{script_id}")
+    return {"script_id": script_id, "hold_reason": None}
+
+
 @app.get("/renders")
 def renders(limit: int = 50, niche: str = DEFAULT_NICHE):
     """Real clips only: the stub provider's colour cards are for offline tests, not the site.
     `post_text` is the on-screen text as lines, for the poster to type into TikTok's text tool
-    over the clean clip (`post_path`); older renders without a clean copy have post_path null."""
-    rows = _store().rows(
+    over the clean clip (`post_path`); older renders without a clean copy have post_path null.
+    `hold_reason` is set when a reviewer held the clip back (see /renders/{script_id}/hold)."""
+    store = _store()
+    learnings_migrate(store)
+    rows = store.rows(
         """SELECT r.id, r.script_id, r.created_at, r.model, r.cost_usd, r.final_path, r.post_path,
-                  s.hook, s.payload
+                  r.hold_reason, s.hook, s.payload
            FROM renders r JOIN scripts s ON s.id=r.script_id JOIN concepts c ON c.id=s.concept_id
            WHERE r.final_path IS NOT NULL AND r.model!='stub' AND c.niche=?
            ORDER BY r.created_at DESC LIMIT ?""",

@@ -3,6 +3,7 @@ import { CLIPS, dateOf, get, usd, type Render, type Script, frameUrl } from "@/l
 import type { Ours } from "@/lib/ours";
 import { Download } from "../download";
 import { Card, H1, Note, Pill, formatName } from "../ui";
+import { holdClip, releaseClip } from "../actions";
 
 export const dynamic = "force-dynamic";
 
@@ -27,9 +28,15 @@ export default async function Page() {
               <div id={`s${r.script_id}`} className="scroll-mt-4" />
               <video poster={frameUrl(`s${r.script_id}`)} controls preload="metadata" className="aspect-[9/16] w-full rounded bg-black" src={src} />
               <div className="mt-2 flex items-center gap-2">
-                {p ? <a href={p.url} target="_blank"><Pill tone="good">posted</Pill></a> : <Pill tone="warn">ready to post</Pill>}
+                {p ? <a href={p.url} target="_blank"><Pill tone="good">posted</Pill></a> : r.hold_reason ? <Pill tone="bad">on hold</Pill> : <Pill tone="warn">ready to post</Pill>}
                 {clean ? <Download src={clean} className="text-xs text-sky-300 hover:underline">download clean clip to post</Download> : <Download src={src} className="text-xs text-sky-300 hover:underline">download</Download>}
               </div>
+              {r.hold_reason && <p className="mt-2 text-xs text-red-200">{r.hold_reason}</p>}
+              {!p && (r.hold_reason ? (
+                <form action={releaseClip} className="mt-2"><input type="hidden" name="script_id" value={r.script_id} /><button className="text-xs text-neutral-400 hover:text-neutral-100">Release</button></form>
+              ) : (
+                <form action={holdClip} className="mt-2 flex gap-1"><input type="hidden" name="script_id" value={r.script_id} /><input name="reason" required placeholder="why hold it" className="min-w-0 flex-1 rounded border border-neutral-800 bg-neutral-900 px-2 py-1 text-xs" /><button className="rounded border border-neutral-700 px-2 py-1 text-xs text-neutral-300 hover:bg-neutral-800">Hold</button></form>
+              ))}
               {clean && r.post_text.length ? (
                 <div className="mt-2 rounded border border-neutral-800 p-2">
                   <p className="text-[11px] uppercase tracking-wide text-neutral-500">text to add in TikTok</p>
