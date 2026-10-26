@@ -175,6 +175,24 @@ def rewards(rows: list[dict], now: int | None = None) -> list[dict]:
     return out
 
 
+PACING_EDGES = [2, 4, 7]
+PACING_LABELS = ["slow", "medium", "fast", "frantic"]
+
+
+def pacing_bucket(cuts_per_10s) -> str | None:
+    """Cuts per 10 seconds as a word, the same edges the cohort analysis uses."""
+    if cuts_per_10s is None:
+        return None
+    try:
+        x = float(cuts_per_10s)
+    except (TypeError, ValueError):
+        return None
+    for edge, label in zip(PACING_EDGES, PACING_LABELS, strict=False):
+        if x < edge:
+            return label
+    return PACING_LABELS[-1]
+
+
 def rank_by(rows: list[dict], key: str, min_n: int = 2) -> list[dict]:
     """Mean reward per value of `key` (e.g. hook_type, concept), with n and a 1-sigma error."""
     groups: dict[str, list[float]] = defaultdict(list)
@@ -262,6 +280,8 @@ def build(
         r["concept"] = t.get("concept")
         r["visual_style"] = t.get("visual_style")
         r["product_on_screen_by_5s"] = t.get("product_on_screen_by_5s")
+        r["pacing_bucket"] = pacing_bucket(t.get("pacing_cuts_per_10s"))
+        r["music_role"] = t.get("music_role")
     scored = rewards(rows)
     return {
         "curve": reference_curve(rows),
@@ -269,6 +289,9 @@ def build(
         "hooks": rank_by(scored, "hook_type"),
         "concepts": rank_by(scored, "concept"),
         "styles": rank_by(scored, "visual_style"),
+        "pacing": rank_by(scored, "pacing_bucket"),
+        "sound": rank_by(scored, "music_role"),
+        "product_early": rank_by(scored, "product_on_screen_by_5s"),
         "stuck_accounts": shadowban_flags(scored),
         "n_scored": sum(1 for r in scored if r["reward"] is not None),
         "n_tagged": sum(1 for r in scored if r["hook_type"]),
