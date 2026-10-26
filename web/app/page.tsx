@@ -66,7 +66,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<Q> 
               <div className="mb-2 text-xs text-neutral-500">Examples with the top-scoring traits</div>
               <div className="grid gap-3 sm:grid-cols-2">
                 {examples.map((v) => (
-                  <a key={v.id} href={v.url} target="_blank" className="flex gap-3 rounded-lg border border-neutral-800 p-3 hover:border-neutral-600">
+                  <a key={v.id} href={v.url} target="_blank" className="flex min-w-0 gap-3 rounded-lg border border-neutral-800 p-3 hover:border-neutral-600">
                     <Thumb id={v.id} size={48} />
                     <div className="min-w-0 text-sm">
                       <div className="truncate">{v.desc || v.id}</div>
