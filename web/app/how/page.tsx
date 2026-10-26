@@ -263,6 +263,14 @@ function AgeCurve() {
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="w-full max-w-xs" role="img" aria-label="Weight vs post age">
       <path d={d} fill="none" stroke="#38bdf8" strokeWidth={2} />
+      {[1, 6, 24, 72].map((h) => {
+        const w = Math.min(1, Math.sqrt(h / 72));
+        return (
+          <circle key={h} cx={(h / 72) * (W - 20) + 10} cy={H - 16 - w * (H - 26)} r={3} fill="#38bdf8">
+            <title>{`A ${h}h old post counts ${Math.round(w * 100)}% as much as a 3 day result`}</title>
+          </circle>
+        );
+      })}
       {[0, 6, 24, 72].map((h) => (
         <text key={h} x={(h / 72) * (W - 20) + 10} y={H - 2} fontSize={10} fill="#737373" textAnchor="middle">{h}h</text>
       ))}
@@ -288,7 +296,7 @@ function Progress({ reached, total, need }: { reached: Record<string, number>; t
           </div>
         );
       })}
-      <Note>Videos tracked that have reached each age. The yellow mark is the {need} needed at 3 days.</Note>
+      <Note>How many tracked videos have a view count taken at each age. We only get one if we were already watching the video then, so most videos found after their first hour have no 1 hour count. The yellow mark is the {need} needed at 3 days.</Note>
     </div>
   );
 }

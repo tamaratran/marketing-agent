@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 // The content is ours, so no sanitising library is needed; unknown syntax falls back to text.
 function inline(text: string, key: number): ReactNode {
   const parts: ReactNode[] = [];
-  const re = /\*\*(.+?)\*\*|\[([^\]]+)\]\(([^)]+)\)|_(.+?)_|(https?:\/\/\S+)/g;
+  const re = /\*\*(.+?)\*\*|\[([^\]]+)\]\(([^)]+)\)|(?<!\w)_(?!\s)(.+?)(?<!\s)_(?!\w)|(https?:\/\/\S+)/g;
   let last = 0, m: RegExpExecArray | null, i = 0;
   while ((m = re.exec(text))) {
     if (m.index > last) parts.push(text.slice(last, m.index));

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { dateOf, get, type Concept } from "@/lib/api";
 import type { Ours } from "@/lib/ours";
-import { Card, H1, Note, Pill, Stat, Table, reward } from "../ui";
+import { Card, H1, Note, Pill, Stat, Table, reward, formatName } from "../ui";
 import { Thumb } from "../thumb";
 
 export const dynamic = "force-dynamic";
@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 export default async function Page() {
   const [o, concepts] = await Promise.all([get<Ours>("/ours"), get<Concept[]>("/concepts")]);
-  const conceptName = new Map(concepts.map((c) => [String(c.id), c.name]));
+  const conceptName = new Map(concepts.map((c) => [String(c.id), formatName(c.name)]));
   const beat = o.posts.filter((p) => (p.lift_72h ?? p.lift_now ?? 0) > 0).length;
   return (
     <>
@@ -34,7 +34,7 @@ export default async function Page() {
             <Thumb key={`t${p.id}`} id={p.id} href={`/videos/${p.id}`} />,
             dateOf(p.create_time),
             <Link key={p.id} href={`/videos/${p.id}`} className="text-sky-300 hover:underline">{(p.desc || p.id).slice(0, 60)}</Link>,
-            p.script_id ? `#${p.script_id} · ${p.concept ?? "?"}` : <Pill key="u" tone="warn">no script matched</Pill>,
+            p.script_id ? `#${p.script_id} · ${p.concept ? formatName(p.concept) : "?"}` : <Pill key="u" tone="warn">no script matched</Pill>,
             p.views_now?.toLocaleString() ?? "", p.views_72h ? Math.round(p.views_72h).toLocaleString() : "not yet",
             reward(p.lift_now, p.baseline_log == null ? "no baseline" : "not yet"), reward(p.lift_72h, p.baseline_log == null ? "no baseline" : "not yet"),
             <span key="n" className="text-neutral-500">{p.n_obs} polls</span>,
