@@ -277,7 +277,7 @@ function AgeCurve() {
       {[0, 6, 24, 72].map((h) => (
         <text key={h} x={(h / 72) * (W - 20) + 10} y={H - 2} fontSize={10} fill="#737373" textAnchor="middle">{h}h</text>
       ))}
-      <text x={W - 10} y={14} fontSize={10} fill="#737373" textAnchor="end">full</text>
+      <text x={W - 18} y={14} fontSize={10} fill="#737373" textAnchor="end">full</text>
     </svg>
   );
 }
