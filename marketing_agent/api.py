@@ -83,7 +83,19 @@ def logic(niche: str = DEFAULT_NICHE):
     store = _store()
     sb = build(store, tags=store.niche_tags(niche) or None)
     clone = next((c for c in policy.concept_scores(store, niche) if c["kind"] == "format"), None)
-    keys = ("id", "author", "views", "followers", "create_time", "log_views", "baseline", "reward")
+    keys = (
+        "id",
+        "author",
+        "views",
+        "followers",
+        "create_time",
+        "observed_at",
+        "log_views",
+        "expected",
+        "creator_offset",
+        "baseline",
+        "reward",
+    )
     return {
         "niche": niche,
         "videos": [{k: v.get(k) for k in keys} for v in sb["videos"]],
@@ -91,7 +103,9 @@ def logic(niche: str = DEFAULT_NICHE):
         "format_edge": policy.FORMAT_EDGE,
         "format_prior": clone["prior"] if clone else None,
         "min_age_h": scoreboard.MIN_AGE_H_FOR_JUDGEMENT,
+        "min_age_h_own": scoreboard.MIN_AGE_H_FOR_OWN,
         "winsor_pct": scoreboard.WINSOR_PCT,
+        "curve": sb["curve"],
     }
 
 

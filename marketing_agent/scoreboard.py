@@ -1,10 +1,13 @@
 """Scoreboard: turn raw view counts into a reward, rank hooks and concepts by it, flag stuck accounts.
 
 Reward per video is log10(views + 1), winsorized at the 95th percentile so one viral hit does not
-dominate, then expressed relative to the baseline for that account (median over its videos, or the
-niche median when the account has fewer than MIN_FOR_OWN_BASELINE videos). A reward of +1 means the
-video did 10x what that account usually does. Public TikTok exposes views, likes, comments, shares
-and saves, not watch time, so completion is approximated by shares + saves per 1k views.
+dominate, then expressed relative to what is typical for a video of that age from an account of
+that size in the niche: a curve log10(views) ~ log10(age) + log10(followers) fitted on the
+reference videos (see fit_curve). When we have MIN_FOR_OWN_BASELINE or more videos from the same
+creator, their track record against that curve is added, so the baseline is the creator's usual,
+age-matched. A reward of +1 means the video did 10x what a video like it usually has by now.
+Public TikTok exposes views, likes, comments, shares and saves, not watch time, so completion is
+approximated by shares + saves per 1k views.
 """
 
 import math
@@ -18,6 +21,10 @@ WINSOR_PCT = 0.95
 SHADOWBAN_MIN_POSTS = 3
 SHADOWBAN_VIEW_CEILING = 1000
 MIN_AGE_H_FOR_JUDGEMENT = 24
+MIN_AGE_H_FOR_OWN = 6  # our own posts: younger than this is noise, so they do not move the picker
+MIN_CURVE_POINTS = 30
+CURVE_MIN_AGE_H = 0.5
+CURVE_MAX_AGE_H = 168  # views plateau after a week; older videos are judged as week-old ones
 
 
 def _winsor(values: list[float], pct: float = WINSOR_PCT) -> float:
@@ -27,25 +34,108 @@ def _winsor(values: list[float], pct: float = WINSOR_PCT) -> float:
     return s[max(0, min(len(s) - 1, math.ceil(len(s) * pct) - 1))]
 
 
+def fit_curve(points: list[tuple[float, float, float]]) -> dict | None:
+    """Typical views by age and account size: least squares for
+    log10(views + 1) = a + b*log10(age_h) + c*log10(followers + 1) over (age_h, views, followers)
+    points from reference videos. None with fewer than MIN_CURVE_POINTS points. `sd` is the
+    spread of the residuals, so callers can say how unusual a video is."""
+    from .analysis import _solve
+
+    pts = [
+        (
+            math.log10(min(max(a, CURVE_MIN_AGE_H), CURVE_MAX_AGE_H)),
+            math.log10((v or 0) + 1),
+            math.log10((f or 0) + 1),
+        )
+        for a, v, f in points
+        if v is not None
+    ]
+    if len(pts) < MIN_CURVE_POINTS:
+        return None
+    xs = [(1.0, la, lf) for la, _, lf in pts]
+    ys = [lv for _, lv, _ in pts]
+    xtx = [[sum(x[i] * x[j] for x in xs) for j in range(3)] for i in range(3)]
+    xty = [sum(x[i] * y for x, y in zip(xs, ys, strict=True)) for i in range(3)]
+    try:
+        a, b, c = _solve(xtx, xty)
+    except (ZeroDivisionError, ValueError):
+        return None
+    resid = [y - (a + b * x[1] + c * x[2]) for x, y in zip(xs, ys, strict=True)]
+    sd = statistics.pstdev(resid) if len(resid) > 1 else 0.0
+    return {
+        "a": round(a, 4),
+        "b": round(b, 4),
+        "c": round(c, 4),
+        "n": len(pts),
+        "sd": round(sd, 3),
+        "followers_fill": round(statistics.median(x[2] for x in xs), 3),
+    }
+
+
+def expected_log(curve: dict, age_h: float, followers: int | None) -> float:
+    """log10 views a typical niche video has at `age_h` from an account with `followers`."""
+    la = math.log10(min(max(age_h, CURVE_MIN_AGE_H), CURVE_MAX_AGE_H))
+    lf = math.log10(followers + 1) if followers else curve["followers_fill"]
+    return curve["a"] + curve["b"] * la + curve["c"] * lf
+
+
+def curve_points(rows: list[dict], now: int | None = None) -> list[tuple[float, float, float]]:
+    """(age at observation, views, followers) per row, for fit_curve."""
+    import time
+
+    now = now or int(time.time())
+    out = []
+    for r in rows:
+        if not r.get("create_time") or r.get("views") is None:
+            continue
+        age_h = ((r.get("observed_at") or now) - r["create_time"]) / 3600
+        if age_h <= 0:
+            continue
+        out.append((age_h, r["views"], r.get("followers")))
+    return out
+
+
+def reference_curve(rows: list[dict], now: int | None = None) -> dict | None:
+    """The curve rewards() judges against: fitted on these rows with the same view cap."""
+    import time
+
+    now = now or int(time.time())
+    cap = _winsor([math.log10((r.get("views") or 0) + 1) for r in rows])
+    return fit_curve([(a, min(v, 10**cap - 1), f) for a, v, f in curve_points(rows, now)])
+
+
 def rewards(rows: list[dict], now: int | None = None) -> list[dict]:
-    """Attach `log_views`, `baseline`, `reward` and `engagement_per_1k` to each row. Rows need
-    views/author/create_time; videos younger than MIN_AGE_H_FOR_JUDGEMENT get reward=None."""
+    """Attach `log_views`, `expected`, `baseline`, `reward` and `engagement_per_1k` to each row.
+    Rows need views/author/create_time (followers and observed_at help); videos younger than
+    MIN_AGE_H_FOR_JUDGEMENT get reward=None. The baseline is the age- and size-matched
+    expectation plus the creator's own track record when MIN_FOR_OWN_BASELINE of their videos
+    are here; without enough videos for a curve it falls back to the niche median."""
     import time
 
     now = now or int(time.time())
     logs = [math.log10((r.get("views") or 0) + 1) for r in rows]
     cap = _winsor(logs)
-    by_author: dict[str, list[float]] = defaultdict(list)
     for r, lv in zip(rows, logs, strict=True):
         r["log_views"] = min(lv, cap)
-        by_author[r.get("author") or ""].append(r["log_views"])
+    curve = fit_curve([(a, min(v, 10**cap - 1), f) for a, v, f in curve_points(rows, now)])
     niche_median = statistics.median(r["log_views"] for r in rows) if rows else 0.0
+    for r in rows:
+        age_obs = ((r.get("observed_at") or now) - (r.get("create_time") or now)) / 3600
+        r["expected"] = (
+            round(expected_log(curve, age_obs, r.get("followers")), 3) if curve else niche_median
+        )
+        r["residual"] = r["log_views"] - r["expected"]
+    by_author: dict[str, list[dict]] = defaultdict(list)
+    for r in rows:
+        by_author[r.get("author") or ""].append(r)
     out = []
     for r in rows:
-        own = by_author[r.get("author") or ""]
-        base = statistics.median(own) if len(own) >= MIN_FOR_OWN_BASELINE else niche_median
+        others = [o["residual"] for o in by_author[r.get("author") or ""] if o is not r]
+        offset = statistics.median(others) if len(others) + 1 >= MIN_FOR_OWN_BASELINE else 0.0
+        base = r["expected"] + offset
         age_h = (now - (r.get("create_time") or now)) / 3600
         views = r.get("views") or 0
+        r["creator_offset"] = round(offset, 3)
         r["baseline"] = round(base, 3)
         r["reward"] = round(r["log_views"] - base, 3) if age_h >= MIN_AGE_H_FOR_JUDGEMENT else None
         r["engagement_per_1k"] = (
@@ -54,6 +144,8 @@ def rewards(rows: list[dict], now: int | None = None) -> list[dict]:
             else 0
         )
         out.append(r)
+    for r in out:
+        r.pop("residual", None)
     return out
 
 
@@ -146,6 +238,7 @@ def build(
         r["product_on_screen_by_5s"] = t.get("product_on_screen_by_5s")
     scored = rewards(rows)
     return {
+        "curve": reference_curve(rows),
         "videos": sorted(scored, key=lambda r: -(r["reward"] if r["reward"] is not None else -9)),
         "hooks": rank_by(scored, "hook_type"),
         "concepts": rank_by(scored, "concept"),

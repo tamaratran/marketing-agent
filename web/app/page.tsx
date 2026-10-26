@@ -121,13 +121,13 @@ export default async function Page({ searchParams }: { searchParams: Promise<Q> 
       )}
 
       {step === 6 && (
-        <Screen title="How it went" lead={account ? `Posts from @${account}, compared with the account's usual views.` : "No posting account yet."}>
+        <Screen title="How it went" lead={account ? `Posts from @${account}, compared with niche videos of the same age from accounts the same size.` : "No posting account yet."}>
           {ours.posts.length ? (
             <ul className="space-y-2 text-sm">
               {ours.posts.slice(0, 6).map((p) => (
                 <li key={p.id} className="flex justify-between gap-3 border-b border-neutral-800 pb-2">
                   <a href={p.url} target="_blank" className="truncate hover:underline">{p.desc || p.id}</a>
-                  <span className="shrink-0 text-neutral-400">{(p.views_72h ?? p.views_now ?? 0).toLocaleString()} views · {reward(p.lift_72h ?? p.lift_now, "too new")}</span>
+                  <span className="shrink-0 text-neutral-400">{(p.views_72h ?? p.views_now ?? 0).toLocaleString()} views · {reward(p.lift_matched ?? p.lift_72h ?? p.lift_now, "too new")}</span>
                 </li>
               ))}
             </ul>

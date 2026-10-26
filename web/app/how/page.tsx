@@ -48,10 +48,9 @@ export default async function How() {
   const chances = pickChances(formats);
   const ranked = formats.map((f, i) => ({ ...f, p: chances[i] })).sort((a, b) => b.p - a.p);
   const leader = ranked[0];
-  const baseCount = new Map<number, number>();
-  scored.forEach((v) => baseCount.set(v.baseline, (baseCount.get(v.baseline) ?? 0) + 1));
-  const nicheBase = [...baseCount.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
-  const vsNiche = scored.filter((v) => v.baseline === nicheBase).length;
+  const withRecord = scored.filter((v) => v.creator_offset !== 0).length;
+  const curve = lg.curve;
+  const typical = (h: number, followers: number) => curve ? Math.round(10 ** (curve.a + curve.b * Math.log10(h) + curve.c * Math.log10(followers + 1))) : null;
   const big = scored.filter((v) => (v.reward as number) >= 1).length;
   const research = ranked.find((r) => r.c.kind !== "format");
   const whatIf = (target: typeof ranked[number] | undefined, lift: number) => {
@@ -69,7 +68,7 @@ export default async function How() {
       <Section n={1} title="The loop">
         <Loop steps={[
           ["Research", `${lg.videos.length} videos from other accounts`],
-          ["Score", `${beat} of ${scored.length} beat their usual`],
+          ["Score", `${beat} of ${scored.length} ahead of videos like them`],
           ["Formats", `${concepts.length} found`],
           ["Pick", leader ? formatName(leader.c.name) : "none yet"],
           ["Script + clip", `${scripts.length} scripts, ${new Set(renders.map((r) => r.script_id)).size} clips`],
@@ -78,24 +77,22 @@ export default async function How() {
         <Note className="mt-3">How our posts do feeds back into the pick. Views on research videos are rechecked every 2 hours.</Note>
       </Section>
 
-      <Section n={2} title="Score: did a video beat its creator's usual?">
+      <Section n={2} title="Score: did a video beat videos like it?">
         <p className="text-sm text-neutral-300">
-          Raw views mislead: 50k views is huge for a new account and a flop for a big one. So every video is compared with
-          its creator&apos;s usual: the middle of their videos we&apos;ve seen. Each square is one video. Right of the dashed line did better than usual, left did worse.
+          Raw views mislead twice over: 50k is huge for a new account and a flop for a big one, and a video that is 3 hours old has
+          had no time to collect views. So every video is compared with what a video of the same age from an account of the same size
+          typically has in this niche right now. That &quot;typical&quot; is a curve fitted on the {curve?.n ?? scored.length} research videos
+          we have view counts for{curve ? <>: for example {typical(6, 300)?.toLocaleString()} views at 6 hours from a 300-follower account, {typical(72, 300)?.toLocaleString()} at 3 days,
+          and {typical(72, 100_000)?.toLocaleString()} at 3 days from a 100k-follower account</> : ""}.
+          When we have 3 or more videos from the same creator, their own track record against that curve is added, so the bar is the creator&apos;s usual, age-matched.
+          Each square is one video. Right of the dashed line did better than videos like it, left did worse.
         </p>
-        <Histogram videos={scored} nicheBase={nicheBase} />
+        <Histogram videos={scored} />
         <Note className="mt-2">
-          {big} of {scored.length} did 10x usual or more. Half land on each side by design, since usual is the middle; the spread is what matters.
+          {big} of {scored.length} did 10x or more. {withRecord} have a creator track record folded in; the rest are judged on age and account size alone.
           {lg.videos.length - scored.length > 0 && ` ${lg.videos.length - scored.length} more are under ${lg.min_age_h}h old and not judged yet.`}
           {" "}The top {Math.round((1 - lg.winsor_pct) * 100)}% of view counts are capped so one viral hit can&apos;t swamp the rest.
         </Note>
-        {nicheBase != null && vsNiche > scored.length / 2 && (
-          <div className="mt-3 rounded-lg border border-amber-900/60 bg-amber-950/30 p-3 text-sm text-amber-200">
-            Only {scored.length - vsNiche} of {scored.length} videos (solid squares) come from creators we have 3 or more videos from. The other {vsNiche} (faded)
-            are compared with the niche&apos;s middle, about {Math.round(10 ** nicheBase).toLocaleString()} views, so for now most scores mean &quot;beat a typical
-            video in this niche&quot;, which favours big accounts. This fixes itself as we track more videos per creator.
-          </div>
-        )}
       </Section>
 
       <Section n={3} title="Pick: which format the next scripts use">
@@ -124,12 +121,12 @@ export default async function How() {
       <Section n={4} title="Learn: how our posts change the pick">
         <p className="text-sm text-neutral-300">
           Once a post from {account ? `@${account}` : "our account"} is matched to its script, its result is added to that
-          format&apos;s head start: a post that does 10x the account&apos;s usual adds 1, one that does a tenth takes 1 away.
+          format&apos;s head start: a post that does 10x what videos like it (same age, same account size, this niche) have adds 1, one that does a tenth takes 1 away.
           The more posts a format has, the less noise it gets, so proven formats settle and untested ones still get tries.
         </p>
         <WhatIf rows={scenarios} />
         <Note className="mt-3">
-          Worked out on today&apos;s numbers. The 3-day result counts fully; before that a post counts partly (a 6 hour old result counts about 30%), so early posts nudge the pick without deciding it.
+          Worked out on today&apos;s numbers. A post under {lg.min_age_h_own ?? 6} hours old does not count at all; after that it counts partly (a 6 hour old result counts about 30%, 3 days counts fully), so early posts nudge the pick without deciding it.
           {linked.length ? ` ${linked.length} post${linked.length === 1 ? " is" : "s are"} linked so far.` : " No posts are linked yet, so every pick so far comes from research alone."}
         </Note>
       </Section>
@@ -185,28 +182,28 @@ function Loop({ steps }: { steps: [string, string][] }) {
   );
 }
 
-function Histogram({ videos, nicheBase }: { videos: Logic["videos"]; nicheBase?: number }) {
+function Histogram({ videos }: { videos: Logic["videos"] }) {
   const step = 0.25, lo = -3, hi = 3;
   const bins = Array.from({ length: (hi - lo) / step }, (_, i) => lo + i * step);
   const at = (r: number) => Math.min(bins.length - 1, Math.max(0, Math.floor((r - lo) / step)));
   const cols = bins.map(() => [] as Logic["videos"]);
-  [...videos].sort((a, b) => Number(a.baseline === nicheBase) - Number(b.baseline === nicheBase)).forEach((v) => cols[at(v.reward as number)].push(v));
+  videos.forEach((v) => cols[at(v.reward as number)].push(v));
   const tall = Math.max(...cols.map((c) => c.length), 1);
   const W = 600, cell = Math.min(10, 150 / tall), H = tall * cell + 40, cw = W / bins.length;
   const x = (r: number) => ((r - lo) / (hi - lo)) * W;
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="mt-4 w-full" role="img" aria-label="How each video did against its creator's usual views">
+    <svg viewBox={`0 0 ${W} ${H}`} className="mt-4 w-full" role="img" aria-label="How each video did against videos of the same age and account size">
       {cols.map((c, i) => c.map((v, j) => (
         <rect key={v.id} x={i * cw + 1} y={H - 28 - (j + 1) * cell} width={cw - 2} height={cell - 1} rx={1}
-          fill={(v.reward as number) > 0 ? "#34d399" : "#f87171"} fillOpacity={v.baseline === nicheBase ? 0.3 : 0.9}>
-          <title>{`@${v.author}: ${(v.views ?? 0).toLocaleString()} views, ${times(v.reward as number)} ${v.baseline === nicheBase ? "a typical niche video" : "their usual"}`}</title>
+          fill={(v.reward as number) > 0 ? "#34d399" : "#f87171"} fillOpacity={0.9}>
+          <title>{`@${v.author}: ${(v.views ?? 0).toLocaleString()} views, ${times(v.reward as number)} videos like it (typical ${Math.round(10 ** v.baseline).toLocaleString()})${v.creator_offset ? ", creator track record included" : ""}`}</title>
         </rect>
       )))}
       <line x1={x(0)} x2={x(0)} y1={0} y2={H - 24} stroke="#a3a3a3" strokeDasharray="4 3" />
       {(["1/1000", "1/100", "1/10", "1x", "10x", "100x", "1000x"] as const).map((t, i) => (
         <text key={t} x={Math.min(W - 16, Math.max(16, x(i - 3)))} y={H - 12} fontSize={10} fill="#737373" textAnchor="middle">{t}</text>
       ))}
-      <text x={W / 2} y={H} fontSize={11} fill="#a3a3a3" textAnchor="middle">views vs usual</text>
+      <text x={W / 2} y={H} fontSize={11} fill="#a3a3a3" textAnchor="middle">views vs videos like it</text>
     </svg>
   );
 }
@@ -241,7 +238,7 @@ function WhatIf({ rows }: { rows: { name: string; before: number; after: number;
     <div className="mt-4 space-y-3">
       {rows.map((r) => (
         <div key={`${r.name}${r.lift}`} className="text-xs">
-          <div className="mb-1 text-neutral-300">If one {r.name} post does {r.lift > 0 ? "10x" : "a tenth of"} usual, its chance of being picked goes</div>
+          <div className="mb-1 text-neutral-300">If one {r.name} post does {r.lift > 0 ? "10x" : "a tenth of"} what videos like it get, its chance of being picked goes</div>
           <div className="grid grid-cols-[3rem_1fr] items-center gap-x-3 gap-y-1">
             <span className="text-right tabular-nums text-neutral-500">{pct(r.before)}</span>
             <div className="h-2 rounded bg-neutral-800"><div className="h-2 rounded bg-neutral-500" style={{ width: `${r.before * 100}%` }} /></div>

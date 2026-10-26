@@ -108,6 +108,14 @@ def _fmt_views(v) -> str:
     return f"{v / 1e6:.1f}M" if v >= 1e6 else f"{v / 1e3:.0f}k" if v >= 1e3 else str(v)
 
 
+def _lift(p: dict) -> float | None:
+    """The lift the picker learns from: age-matched when a reference curve exists, else the
+    account's usual (72h first, then now)."""
+    if p.get("lift_matched") is not None:
+        return p["lift_matched"]
+    return p["lift_72h"] if p["lift_72h"] is not None else p["lift_now"]
+
+
 def write_cycle(store: Store, niche: str, product: str, stages: list[dict] | None = None) -> int:
     """Compose this cycle's entry from the db and store it. Deterministic: every statement comes
     from a stored measurement or score, so the file is a record, not a guess."""
@@ -185,24 +193,18 @@ def write_cycle(store: Store, niche: str, product: str, stages: list[dict] | Non
     lines += ["", "### How our posts did", ""]
     if posts:
         lines += [
-            "| post | account | age h | views | concept | lift vs our usual |",
+            "| post | account | age h | views | concept | lift vs typical at its age |",
             "|---|---|---|---|---|---|",
         ]
         for p in posts[:12]:
-            lift = p["lift_72h"] if p["lift_72h"] is not None else p["lift_now"]
+            lift = _lift(p)
             lines.append(
                 f"| {p['url']} | {p['author']} | {p['age_h']} | {p['views_now'] or ''} |"
                 f" {p['concept'] or 'unmatched'} | {'' if lift is None else f'{lift:+.2f}'} |"
             )
-        lifted = [
-            p
-            for p in posts
-            if (p["lift_72h"] if p["lift_72h"] is not None else p["lift_now"]) is not None
-        ]
+        lifted = [p for p in posts if _lift(p) is not None]
         if lifted:
-            best = max(
-                lifted, key=lambda p: p["lift_72h"] if p["lift_72h"] is not None else p["lift_now"]
-            )
+            best = max(lifted, key=_lift)
             facts["best_own_concept"] = best["concept"]
             lines += ["", f"Best so far: {best['concept'] or 'unmatched'} ({best['url']})."]
     else:
