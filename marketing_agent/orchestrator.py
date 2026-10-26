@@ -140,7 +140,7 @@ Then:
 4. Commit the state: cd ../mkt-state && git add -A && git commit -m "state: renders {day}" \
    && git push origin HEAD:{state_branch}
 5. Post every clip you rendered and did not hold. The account owner asked for this: each call
-   starts a posting session that uploads the clip from our account and registers the link:
+   hands the clip to our poster session, which uploads it from our account and registers the link:
    curl -sS -X POST {api_url}/renders/<script_id>/post -H "Authorization: Bearer $MKT_API_TOKEN"
    One call per clip, never twice for the same clip, never for a held clip.
 Never message anyone and never post from any account but ours.
@@ -230,6 +230,48 @@ def record_stage(store: Store, niche: str, name: str, status: str, note: str = "
     return rows[0]["id"]
 
 
+DEAD_SESSION = {"terminated", "archived", "expired", "deleted", "exited"}
+
+
+def poster_session(
+    store: Store, client: DevinClient, handle: str, prompt: str, **create_kw
+) -> tuple[dict, bool]:
+    """One Devin session per account does all the posting. Each press of Post (or each clip a
+    render cycle finishes) is a message to that session, so TikTok sees one browser that signed in
+    once instead of a fresh login per clip, which locks the account after a few in a row. Returns
+    (session, reused). When the stored session is gone, a new one is started and remembered."""
+    store.migrate()
+    rows = store.rows("SELECT session_id, url FROM poster_sessions WHERE handle=?", (handle,))
+    now = int(time.time())
+    if rows:
+        sid, url = rows[0]["session_id"], rows[0]["url"]
+        try:
+            info = client.get_session(sid)
+            alive = (
+                not info.get("is_archived")
+                and str(info.get("status", "")).lower() not in DEAD_SESSION
+            )
+            if alive:
+                client.send_message(sid, prompt)
+                with store.conn() as c:
+                    c.execute(
+                        "UPDATE poster_sessions SET last_used_at=? WHERE handle=?", (now, handle)
+                    )
+                return {"session_id": sid, "url": url}, True
+        except RuntimeError:
+            pass
+    s = client.create_session(prompt, title=f"mkt poster @{handle}", **create_kw)
+    with store.conn() as c:
+        c.execute(
+            """INSERT INTO poster_sessions VALUES (?,?,?,?,?)
+               ON CONFLICT(handle) DO UPDATE SET session_id=excluded.session_id, url=excluded.url,
+                                                created_at=excluded.created_at,
+                                                last_used_at=excluded.last_used_at""",
+            (handle, s["session_id"], s["url"], now, now),
+        )
+    return s, False
+
+
 def post_prompt(
     script_id: int,
     clip_url: str,
@@ -266,6 +308,11 @@ Sound to add with the uploader's "Sounds" button: {sound_line}
 If that exact sound cannot be found, search its title; if still missing, post with the clip's own
 audio and say so in your summary.
 
+You are the poster session for @{handle}: every clip the site posts comes to you as a message like
+this one, so the login below happens once and TikTok sees one signed-in browser, not a fresh login
+per clip (which locks the account). If you set up the repo and signed in for an earlier clip, skip
+straight to the upload.
+
 Setup (in the repo): uv venv && . .venv/bin/activate && uv pip install -e ".[dev]"
 The uploader runs in the Chrome already open in your VM at http://localhost:29229 (Playwright over
 CDP). It must be signed in as @{handle}: `mkt own login` reuses a verified login or submits
@@ -287,7 +334,9 @@ Then:
 3. Reply with: the post URL, the text lines as added, the sound used, and anything TikTok changed
    or refused. Attach a screenshot of the posted video page.
 
-Rules: one post, this clip only. Never message anyone, no bot accounts, no purchases, no account,
+Rules: one post per message, this clip only, then wait for the next. If you already posted script
+#{script_id} earlier (check https://www.tiktok.com/@{handle} before uploading), do not post it again:
+register the existing URL and reply with it. Never message anyone, no bot accounts, no purchases, no account,
 password or security changes. Do not edit the repo, open PRs or merge. Do not commit secrets."""
 
 
