@@ -112,7 +112,14 @@ def snapshot_creator(
         "median_views": statistics.median(views) if views else None,
         "median_log_views": statistics.median(math.log10(v) for v in views) if views else None,
     }
-    store.insert("creator_snapshots", snap)
+    cols = ",".join(snap)
+    updates = ",".join(f"{key}=excluded.{key}" for key in snap if key not in ("author", "taken_at"))
+    with store.conn() as c:
+        c.execute(
+            f"INSERT INTO creator_snapshots ({cols}) VALUES ({','.join('?' * len(snap))}) "
+            f"ON CONFLICT(author,taken_at) DO UPDATE SET {updates}",
+            list(snap.values()),
+        )
     return snap
 
 

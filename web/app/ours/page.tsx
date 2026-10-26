@@ -16,7 +16,7 @@ export default async function Page() {
   const beat = o.posts.filter((p) => (p.lift_72h ?? p.lift_now ?? 0) > 0).length;
   return (
     <>
-      <H1 sub="Posts humans made from our accounts, found by the campaign hashtag, matched to the script they came from. Their lift over the account's own baseline is what the concept picker is rewarded by.">Our posts</H1>
+      <H1 sub="Posts discovered on our accounts since tracking began. Caption matches connect posts to scripts; only matched posts can reward the concept picker. Older posts provide a baseline, not campaign results.">Our posts</H1>
       <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-4">
         <Stat label="accounts watched" value={o.accounts.length} />
         <Stat label="posts found" value={o.posts.length} />
@@ -24,14 +24,14 @@ export default async function Page() {
         <Stat label="concepts with reward" value={Object.keys(o.rewards).length} />
       </div>
       {o.accounts.length === 0 ? (
-        <Card className="mb-4"><p className="text-sm text-amber-200">No posting account configured yet. Set one with <code>mkt own add @handle --tag campaigntag</code>; every clip caption must carry that tag and posts are picked up on the next run.</p></Card>
+        <Card className="mb-4"><p className="text-sm text-amber-200">No posting account configured yet. Verify the browser session with <code>mkt own login</code>, then register it with <code>mkt own add @handle</code>. The next sync reads the profile directly; no campaign hashtag is required.</p></Card>
       ) : (
         <Card title="Accounts" className="mb-4">
-          <Table head={["handle", "campaign tag", "product", "since"]} rows={o.accounts.map((a) => [<Link key={a.handle} href={`/creators/${a.handle}`} className="text-sky-300 hover:underline">@{a.handle}</Link>, `#${a.campaign_tag}`, a.product, dateOf(a.added_at)])} />
+          <Table head={["handle", "fallback tag", "product", "since"]} rows={o.accounts.map((a) => [<Link key={a.handle} href={`/creators/${a.handle}`} className="text-sky-300 hover:underline">@{a.handle}</Link>, a.campaign_tag ? `#${a.campaign_tag}` : "none", a.product, dateOf(a.added_at)])} />
         </Card>
       )}
       <Card title="Posts">
-        {o.posts.length === 0 ? <p className="text-sm text-neutral-500">Nothing posted from our accounts yet.</p> : (
+        {o.posts.length === 0 ? <p className="text-sm text-neutral-500">No campaign posts recorded. This does not mean the account has no existing TikTok posts.</p> : (
           <Table head={["", "posted", "post", "script / concept", "views now", "views 72h", "lift now", "lift 72h", ""]} rows={o.posts.map((p) => [
             <Thumb key={`t${p.id}`} id={p.id} href={`/videos/${p.id}`} />,
             dateOf(p.create_time),

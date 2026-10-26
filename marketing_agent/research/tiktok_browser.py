@@ -46,39 +46,68 @@ async def scrape_hashtag(tag: str, cdp_url: str, scrolls: int = 3) -> list[dict]
 
 async def scrape_profile(author: str, cdp_url: str, scrolls: int = 1) -> list[dict]:
     """The author's recent posts (for their baseline), newest first."""
-    return await _scrape_items(
-        f"https://www.tiktok.com/@{author}", "/api/post/item_list", "profile", cdp_url, scrolls
+    from .tiktok_auth import normalize_handle
+
+    author = normalize_handle(author)
+    rows = await _scrape_items(
+        f"https://www.tiktok.com/@{author}",
+        "/api/post/item_list",
+        "profile",
+        cdp_url,
+        scrolls,
+        require_response=True,
     )
+    owned = [row for row in rows if (row.get("author") or "").lower() == author]
+    if rows and not owned:
+        raise RuntimeError("TikTok returned a different profile's feed; no data imported.")
+    return owned
 
 
 async def _scrape_items(
-    url: str, api_path: str, source_tag: str, cdp_url: str, scrolls: int
+    url: str,
+    api_path: str,
+    source_tag: str,
+    cdp_url: str,
+    scrolls: int,
+    require_response: bool = False,
 ) -> list[dict]:
     async with async_playwright() as p:
         browser = await p.chromium.connect_over_cdp(cdp_url)
         page = await browser.contexts[0].new_page()
         items: dict[str, dict] = {}
+        received = False
+        responses: list[asyncio.Task] = []
 
         async def on_response(resp):
+            nonlocal received
             if api_path not in resp.url:
                 return
             try:
                 data = await resp.json()
             except Exception:
                 return
+            if data.get("statusCode") != 0 or not isinstance(data.get("itemList"), list):
+                return
+            received = True
             for it in data.get("itemList") or []:
                 items[it["id"]] = it
 
-        page.on("response", on_response)
+        page.on("response", lambda resp: responses.append(asyncio.create_task(on_response(resp))))
         try:
             await page.goto(url, wait_until="domcontentloaded", timeout=45000)
-        except Exception:
-            pass
-        await page.wait_for_timeout(6000)
-        for _ in range(scrolls):
-            await page.mouse.wheel(0, 4000)
-            await page.wait_for_timeout(2500)
-        await page.close()
+            await page.wait_for_timeout(6000)
+            for _ in range(scrolls):
+                await page.mouse.wheel(0, 4000)
+                await page.wait_for_timeout(2500)
+            if responses:
+                await asyncio.gather(*responses)
+            if require_response and not received:
+                raise RuntimeError(
+                    "TikTok did not return a readable profile feed. Check login/access in Chrome; "
+                    "this is not a verified empty account."
+                )
+        finally:
+            await page.close()
     rows = [_row(it, source_tag) for it in items.values()]
     rows.sort(key=lambda r: -r["create_time"])
     return rows
