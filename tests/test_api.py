@@ -154,3 +154,30 @@ def test_video_and_creator_detail(client):
     assert c["videos"][0]["id"] == "v1"
     assert client.get("/videos/nope").status_code == 404
     assert client.post("/repoll").status_code in (401, 503)
+
+
+def test_run_cycle_with_empty_body_uses_api_config(client, monkeypatch):
+    """The site's Run cycle button posts {} and the API fills in its MKT_* config."""
+    from marketing_agent import orchestrator
+
+    seen = {}
+
+    def fake_create(self, prompt, **kw):
+        seen["prompt"], seen["kw"] = prompt, kw
+        return {"session_id": "devin-1", "url": "https://app.devin.ai/sessions/1"}
+
+    monkeypatch.setattr(orchestrator.DevinClient, "__init__", lambda self: None)
+    monkeypatch.setattr(orchestrator.DevinClient, "create_session", fake_create)
+    r = client.post("/runs", headers=AUTH)
+    assert r.status_code == 200 and r.json()["session_id"] == "devin-1"
+    assert "--renders 5 --resolution 720p" in seen["prompt"]
+    assert seen["kw"]["max_acu_limit"] == 10
+    run = client.get("/runs").json()[0]
+    assert run["note"] == "5 clips at 720p" and run["url"].endswith("/1")
+    r = client.post(
+        "/runs",
+        headers=AUTH,
+        json={"renders": 2, "resolution": "1080p", "refs": ["https://x/i.png"]},
+    )
+    assert r.status_code == 200
+    assert '--renders 2 --resolution 1080p --ref "https://x/i.png"' in seen["prompt"]
