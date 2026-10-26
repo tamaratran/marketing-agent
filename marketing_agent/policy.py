@@ -110,13 +110,49 @@ def reference_traits(store: Store, tag: str | None = None, top: int = 3) -> str:
     return "\n".join(parts)
 
 
+def our_clip_hooks(store: Store, top: int = 6) -> str:
+    """Hooks of the clips we have already rendered, newest first, each with how often we used it.
+    Not a reward: these are unposted or unmeasured, so the writer carries forward what we keep
+    making rather than what the market or our posts have proven."""
+    rows = store.rows(
+        "SELECT s.hook, s.payload FROM renders r JOIN scripts s ON s.id=r.script_id "
+        "ORDER BY r.created_at DESC LIMIT 40"
+    )
+    seen: dict[str, dict] = {}
+    for r in rows:
+        hook = (r["hook"] or "").strip()
+        if not hook:
+            continue
+        try:
+            body = json.loads(r["payload"] or "{}").get("body", "")
+        except ValueError:
+            body = ""
+        entry = seen.setdefault(hook.lower(), {"hook": hook, "n": 0, "open": body.split(". ")[0]})
+        entry["n"] += 1
+    if not seen:
+        return ""
+    lines = [
+        f'- "{e["hook"]}" (used {e["n"]}x): {e["open"][:140]}'
+        if e["open"]
+        else f'- "{e["hook"]}" (used {e["n"]}x)'
+        for e in list(seen.values())[:top]
+    ]
+    return "our clips so far (rendered, not yet measured):\n" + "\n".join(lines)
+
+
 def winning_traits(store: Store, tag: str | None = None, top: int = 3) -> str:
     """Short text for the script prompt: our own posts first, then the reference videos, then
-    where the two disagree, each labelled so the writer knows which is which. Empty when nothing
-    is scored."""
+    where the two disagree, each labelled so the writer knows which is which. In between, the hooks
+    of our own rendered clips so the writer builds on them before any post is measured. Empty when
+    nothing is scored or rendered."""
     from .compare import compare_text
 
-    parts = (our_traits(store, top), reference_traits(store, tag, top), compare_text(store, tag))
+    parts = (
+        our_traits(store, top),
+        our_clip_hooks(store),
+        reference_traits(store, tag, top),
+        compare_text(store, tag),
+    )
     return "\n\n".join(t for t in parts if t)
 
 
