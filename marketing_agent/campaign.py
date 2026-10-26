@@ -22,8 +22,8 @@ class Account(BaseModel):
 
 
 class Niche(BaseModel):
-    name: str = "wearables"
-    hashtags: list[str] = Field(default_factory=lambda: ["smartring", "whoop", "ouraring"])
+    name: str = ""
+    hashtags: list[str] = Field(default_factory=list)
 
 
 class Product(BaseModel):
@@ -31,7 +31,7 @@ class Product(BaseModel):
     developer: str = ""
     website: str = ""
     app_store: str = ""
-    description: str = "a smart ring that tracks sleep, stress and recovery"
+    description: str = ""
     hashtags: list[str] = Field(default_factory=list)
     references: list[str] = Field(default_factory=list)
 

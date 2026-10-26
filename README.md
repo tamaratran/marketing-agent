@@ -131,8 +131,8 @@ the `state` branch, and replies with the day's summary and the rendered clips.
 ```bash
 export DEVIN_API_KEY=...   # Settings > Devin API > PATs
 export DEVIN_ORG_ID=org-... # top of Settings > Devin API
-mkt devin kickoff wearables smartring whoop ouraring --product "..." --dry-run   # show the prompt
-mkt devin kickoff wearables smartring whoop ouraring --product "..."             # start it
+mkt devin kickoff --dry-run   # show the prompt (niche, hashtags, product from campaign.toml)
+mkt devin kickoff             # start it
 mkt devin status <session_id>
 ```
 
@@ -172,7 +172,7 @@ one-off runs and are otherwise unset. `MKT_CAMPAIGN` points at another file.
 
 ## Format cloning
 
-`mkt daily ... --product-tag immersiveworkout --product-tag subwaysurfers` (API: `MKT_PRODUCT_TAGS`)
+`[product].hashtags` in campaign.toml (CLI `--product-tag`, API `MKT_PRODUCT_TAGS`)
 makes the run watch the product's own best-performing TikToks in the db (any age, ranked by views
 discounted for account size, frames + transcript) and store their beat sheet as a `format` concept:
 hook shot and delivery, shot order with timings, pacing, on-screen text budget, shared sound. The

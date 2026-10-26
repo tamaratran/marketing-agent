@@ -92,8 +92,8 @@ export default async function How() {
         {nicheBase != null && vsNiche > scored.length / 2 && (
           <div className="mt-3 rounded-lg border border-amber-900/60 bg-amber-950/30 p-3 text-sm text-amber-200">
             Only {scored.length - vsNiche} of {scored.length} videos (solid squares) come from creators we have 3 or more videos from. The other {vsNiche} (faded)
-            are compared with the niche&apos;s middle, about {Math.round(10 ** nicheBase).toLocaleString()} views, so for now most scores mean &quot;beat a typical fitness
-            video&quot;, which favours big accounts. This fixes itself as we track more videos per creator.
+            are compared with the niche&apos;s middle, about {Math.round(10 ** nicheBase).toLocaleString()} views, so for now most scores mean &quot;beat a typical
+            video in this niche&quot;, which favours big accounts. This fixes itself as we track more videos per creator.
           </div>
         )}
       </Section>
