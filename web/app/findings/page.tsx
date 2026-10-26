@@ -83,7 +83,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ o
       ))}
       {empty.length > 0 && (
         <Card className="mb-4">
-          <p className="text-sm text-neutral-400">Not enough 3-day-old videos to compare yet: {empty.map(human).join(", ")}.</p>
+          <p className="text-sm text-neutral-400">Not enough scored videos to compare yet: {empty.map(human).join(", ")}.</p>
         </Card>
       )}
       {Object.keys(fits).length === 0 && <p className="text-sm text-neutral-500">No analysis stored yet. Start a run cycle or choose &quot;Check post performance&quot; to refresh it.</p>}
