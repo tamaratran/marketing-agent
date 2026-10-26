@@ -27,7 +27,7 @@ export default async function Page() {
     get<Script[]>("/scripts?days=14&limit=200"), get<Render[]>("/renders"), get<Run[]>("/runs?limit=5"), get<Campaign>("/campaign"),
   ]);
   const newest = scripts.reduce((m, s) => Math.max(m, s.created_at), 0);
-  const batch = scripts.filter((s) => s.created_at >= newest - 6 * 3600).sort((a, b) => b.demo_score - a.demo_score || a.id - b.id);
+  const batch = scripts.filter((s) => s.created_at >= newest - 20 * 60).sort((a, b) => b.demo_score - a.demo_score || a.id - b.id);
   const rendered = new Set(renders.map((r) => r.script_id));
   const now = nowSec();
   const running = runs.find((r) => !r.finished_at && now - r.created_at < 3 * 3600);
