@@ -1,29 +1,27 @@
 import Link from "next/link";
-import { CLIPS, dateOf, get, usd, type Concept, type Render, type Script, frameUrl } from "@/lib/api";
+import { CLIPS, dateOf, get, usd, type Overview, type Render, type Script, type VideoDetail, frameUrl } from "@/lib/api";
 import type { Ours, OursPost } from "@/lib/ours";
 import { Download } from "../download";
 import { Card, Fold, H1, NextStep, Pill, Stat, Table, reward, formatName } from "../ui";
 import { Thumb } from "../thumb";
-import { addPost, holdClip, postClip, releaseClip } from "../actions";
+import { postClip, releaseClip } from "../actions";
+import { MIN_AGE_H_OWN, WhyFold, explain } from "./why";
 import { PostButton } from "../post-button";
 
 export const dynamic = "force-dynamic";
 
-// Mirrors scoreboard.MIN_AGE_H_FOR_OWN: younger posts are not judged.
-const MIN_AGE_H_OWN = 6;
-
 const views = (n: number | null | undefined) => (n == null ? "" : n.toLocaleString("en-US"));
 
 export default async function Page() {
-  const [all, scripts, ours, concepts] = await Promise.all([
-    get<Render[]>("/renders"), get<Script[]>("/scripts?days=60&limit=500"), get<Ours>("/ours"), get<Concept[]>("/concepts"),
+  const [all, scripts, ours, overview] = await Promise.all([
+    get<Render[]>("/renders"), get<Script[]>("/scripts?days=60&limit=500"), get<Ours>("/ours"), get<Overview>("/overview"),
   ]);
+  const details = new Map(await Promise.all(ours.posts.map(async (p) => [p.id, await get<VideoDetail>(`/videos/${p.id}`).catch(() => null)] as const)));
   const seen = new Set<number>();
   const rows = all.filter((r) => !seen.has(r.script_id) && seen.add(r.script_id));
   const byId = new Map(scripts.map((s) => [s.id, s]));
   const posts = new Map(ours.posts.filter((p) => p.script_id).map((p) => [p.script_id as number, p]));
   const account = ours.accounts[0]?.handle;
-  const conceptName = new Map(concepts.map((c) => [String(c.id), formatName(c.name)]));
   const posted = rows.filter((r) => posts.has(r.script_id)).length;
   const held = rows.filter((r) => r.hold_reason && !posts.has(r.script_id)).length;
   const measured = ours.posts.filter((p) => p.age_h >= MIN_AGE_H_OWN && p.lift_matched != null);
@@ -49,14 +47,13 @@ export default async function Page() {
                   <video poster={frameUrl(`s${r.script_id}`)} controls preload="metadata" className="aspect-[9/16] w-full rounded bg-black" src={src} />
                   <div className="min-w-0 text-sm">
                     {p && <PostStats p={p} />}
+                    {p && <WhyFold why={explain(p, details.get(p.id) ?? null, overview)} />}
                     {!p && !r.hold_reason && clean && !r.post_session_url && <PostButton action={postClip} scriptId={r.script_id} account={account} />}
                     {!p && r.post_session_url && <p className="text-xs text-neutral-400">Devin is posting this from @{account}: <a href={r.post_session_url} target="_blank" className="text-sky-300 hover:underline">watch</a></p>}
                     {r.hold_reason && <p className="text-xs text-red-200">{r.hold_reason}</p>}
-                    {!p && (r.hold_reason ? (
+                    {!p && r.hold_reason && (
                       <form action={releaseClip} className="mt-2"><input type="hidden" name="script_id" value={r.script_id} /><button className="text-xs text-neutral-400 hover:text-neutral-100">Release</button></form>
-                    ) : (
-                      <form action={holdClip} className="mt-2 flex gap-1"><input type="hidden" name="script_id" value={r.script_id} /><input name="reason" required placeholder="why hold it" className="min-w-0 flex-1 rounded border border-neutral-700 bg-neutral-900 px-2 py-1 text-xs" /><button className="rounded border border-neutral-700 px-2 py-1 text-xs text-neutral-300 hover:bg-neutral-800">Hold</button></form>
-                    ))}
+                    )}
                     {clean && r.post_text.length > 0 && (
                       <div className="mt-3 rounded border border-neutral-800 p-2">
                         <p className="text-[11px] uppercase tracking-wide text-neutral-500">text to add in TikTok</p>
@@ -92,18 +89,6 @@ export default async function Page() {
         </Card>
       )}
 
-      <Fold summary={<span className="text-sm text-neutral-300">What the picker has learned from our posts</span>} className="mt-6">
-        {Object.keys(ours.rewards).length === 0 ? <p className="text-sm text-neutral-500">Nothing yet. Until one post is measured, the picker follows the market.</p> : (
-          <Table head={["format", "vs videos like it", "posts"]} rows={Object.entries(ours.rewards).map(([cid, r]) => [conceptName.get(cid) ?? `#${cid}`, reward(r.mean_reward), r.n])} />
-        )}
-      </Fold>
-      <Fold summary={<span className="text-sm text-neutral-300">I posted a clip myself</span>} className="mt-2">
-        <form action={addPost} className="flex flex-wrap items-center gap-2">
-          <input name="url" required placeholder="https://www.tiktok.com/@handle/video/..." className="min-w-[18rem] flex-1 rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm" />
-          <input name="caption" placeholder="caption you used (optional)" className="min-w-[18rem] flex-1 rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm" />
-          <button className="rounded-md bg-sky-600 px-3 py-2 text-sm font-medium text-white hover:bg-sky-500">Add post</button>
-        </form>
-      </Fold>
       {ours.accounts.length === 0 && <p className="mt-3 text-sm text-amber-200">No posting account yet: <code>mkt own login</code>, then <code>mkt own add @handle</code>.</p>}
       <NextStep from="/clips" />
     </>
