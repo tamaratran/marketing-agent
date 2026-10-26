@@ -66,11 +66,17 @@ export default async function Page({ searchParams }: { searchParams: Promise<Q> 
       )}
 
       {step === 2 && concept && (
-        <Screen title={formatName(concept.name)} lead="The agent groups videos like these into reusable formats. This is the format behind the clip you are about to see.">
+        <Screen title={formatName(concept.name)} lead="The format the picker chose for this cycle. The research step groups the videos from step 1 into reusable formats; this one is the recipe the script and clip in the next steps were made from.">
           <p className="text-sm leading-relaxed text-neutral-300">{concept.description}</p>
-          <div className="mt-5 text-xs text-neutral-500">Other formats it found</div>
-          <ul className="mt-2 space-y-1 text-sm text-neutral-400">
-            {concepts.filter((c) => c.id !== concept.id).slice(0, 4).map((c) => <li key={c.id}>{formatName(c.name)}</li>)}
+          <Examples examples={concept.examples} />
+          <div className="mt-5 text-xs text-neutral-500">Other formats it found, not picked this time</div>
+          <ul className="mt-2 space-y-3 text-sm text-neutral-400">
+            {concepts.filter((c) => c.id !== concept.id).slice(0, 4).map((c) => (
+              <li key={c.id}>
+                <Link href="/concepts" className="text-sky-300 hover:underline">{formatName(c.name)}</Link>
+                <Examples examples={c.examples} />
+              </li>
+            ))}
           </ul>
           <Aside>Formats with more early views get picked more often. Once our own posts have results, the ones that work for us get picked more. <Link href="/how" className="text-sky-300 hover:underline">See how it decides</Link></Aside>
         </Screen>
@@ -199,6 +205,21 @@ function Others({ clips, current, step, posted }: { clips: Render[]; current?: n
           </Link>
         ))}
       </div>
+    </div>
+  );
+}
+
+/** The most-viewed scraped videos the research step filed under a format, so the name is not abstract. */
+function Examples({ examples }: { examples?: { id: string; author: string; url: string; views: number | null }[] }) {
+  if (!examples?.length) return null;
+  return (
+    <div className="mt-2 flex flex-wrap gap-3">
+      {examples.map((e) => (
+        <a key={e.id} href={e.url} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-xs text-neutral-400 hover:text-neutral-200">
+          <Thumb id={e.id} size={32} />
+          <span>@{e.author}{e.views != null && <span className="text-neutral-500"> · {e.views.toLocaleString()} views</span>}</span>
+        </a>
+      ))}
     </div>
   );
 }
