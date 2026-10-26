@@ -8,7 +8,7 @@ from pathlib import Path
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, PlainTextResponse
 from pydantic import BaseModel
 
 from . import campaign as campaign_cfg
@@ -16,6 +16,8 @@ from . import policy, scoreboard
 from .analysis import analyze, latest_findings, save_findings
 from .cohort import build_features, features, latest_snapshot, repoll
 from .config import settings
+from .learnings import document as learnings_doc
+from .learnings import entries as learnings_entries
 from .own import accounts as own_accounts
 from .own import own_posts, own_rewards
 from .policy import concept_scores, winning_traits
@@ -155,6 +157,19 @@ def render_file(render_id: int):
 @app.get("/runs")
 def runs(limit: int = 30):
     return _store().rows("SELECT * FROM runs ORDER BY id DESC LIMIT ?", (limit,))
+
+
+@app.get("/learnings")
+def learnings(niche: str | None = None, limit: int = 50):
+    """What the agent has learned, newest first: one entry per cycle plus the notes the session
+    running it added. Written by `mkt learn`."""
+    return learnings_entries(_store(), niche, limit)
+
+
+@app.get("/learnings.md", response_class=PlainTextResponse)
+def learnings_md(niche: str | None = None):
+    """The same as one markdown file."""
+    return learnings_doc(_store(), niche)
 
 
 @app.get("/campaign")

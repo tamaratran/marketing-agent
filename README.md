@@ -145,6 +145,14 @@ on the API with an empty body, and the API starts the Devin session with the cam
 The 2-hourly cohort re-poll (`deploy/modal_repoll.py`) is the only scheduled job; it measures, it
 does not create or post anything.
 
+## Learnings
+
+After every cycle `mkt daily` writes an entry to the `learnings` table (`mkt learn write` does it
+by hand): what the source videos measured as (speed, speech, sound, text budget), what the picker
+leaned on, how our posts did against the market, and what changed since the last cycle. The Devin
+session adds its own reading with `mkt learn add "title" --body "..."`. The API serves them as
+`GET /learnings` and as one file, `GET /learnings.md`; the site shows them on Learnings.
+
 ## campaign.toml
 
 One file says what the loop is for; the API (`GET /campaign`, shown on Runs), the CLI (`mkt
