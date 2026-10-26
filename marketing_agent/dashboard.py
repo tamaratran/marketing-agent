@@ -66,7 +66,8 @@ def render(store: Store, niche: str, out: Path, copy_assets: bool = True) -> Pat
         (week,),
     )
     renders = store.rows(
-        """SELECT r.id, r.script_id, r.final_path, r.cost_usd, r.model, r.created_at, s.hook
+        """SELECT r.id, r.script_id, r.final_path, r.post_path, r.cost_usd, r.model, r.created_at,
+                  s.hook
            FROM renders r JOIN scripts s ON s.id=r.script_id
            WHERE r.final_path IS NOT NULL ORDER BY r.created_at DESC LIMIT 12"""
     )
@@ -83,6 +84,9 @@ def render(store: Store, niche: str, out: Path, copy_assets: bool = True) -> Pat
             dst.parent.mkdir(exist_ok=True)
             if not dst.exists() or dst.stat().st_size != src.stat().st_size:
                 shutil.copyfile(src, dst)
+            clean = Path(r["post_path"]) if r.get("post_path") else None
+            if clean and clean.exists():
+                shutil.copyfile(clean, dst.parent / clean.name)
             rel = f"renders/{src.name}"
         elif (out.parent / "renders" / src.name).exists():
             rel = f"renders/{src.name}"
