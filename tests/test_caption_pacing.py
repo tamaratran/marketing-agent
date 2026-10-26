@@ -31,3 +31,14 @@ def test_video_prompt_bans_generated_text():
     from marketing_agent.video.generate import GenRequest, video_prompt
 
     assert "No on-screen text" in video_prompt(GenRequest(prompt="a tired selfie"))
+
+
+def test_stacked_hook_keeps_its_line_break_when_burned(tmp_path):
+    from marketing_agent.video.edit import Caption, drawtext_filters, wrap_lines
+
+    assert wrap_lines("POV: cardio\nfinally got fun", 24) == "POV: cardio\nfinally got fun"
+    assert wrap_lines("one line that is much too long for the width", 24) == (
+        "one line that is much\ntoo long for the width"
+    )
+    drawtext_filters([Caption("POV: cardio\nfinally got fun", 0, 6)], tmp_path)
+    assert (tmp_path / "cap0.txt").read_text() == "POV: cardio\nfinally got fun"
