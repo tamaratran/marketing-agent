@@ -48,7 +48,7 @@ export default async function Page() {
           </Step>
         </div>
         <Note className="mt-3">
-          Research uses other people&apos;s videos only; our results use our own account only. The two are never mixed. A Devin session runs steps 1 to 4 when you press Run cycle on Runs; posting is always done by a person.
+          Research uses other people&apos;s videos only; our results use our own account only. The two are never mixed. A Devin session runs steps 1 to 4 when you press Run cycle on Runs; posting happens only when a person presses Post on a clip.
         </Note>
       </Card>
 
