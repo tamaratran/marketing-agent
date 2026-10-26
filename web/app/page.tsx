@@ -106,12 +106,15 @@ export default async function Page({ searchParams }: { searchParams: Promise<Q> 
       {step === 5 && (
         <Screen title="Post it" lead={`Nothing is posted automatically. Post it yourself${account ? ` from @${account}` : ""}.`}>
           <ol className="space-y-3 text-sm text-neutral-300">
-            <Li n={1}>Download the clip{clip ? <> (<Download src={`${CLIPS}/s${clip.script_id}.mp4`}>here</Download>)</> : null} and upload it in TikTok.</Li>
-            <Li n={2}>
-              Add the sound:{" "}
-              {script?.sound ? (script.sound_url ? <a href={script.sound_url} target="_blank" className="text-sky-300 hover:underline">{script.sound}</a> : <b>{script.sound}</b>) : "none was picked, so use one that is trending in this format."}
-            </Li>
-            <Li n={3}>Start the caption with the opening line{script ? <>: <b>{script.hook}</b></> : null}. That is how we match the post back to this script.</Li>
+            {[
+              <>Download the clip{clip ? <> (<Download src={`${CLIPS}/s${clip.script_id}${clip.post_path ? "_clean" : ""}.mp4`}>here</Download>)</> : null} and upload it in TikTok.</>,
+              clip?.post_path && clip.post_text.length > 0 ? <>Add the text with TikTok&apos;s text tool, one line per card: {clip.post_text.map((ln, i) => <b key={i}>{i ? " / " : ""}{ln}</b>)}. The clip has no text burned in, so TikTok&apos;s text stays crisp and editable.</> : null,
+              <>
+                Add the sound:{" "}
+                {script?.sound ? (script.sound_url ? <a href={script.sound_url} target="_blank" className="text-sky-300 hover:underline">{script.sound}</a> : <b>{script.sound}</b>) : "none was picked, so use one that is trending in this format."}
+              </>,
+              <>Start the caption with the opening line{script ? <>: <b>{script.hook}</b></> : null}. That is how we match the post back to this script.</>,
+            ].filter(Boolean).map((item, i) => <Li key={i} n={i + 1}>{item}</Li>)}
           </ol>
           {!account && <Aside>No posting account is registered yet, so results can&apos;t be tracked. Run <code>mkt own add @handle</code>.</Aside>}
         </Screen>
