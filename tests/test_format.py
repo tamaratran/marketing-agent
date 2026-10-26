@@ -274,3 +274,27 @@ def test_burned_captions_drop_emoji_the_font_cannot_draw(tmp_path):
     )
     drawtext_filters([Caption("burned 475 \U0001f525", 0, 2)], tmp_path)
     assert (tmp_path / "cap0.txt").read_text() == "burned 475"
+
+
+def test_own_results_on_an_older_row_reach_the_latest_concept(tmp_path: Path, monkeypatch):
+    store = Store(tmp_path / "db.sqlite")
+    ids = [
+        store.insert(
+            "concepts",
+            {
+                "niche": "fitness",
+                "created_at": t,
+                "name": "Clone: x",
+                "description": "x",
+                "video_ids": "[]",
+                "early_score": 0.0,
+                "payload": '{"kind": "format"}',
+            },
+        )
+        for t in (1, 2)
+    ]
+    from marketing_agent import own
+
+    monkeypatch.setattr(own, "own_rewards", lambda s: {ids[0]: {"mean_reward": -0.5, "n": 2}})
+    (c,) = concept_scores(store, "fitness")
+    assert c["id"] == ids[1] and c["n"] == 2 and c["mean_reward"] == -0.5

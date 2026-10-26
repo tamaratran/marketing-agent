@@ -131,6 +131,12 @@ def concept_scores(store: Store, niche: str, tag: str | None = None) -> list[dic
         "SELECT id, name, description, early_score, payload FROM concepts WHERE niche=? ORDER BY created_at DESC",
         (niche,),
     )
+    # Each research run stores a fresh row per concept, so our posts can point at an older row of
+    # the same name; pool them by name so their results reach the row the picker uses.
+    by_name: dict[str, list[dict]] = {}
+    for c in rows:
+        if c["id"] in ours:
+            by_name.setdefault(c["name"], []).append(ours[c["id"]])
     seen, out = set(), []
     for c in rows:
         if c["name"] in seen:
@@ -141,7 +147,13 @@ def concept_scores(store: Store, niche: str, tag: str | None = None) -> list[dic
         except ValueError:
             kind = ""
         prior = math.log10((c["early_score"] or 0) + 1) / 3  # ~0..1 for 1..1000 early score
-        obs = ours.get(c["id"])
+        hits = by_name.get(c["name"], [])
+        n = sum(h["n"] for h in hits)
+        obs = (
+            {"mean_reward": round(sum(h["mean_reward"] * h["n"] for h in hits) / n, 3), "n": n}
+            if n
+            else None
+        )
         out.append(
             {
                 **c,
