@@ -33,6 +33,15 @@ def test_video_prompt_bans_generated_text():
     assert "No on-screen text" in video_prompt(GenRequest(prompt="a tired selfie"))
 
 
+def test_video_prompt_casts_a_natural_looking_person():
+    from marketing_agent.video.generate import GenRequest, video_prompt
+
+    out = video_prompt(GenRequest(prompt="a tired selfie"))
+    assert "good-looking in a real, everyday way" in out
+    assert "AI-generated" in out
+    assert out.index("a tired selfie") < out.index("good-looking") < out.index("No on-screen text")
+
+
 def test_stacked_hook_keeps_its_line_break_when_burned(tmp_path):
     from marketing_agent.video.edit import Caption, drawtext_filters, wrap_lines
 

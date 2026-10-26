@@ -46,7 +46,9 @@ class ScriptBatch(BaseModel):
 
 PROMPT = """You write TikTok scripts that remix a trending CONCEPT (a format) to a PRODUCT.
 Rules: the video_prompt describes picture and sound only; never ask the video model for on-screen text, captions, titles or legible app UI (the captions field is burned in afterwards, generated text renders as gibberish). The hook field is the caption text itself, with no 'Text on screen:' label. 1-3 second hook, product on screen by 5 seconds, 10-20 seconds total, UGC feel (one person,
-phone camera, natural light), no brand-ad polish, no em dashes. Each script must be filmable by one
+phone camera, natural light), no brand-ad polish, no em dashes. Cast the person as good-looking in a
+real, everyday way: fit, natural skin and hair, a face that could be a friend's; never a flawless
+model or an AI-polished look (videos with attractive people do well, ones that look generated do not). Each script must be filmable by one
 creator in one take or be generatable by a video model. Vary the hooks across scripts.
 Score demo_score_1_5 honestly: 5 means the product's value is obvious on screen within 5s, 1 means it
 needs explaining. Write {n} scripts.
@@ -65,7 +67,9 @@ nothing else in `captions`. If hook_delivery is spoken or visual, set hook_on_sc
 the spoken hook in `spoken` and `hook` (it is still the first line a viewer hears). Set `sound` to
 "{sound}" on every script. The video_prompt describes picture and sound only; never ask the video
 model for on-screen text, titles or legible UI. Total length {duration}s. UGC feel, one person, phone
-camera, no brand-ad polish, no em dashes, no explaining the product in text: show it. Score
+camera, no brand-ad polish, no em dashes, no explaining the product in text: show it. Cast the person
+as good-looking in a real, everyday way: fit, natural skin and hair, a face that could be a friend's;
+never a flawless model or an AI-polished look (attractive does well, generated-looking does not). Score
 demo_score_1_5 honestly (5 = the product's value is obvious on screen within 5s). Write {n} scripts.
 
 FORMAT: {name}
