@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { API, get, type Campaign, type CycleFacts, type Findings, type Learning, type Render, type Run, type Script } from "@/lib/api";
+import { get, type Campaign, type CycleFacts, type Findings, type Learning, type Render, type Run, type Script } from "@/lib/api";
 import { startRenders, startResearch } from "../actions";
-import { Trend, traitValue, type RankRow } from "../charts";
+import { traitValue, type RankRow } from "../charts";
 import { Markdown } from "../md";
 import { Card, Fold, H1, NextStep, Note, button, formatName, ghost, times } from "../ui";
 
@@ -35,13 +35,9 @@ export default async function Page() {
   const now = nowSec();
   const running = runs.find((r) => !r.finished_at && now - r.created_at < 3 * 3600);
   const cycles = rows.filter((e) => e.kind === "cycle" && e.facts).sort((a, b) => a.created_at - b.created_at);
-  const notes = rows.filter((e) => e.kind !== "cycle"), cycleRows = rows.filter((e) => e.kind === "cycle");
+  const notes = rows.filter((e) => e.kind !== "cycle");
   const latest = cycles[cycles.length - 1]?.facts;
   const prev = cycles[cycles.length - 2]?.facts;
-  const scoredPts = cycles.filter((c) => c.facts.n_scored != null).map((c) => ({ t: c.created_at, v: c.facts.n_scored as number }));
-  const taggedPts = cycles.filter((c) => c.facts.n_tagged != null).map((c) => ({ t: c.created_at, v: c.facts.n_tagged as number }));
-  const ownPts = cycles.filter((c) => c.facts.own_mean_lift != null).map((c) => ({ t: c.created_at, v: c.facts.own_mean_lift as number }));
-  const clonePts = cycles.flatMap((c) => { const p = c.facts.picks?.find((x) => /clone/i.test(x.name)); return p ? [{ t: c.created_at, v: p.share }] : []; });
   return (
     <>
       <H1 sub="What the data says, what the agent wrote about it, and what it proposes to make next.">Learnings</H1>
@@ -58,7 +54,7 @@ export default async function Page() {
 
       <Card title="What the data says">
         <Note>
-          {latest ? <>As of {when(cycles[cycles.length - 1].created_at)}: {latest.n_scored ?? 0} research videos scored against videos of the same age and account size, {latest.n_tagged ?? 0} of them classified by trait. Every run adds to these numbers; they are never reset. </> : null}
+          {latest ? <>As of {when(cycles[cycles.length - 1].created_at)}: {latest.n_scored ?? 0} research videos scored against videos of the same age and account size, {latest.n_tagged ?? 0} of them classified by trait. </> : null}
           What wins now is on <Link href="/" className="text-sky-300 hover:underline">Formats</Link>.
         </Note>
         {!latest ? (
@@ -70,19 +66,6 @@ export default async function Page() {
         )}
       </Card>
 
-      {cycles.length > 0 && (
-        <Card title="Over time" className="mt-4">
-          <Note>One point per run, oldest left.</Note>
-          <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <Trend points={scoredPts} label="Research videos scored" fmt={(v) => String(Math.round(v))} />
-            <Trend points={taggedPts} label="Videos classified" fmt={(v) => String(Math.round(v))} />
-            <Trend points={ownPts} label="Our posts, views vs videos like them" fmt={(v) => pct(v)} />
-            <Trend points={clonePts} label="Clone format's pick share" fmt={(v) => `${Math.round(v * 100)}%`} />
-          </div>
-          {scoredPts.length + taggedPts.length + clonePts.length === 0 && <Note className="mt-2">Nothing to plot yet; the next run adds the first point.</Note>}
-          {ownPts.length === 0 && <Note className="mt-2">No post is 6 hours old yet.</Note>}
-        </Card>
-      )}
 
       <Card title="Proposed next scripts" className="mt-4">
         {batch.length === 0 ? <Note>No scripts yet. Research again writes the first batch.</Note> : (
@@ -117,9 +100,6 @@ export default async function Page() {
         )}
       </Card>
 
-      <Note className="my-4">
-        Everything on this page as one file: <a href={`${API}/learnings.md`} className="text-sky-300 hover:underline" target="_blank">learnings.md</a>
-      </Note>
       {rows.length === 0 && <Card><Note>Nothing yet. The first run writes the first entry.</Note></Card>}
       {notes.length > 0 && (
         <Card title="Observations" className="mt-4">
@@ -130,27 +110,6 @@ export default async function Page() {
                 <span className="flex flex-wrap items-center gap-2">
                   <span className="font-semibold text-neutral-100">{e.title}</span>
                   <span className="text-xs text-neutral-500">{when(e.created_at)}</span>
-                </span>
-              }>
-                <Markdown text={formatName(e.body)} />
-              </Fold>
-            ))}
-          </div>
-        </Card>
-      )}
-      {cycleRows.length > 0 && (
-        <Card title={`Run log, ${cycleRows.length} ${cycleRows.length === 1 ? "run" : "runs"}`} className="mt-4">
-          <Note>What each run measured, one line each; the tables above already hold the latest totals. Open a line for the full write-up.</Note>
-          <div className="mt-3 space-y-2">
-            {cycleRows.map((e) => (
-              <Fold key={e.id} summary={
-                <span className="flex flex-wrap items-center gap-2 text-sm">
-                  <span className="text-neutral-200">{when(e.created_at)}</span>
-                  {e.facts?.n_scored != null ? (
-                    <span className="text-xs text-neutral-500">{e.facts.n_scored} scored · {e.facts.n_tagged ?? 0} classified · {e.facts.own_posts ?? 0} of ours{e.facts.own_mean_lift != null && <>, {pct(e.facts.own_mean_lift)} views vs videos like them</>}</span>
-                  ) : (
-                    <span className="text-xs text-neutral-500">no counts recorded</span>
-                  )}
                 </span>
               }>
                 <Markdown text={formatName(e.body)} />
@@ -244,7 +203,6 @@ function TraitTables({ latest, prev, minN }: { latest: CycleFacts; prev?: CycleF
                   <tr className="text-left text-xs text-neutral-500">
                     <th className="pb-1.5 pr-4 font-medium">Value</th>
                     <th className="pb-1.5 pr-4 font-medium">Views vs videos like it</th>
-                    <th className="pb-1.5 pr-4 font-medium">Beat their match</th>
                     <th className="pb-1.5 pr-4 font-medium">Videos</th>
                     <th className="pb-1.5 font-medium">Enough to count?</th>
                   </tr>
@@ -260,7 +218,6 @@ function TraitTables({ latest, prev, minN }: { latest: CycleFacts; prev?: CycleF
                           {pct(r.mean_reward)}
                           {moved && <span className="text-xs text-neutral-500"> (was {pct(moved.mean_reward)} last cycle)</span>}
                         </td>
-                        <td className="py-1.5 pr-4 tabular-nums">{r.win_rate != null ? `${Math.round(r.win_rate * 100)}%` : ""}</td>
                         <td className="py-1.5 pr-4 tabular-nums">{r.n}</td>
                         <td className="py-1.5">{thin ? `no, under ${minN}` : "yes"}</td>
                       </tr>
@@ -272,10 +229,7 @@ function TraitTables({ latest, prev, minN }: { latest: CycleFacts; prev?: CycleF
           </div>
         );
       })}
-      <Note>
-        &quot;+90%&quot; means those videos got 90% more views than videos of the same age from accounts of the same size; &quot;beat their match&quot; is how many of them did better than that comparison at all.
-        A value needs {minN} videos before it counts. These are raw averages; the step 6 check on <Link href="/how#check" className="text-sky-300 hover:underline">How it decides</Link> also holds length and posting hour fixed.
-      </Note>
+      <Note>&quot;+90%&quot; means those videos got 90% more views than videos of the same age from accounts of the same size. Raw averages; the controlled version is step 6 on <Link href="/how#check" className="text-sky-300 hover:underline">How it decides</Link>.</Note>
     </div>
   );
 }
