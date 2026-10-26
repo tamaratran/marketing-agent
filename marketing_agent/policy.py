@@ -167,23 +167,33 @@ def concept_scores(store: Store, niche: str, tag: str | None = None) -> list[dic
         "SELECT id, name, description, early_score, payload FROM concepts WHERE niche=? ORDER BY created_at DESC",
         (niche,),
     )
+
     # Each research run stores a fresh row per concept, so our posts can point at an older row of
-    # the same name; pool them by name so their results reach the row the picker uses.
+    # the same name; pool them by name so their results reach the row the picker uses. The
+    # product's own cloned format is one concept however the model titles its beat sheet, so
+    # every format-kind row pools under one key and only the newest one is a candidate.
+    def kind_of(c: dict) -> str:
+        try:
+            return json.loads(c.get("payload") or "{}").get("kind", "")
+        except ValueError:
+            return ""
+
+    def key(c: dict) -> str:
+        return "format" if kind_of(c) == "format" else c["name"]
+
     by_name: dict[str, list[dict]] = {}
     for c in rows:
         if c["id"] in ours:
-            by_name.setdefault(c["name"], []).append(ours[c["id"]])
+            by_name.setdefault(key(c), []).append(ours[c["id"]])
     seen, out = set(), []
     for c in rows:
-        if c["name"] in seen:
+        if key(c) in seen:
             continue
-        seen.add(c["name"])
-        try:
-            kind = json.loads(c.pop("payload") or "{}").get("kind", "")
-        except ValueError:
-            kind = ""
+        seen.add(key(c))
+        kind = kind_of(c)
+        c.pop("payload", None)
         prior = math.log10((c["early_score"] or 0) + 1) / 3  # ~0..1 for 1..1000 early score
-        hits = by_name.get(c["name"], [])
+        hits = by_name.get(key(c), [])
         n = sum(h["n"] for h in hits)
         obs = (
             {"mean_reward": round(sum(h["mean_reward"] * h["n"] for h in hits) / n, 3), "n": n}
