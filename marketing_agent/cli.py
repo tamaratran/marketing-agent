@@ -114,14 +114,23 @@ def download(tag, top, max_age_h):
 def classify(limit, model):
     """Tag downloaded, untagged videos with the multimodal classifier."""
     from .classifier.classify import classify as run_classify
+    from .research.tiktok_browser import fetch_video_sync
 
     store = _store()
     model = model or settings.openai_model
     for v in store.untagged(limit):
+        path = Path(v["local_path"])
+        if not path.exists():
+            # local_path can come from another machine's db (mkt sync pull)
+            path = settings.videos_dir / f"{v['id']}.mp4"
+            try:
+                fetch_video_sync(v["url"], path, settings.cdp_url)
+            except Exception as e:  # noqa: BLE001 - one unfetchable video must not stop the rest
+                console.print(f"[red]{v['id']}: {e!r}")
+                continue
+            store.set_local_path(v["id"], str(path))
         v["hashtags"] = json.loads(v["hashtags"] or "[]")
-        res = run_classify(
-            Path(v["local_path"]), v, model=model, transcribe_model=settings.transcribe_model
-        )
+        res = run_classify(path, v, model=model, transcribe_model=settings.transcribe_model)
         store.save_tags(v["id"], model, res)
         tg = res["tags"]
         console.print(
