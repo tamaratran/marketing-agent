@@ -347,6 +347,19 @@ def frames(out):
 
 
 @cli.command()
+@click.argument("name")
+@click.argument("status", type=click.Choice(["ok", "failed", "skipped"]))
+@click.argument("note", required=False, default="")
+def stage(name, status, note):
+    """Record the outcome of a stage rerun by hand on the newest run of the campaign's niche, so
+    the Runs page shows the rerun's result instead of the first attempt's error."""
+    from .orchestrator import record_stage
+
+    rid = record_stage(_store(), campaign_cfg.load().niche.name, name, status, note)
+    console.print(f"run {rid}: {name} {status}" if rid else "no recorded run to update")
+
+
+@cli.command()
 @click.option("--max-age-days", default=8.0)
 @click.option("--niche", default=None)
 def repoll(max_age_days, niche):
