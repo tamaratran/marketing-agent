@@ -22,6 +22,8 @@ from .scoreboard import build
 from .store import Store
 from .video.edit import strip_label
 
+DEFAULT_NICHE = os.environ.get("MKT_NICHE", "wearables")
+
 
 def _store() -> Store:
     return Store(settings.db_path)
@@ -50,7 +52,7 @@ def health():
 
 
 @app.get("/overview")
-def overview(niche: str = "wearables"):
+def overview(niche: str = DEFAULT_NICHE):
     store = _store()
     sb = build(store, tags=store.niche_tags(niche) or None)
     spent = sum(r["cost_usd"] or 0 for r in store.rows("SELECT cost_usd FROM renders"))
@@ -73,12 +75,14 @@ def overview(niche: str = "wearables"):
 
 
 @app.get("/concepts")
-def concepts(niche: str = "wearables"):
+def concepts(niche: str = DEFAULT_NICHE):
     return concept_scores(_store(), niche)
 
 
 @app.get("/scripts")
-def scripts(days: int = 7, product: str | None = None, limit: int = 100, niche: str = "wearables"):
+def scripts(
+    days: int = 7, product: str | None = None, limit: int = 100, niche: str = DEFAULT_NICHE
+):
     since = int(time.time()) - days * 86400
     sql = """SELECT s.id, s.concept_id, c.name concept, s.product, s.created_at, s.hook,
                     s.demo_score, s.payload FROM scripts s LEFT JOIN concepts c ON c.id=s.concept_id
@@ -98,7 +102,7 @@ def scripts(days: int = 7, product: str | None = None, limit: int = 100, niche: 
 
 
 @app.get("/renders")
-def renders(limit: int = 50, niche: str = "wearables"):
+def renders(limit: int = 50, niche: str = DEFAULT_NICHE):
     """Real clips only: the stub provider's colour cards are for offline tests, not the site."""
     rows = _store().rows(
         """SELECT r.id, r.script_id, r.created_at, r.model, r.cost_usd, r.final_path, s.hook
@@ -234,7 +238,7 @@ def runs(limit: int = 30):
 
 
 class RunIn(BaseModel):
-    niche: str = "wearables"
+    niche: str = DEFAULT_NICHE
     tags: list[str] = ["smartring", "whoop", "ouraring"]
     product: str
     renders: int = 1
@@ -303,7 +307,7 @@ def repoll_cohort(max_age_days: float = 8.0, niche: str | None = None):
 
 
 @app.get("/features")
-def features_list(niche: str = "wearables"):
+def features_list(niche: str = DEFAULT_NICHE):
     return features(_store(), niche)
 
 
