@@ -15,6 +15,27 @@ from .store import Store
 console = Console()
 
 
+def _campaign():
+    from . import campaign as campaign_cfg
+
+    return campaign_cfg.load()
+
+
+def _niche(niche):
+    return niche or _campaign().niche.name
+
+
+def _tags(tags, niche=None):
+    tags = list(tags) or _campaign().niche.hashtags or (_store().niche_tags(niche) if niche else [])
+    if not tags:
+        raise click.UsageError("No hashtags given and campaign.toml has none")
+    return tags
+
+
+def _product(product):
+    return product or _campaign().product.description
+
+
 def _store() -> Store:
     return Store(settings.db_path)
 
@@ -25,10 +46,11 @@ def cli():
 
 
 @cli.command()
-@click.argument("tags", nargs=-1, required=True)
+@click.argument("tags", nargs=-1)
 @click.option("--scrolls", default=3)
 def scrape(tags, scrolls):
     """Pull fresh videos for hashtags from TikTok (browser via CDP) into the store."""
+    tags = _tags(tags)
     from .research.tiktok_browser import scrape_hashtag_sync
 
     store = _store()
@@ -109,13 +131,15 @@ def classify(limit, model):
 
 
 @cli.command()
-@click.argument("niche")
-@click.argument("tags", nargs=-1, required=True)
+@click.argument("niche", required=False)
+@click.argument("tags", nargs=-1)
 @click.option("--scrolls", default=6)
 @click.option("--max-classify", default=100, help="Cohort videos to download and tag this run")
 def cohort(niche, tags, scrolls, max_classify):
     """Enroll fresh videos (<6h old) from the niche's hashtags as a cohort, snapshot their
     creators, download and tag all of them, and build the feature rows. Repoll keeps the curves."""
+    niche = _niche(niche)
+    tags = _tags(tags, niche)
     from .cohort import build_features, enroll, snapshot_creator
     from .research.tiktok_browser import profile_stats, scrape_hashtag_sync
 
@@ -214,11 +238,13 @@ def own_add(handle, tag, product):
 
 
 @own.command("sync")
-@click.argument("niche")
+@click.argument("niche", required=False)
 @click.argument("tags", nargs=-1)
 @click.option("--source", type=click.Choice(["profile", "hashtag"]), default="profile")
 def own_sync(niche, tags, source="profile"):
     """Read our profiles in Chrome; --source hashtag explicitly opts into fallback discovery."""
+    niche = _niche(niche)
+    tags = _tags(tags, niche)
     from .own import sync_own
     from .research.tiktok_auth import LoginRequired
 
@@ -310,12 +336,13 @@ def repoll(max_age_days, niche):
 
 
 @cli.command()
-@click.argument("niche")
+@click.argument("niche", required=False)
 @click.option("--tag", default=None)
 @click.option("--max-age-h", default=72)
 @click.option("--limit", default=40)
 def concepts(niche, tag, max_age_h, limit):
     """Cluster ranked videos into reusable concepts and store them."""
+    niche = _niche(niche)
     from .research.radar import cluster, rank
 
     store = _store()
@@ -531,9 +558,10 @@ def compare_cmd(tag, top):
 
 
 @cli.command()
-@click.argument("niche")
+@click.argument("niche", required=False)
 def policy(niche):
     """What the loop has learned: winning traits and the per-concept prior/observed/sampled scores."""
+    niche = _niche(niche)
     from .policy import concept_scores, winning_traits
 
     store = _store()
@@ -552,9 +580,9 @@ def policy(niche):
 
 
 @cli.command()
-@click.argument("niche")
-@click.argument("tags", nargs=-1, required=True)
-@click.option("--product", default=None, help="If set, also write scripts for the top concept")
+@click.argument("niche", required=False)
+@click.argument("tags", nargs=-1)
+@click.option("--product", default=None, help="Default: campaign.toml [product].description")
 @click.option(
     "--product-tag",
     "product_tags",
@@ -567,6 +595,10 @@ def policy(niche):
 def run(ctx, niche, tags, product, product_tags, top):
     """Daily loop: scrape -> download top -> classify -> concepts -> format of the product's own
     best videos -> pick by reward -> scripts."""
+    niche = _niche(niche)
+    tags = _tags(tags, niche)
+    product = _product(product)
+    product_tags = list(product_tags) or _campaign().product.hashtags
     _store().set_niche_tags(niche, list(tags))
     ctx.invoke(scrape, tags=tags, scrolls=3)
     ctx.invoke(download, tag=None, top=top, max_age_h=72)
@@ -587,12 +619,13 @@ def run(ctx, niche, tags, product, product_tags, top):
 
 
 @cli.command("format")
-@click.argument("niche")
+@click.argument("niche", required=False)
 @click.option("--product-tag", "product_tags", multiple=True, required=True)
 @click.option("--limit", default=5, help="How many source videos to watch")
 def format_cmd(niche, product_tags, limit):
     """Watch the product's best TikToks in the db (frames + transcript) and store their beat sheet
     as a 'format' concept: hook shot, shot order and timings, pacing, text budget, sound."""
+    niche = _niche(niche)
     from .research.format import build_format, product_sources
 
     store = _store()
@@ -766,13 +799,14 @@ def daily(
 
 
 @cli.command()
-@click.argument("niche")
+@click.argument("niche", required=False)
 @click.option(
     "--out", type=click.Path(), default=None, help="index.html path (default data/site/index.html)"
 )
 @click.option("--no-assets", is_flag=True, help="Do not copy clips next to the page")
 def dashboard(niche, out, no_assets):
     """Static HTML dashboard from the db: what works, concepts, clips, scripts, our posts."""
+    niche = _niche(niche)
     from .dashboard import render as render_dashboard
 
     out = Path(out) if out else settings.data_dir / "site" / "index.html"
