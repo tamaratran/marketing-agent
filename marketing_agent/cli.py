@@ -391,13 +391,17 @@ def render_latest(ctx, renders, resolution, refs):
     if not latest or latest[0]["t"] is None:
         raise click.ClickException("no scripts yet; run a cycle first")
     day_start = latest[0]["t"] - 6 * 3600
+    from .policy import rank_scripts
+
     todo = [
         r["id"]
-        for r in store.rows(
-            "SELECT s.id FROM scripts s LEFT JOIN renders r ON r.script_id=s.id "
-            "WHERE s.product=? AND s.created_at>=? AND r.id IS NULL "
-            "ORDER BY s.demo_score DESC, s.id",
-            (c.product.description, day_start),
+        for r in rank_scripts(
+            store.rows(
+                "SELECT s.id, s.demo_score, s.payload FROM scripts s "
+                "LEFT JOIN renders r ON r.script_id=s.id "
+                "WHERE s.product=? AND s.created_at>=? AND r.id IS NULL",
+                (c.product.description, day_start),
+            )
         )
     ]
     if not todo:
@@ -724,10 +728,13 @@ def policy(niche):
     " format to clone (any age), ahead of the fresh niche concepts",
 )
 @click.option("--top", default=8)
+@click.option("--batch-formats", default=3, help="Formats the script batch spans, by pick share")
+@click.option("--batch-per-format", default=2, help="Scripts kept per format")
 @click.pass_context
-def run(ctx, niche, tags, product, product_tags, top):
+def run(ctx, niche, tags, product, product_tags, top, batch_formats=3, batch_per_format=2):
     """Daily loop: scrape -> download top -> classify -> concepts -> format of the product's own
-    best videos -> pick by reward -> scripts."""
+    best videos -> the picker's top formats -> a batch of scripts across them, each stored with
+    why its format was proposed."""
     niche = _niche(niche)
     tags = _tags(tags, niche)
     product = _product(product)
@@ -740,15 +747,31 @@ def run(ctx, niche, tags, product, product_tags, top):
     if product_tags:
         ctx.invoke(format_cmd, niche=niche, product_tags=product_tags, limit=5)
     if product:
-        from .policy import pick_concept
+        from .policy import propose_batch, winning_traits
+        from .video.scripts import write_scripts
 
-        best = pick_concept(_store(), niche)
-        if best:
+        store = _store()
+        for c in propose_batch(store, niche, formats=batch_formats):
             console.print(
-                f"picked concept {best['id']} '{best['name']}' (prior {best['prior']}, "
-                f"observed {best['mean_reward']}, n={best['n']}, sampled {best['sampled']})"
+                f"format {c['id']} '{c['name']}': picked {c['pick_share']:.0%} of the time, "
+                f"head start {c['prior']}, expected lift {c['learned']}, "
+                f"our posts n={c['n']} mean {c['mean_reward']}"
             )
-            ctx.invoke(scripts, concept_id=best["id"], product=product, n=12, min_score=3)
+            full = store.rows("SELECT payload FROM concepts WHERE id=?", (c["id"],))
+            concept = {**json.loads(full[0]["payload"]), "id": c["id"], "name": c["name"]}
+            out = write_scripts(
+                store,
+                concept,
+                product,
+                n=2 * batch_per_format,
+                min_score=3,
+                model=settings.openai_model,
+                context=winning_traits(store),
+                keep=batch_per_format,
+                why=c["why"],
+            )
+            for s in out:
+                console.print(f"  #{s['id']} demo {s['demo_score_1_5']}  {s['hook']}")
 
 
 @cli.command("format")
@@ -908,11 +931,15 @@ def daily(
     )
     stage("analyze", lambda: ctx.invoke(analyze, niche=()))
     store = _store()
+    from .policy import rank_scripts
+
     todays = [
         r["id"]
-        for r in store.rows(
-            "SELECT id FROM scripts WHERE product=? AND created_at>=? ORDER BY demo_score DESC, id",
-            (product, int(rep.started)),
+        for r in rank_scripts(
+            store.rows(
+                "SELECT id, demo_score, payload FROM scripts WHERE product=? AND created_at>=?",
+                (product, int(rep.started)),
+            )
         )
     ]
     if not renders:

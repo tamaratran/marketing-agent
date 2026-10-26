@@ -114,7 +114,7 @@ def test_daily_report_only_counts_this_runs_scripts_and_renders(tmp_path):
         },
     )
     text = rep.write(tmp_path / "today.md", store).read_text()
-    assert "new hook" in text and "1 kept" in text
+    assert "new hook" in text and "1 script across 1 format" in text
     head = text.split("our clips so far")[0]
     assert "old hook" not in head and "old.mp4" not in text
 
