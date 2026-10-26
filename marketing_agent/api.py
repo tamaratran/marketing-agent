@@ -149,8 +149,12 @@ def renders(limit: int = 50, niche: str = DEFAULT_NICHE):
     for r in rows:
         payload = json.loads(r.pop("payload") or "{}")
         r["hook"] = strip_label(r["hook"] or "")
-        lines = [r["hook"]] if r["hook"] and payload.get("hook_on_screen", True) else []
-        r["post_text"] = lines + [ln for ln in payload.get("captions") or [] if ln.strip()]
+        hook = r["hook"] if payload.get("hook_on_screen", True) else ""
+        caps = [ln.strip() for ln in payload.get("captions") or [] if ln.strip()]
+        # Scripts often list the hook again as caption fragments ("POV: cardio" + "finally got
+        # fun"); the poster types the hook once, so those fragments are not repeated.
+        caps = [ln for ln in caps if not (hook and ln.lower() in hook.lower())]
+        r["post_text"] = ([hook] if hook else []) + caps
     return rows
 
 

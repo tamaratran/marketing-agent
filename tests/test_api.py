@@ -234,7 +234,9 @@ def test_renders_carry_the_text_to_type_into_tiktok(tmp_path):
             "hook": "Text on screen: POV: cardio finally got fun",
             "body": "",
             "demo_score": 5,
-            "payload": json.dumps({"captions": ["POV: cardio", "finally got fun", " "]}),
+            "payload": json.dumps(
+                {"captions": ["POV: cardio", "finally got fun", " ", "free app on iPhone"]}
+            ),
         },
     )
     store.insert(
@@ -254,5 +256,5 @@ def test_renders_carry_the_text_to_type_into_tiktok(tmp_path):
     )
     rows = client.get("/renders?niche=fitness").json()
     assert rows[0]["post_path"] == "s1_clean.mp4"
-    assert rows[0]["post_text"] == ["POV: cardio finally got fun", "POV: cardio", "finally got fun"]
+    assert rows[0]["post_text"] == ["POV: cardio finally got fun", "free app on iPhone"]
     assert [r["id"] for r in rows][1] == old and rows[1]["post_path"] is None
