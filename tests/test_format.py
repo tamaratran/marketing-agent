@@ -4,7 +4,7 @@ import time
 from pathlib import Path
 
 from marketing_agent.orchestrator import daily_prompt
-from marketing_agent.policy import FORMAT_PRIOR, concept_scores, pick_concept
+from marketing_agent.policy import FORMAT_EDGE, concept_scores, pick_concept
 from marketing_agent.research.format import (
     FormatSheet,
     common_sound,
@@ -119,10 +119,12 @@ def test_format_concept_outranks_market_concepts(tmp_path: Path):
     c = store_format(store, "fitness", ["subwaysurfers"], srcs, SHEET)
     assert c["kind"] == "format" and c["sound"] == "SUBWAY SURFERS" and c["video_ids"] == ["1"]
     scores = {s["name"]: s for s in concept_scores(store, "fitness")}
-    assert scores[c["name"]]["prior"] == FORMAT_PRIOR
-    assert scores["Challenge day progression"]["prior"] < 1.1
+    market = scores["Challenge day progression"]["prior"]
+    assert market < 1.1
+    assert scores[c["name"]]["prior"] == round(market + FORMAT_EDGE, 3)
     rng = random.Random(0)
-    assert all(pick_concept(store, "fitness", rng)["id"] == c["id"] for _ in range(50))
+    wins = sum(pick_concept(store, "fitness", rng)["id"] == c["id"] for _ in range(2000)) / 2000
+    assert 0.8 < wins < 0.97  # favoured, but the market format still gets tested
     saved = json.loads(
         store.rows("SELECT payload FROM concepts WHERE id=?", (c["id"],))[0]["payload"]
     )

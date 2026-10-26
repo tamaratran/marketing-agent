@@ -24,7 +24,7 @@ export type Overview = {
   stuck_accounts: { author: string; n?: number; median_views?: number }[];
   top_videos: { id: string; url: string; author: string; views: number; reward: number | null; hook_type: string; visual_style: string; desc: string; source_tag?: string; create_time?: number }[];
 };
-export type Concept = { id: number; name: string; description: string; early_score: number; prior: number; mean_reward: number | null; n: number };
+export type Concept = { id: number; name: string; description: string; early_score: number; prior: number; mean_reward: number | null; n: number; kind?: string };
 export type Script = { id: number; concept: string; product: string; created_at: number; hook: string; demo_score: number; captions: string[]; body: string; spoken?: string; hook_on_screen?: boolean; sound?: string; sound_url?: string };
 export type Render = { id: number; script_id: number; created_at: number; model: string; cost_usd: number; hook: string };
 export type Campaign = {
@@ -66,5 +66,5 @@ export const fmt = (n: number | null | undefined, d = 2) => (n === null || n ===
 export type Logic = {
   niche: string;
   videos: { id: string; author: string; views: number | null; followers: number | null; create_time: number; log_views: number; baseline: number; reward: number | null }[];
-  explore_sd: number; format_prior: number; min_age_h: number; winsor_pct: number;
+  explore_sd: number; format_edge?: number; format_prior: number | null; min_age_h: number; winsor_pct: number;
 };
