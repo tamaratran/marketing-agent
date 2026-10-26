@@ -135,8 +135,11 @@ Run:
 Then:
 1. Read the report. Every stage has ok/failed. If a stage failed because of a code bug, make the
    smallest fix, rerun that stage (the individual mkt commands are in the README), and open one PR
-   against main per fix with the failure and the fix in the description. If it failed for a missing
-   key, credit or network reason, do not work around it; say so in your summary.
+   against main per fix with the failure and the fix in the description. Then record the rerun's
+   outcome on the run so the site shows it instead of the first attempt's error:
+   mkt stage <stage> ok|failed "<what happened, one line>"
+   If it failed for a missing key, credit or network reason, do not work around it; say so in
+   your summary.
 2. Write down what you noticed, in plain words, for the Learnings page (the cycle's measured
    entry is already written by `mkt daily`; this is your reading of it): what the source videos
    actually do that the scripts should copy, what came out wrong and why, what you changed.
@@ -154,6 +157,34 @@ Then:
 
 Rules: never post to TikTok, never message anyone, no bot accounts, no account warming,
 no purchases, no account or password changes. Do not commit secrets. Do not merge PRs."""
+
+
+def record_stage(store: Store, niche: str, name: str, status: str, note: str = "") -> int | None:
+    """After a stage is rerun by hand (a fix mid-cycle), write its new outcome onto the newest
+    recorded run for the niche so the Runs page stops showing the first attempt's error. Returns
+    the run id, or None when no run has been recorded yet."""
+    import json
+
+    rows = store.rows(
+        "SELECT id, stages FROM runs WHERE niche=? AND stages IS NOT NULL ORDER BY id DESC LIMIT 1",
+        (niche,),
+    )
+    if not rows:
+        return None
+    stages = json.loads(rows[0]["stages"] or "[]")
+    for s in stages:
+        if s["stage"] == name:
+            s["status"], s["note"] = status, note
+            break
+    else:
+        stages.append({"stage": name, "status": status, "seconds": 0, "note": note})
+    overall = "failed" if any(s["status"] == "failed" for s in stages) else "ok"
+    with store.conn() as c:
+        c.execute(
+            "UPDATE runs SET stages=?, status=?, finished_at=? WHERE id=?",
+            (json.dumps(stages), overall, int(time.time()), rows[0]["id"]),
+        )
+    return rows[0]["id"]
 
 
 class DailyReport:
