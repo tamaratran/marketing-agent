@@ -18,7 +18,7 @@ export const usd = (n: number) => `$${(n ?? 0).toFixed(2)}`;
 
 export type Overview = {
   niche: string; videos: number; scored: number; tagged: number; concepts: number;
-  spent_usd: number; owed_usd: number; winning: string;
+  spent_usd: number; winning: string;
   hooks: { hook_type: string; n: number; mean_reward: number; win_rate: number }[];
   styles: { visual_style: string; n: number; mean_reward: number; win_rate: number }[];
   stuck_accounts: { author: string; n?: number; median_views?: number }[];
@@ -27,9 +27,6 @@ export type Overview = {
 export type Concept = { id: number; name: string; description: string; early_score: number; prior: number; mean_reward: number | null; n: number };
 export type Script = { id: number; concept: string; product: string; created_at: number; hook: string; demo_score: number; captions: string[]; body: string; spoken?: string; hook_on_screen?: boolean; sound?: string; sound_url?: string };
 export type Render = { id: number; script_id: number; created_at: number; model: string; cost_usd: number; hook: string };
-export type Creator = { handle: string; channel: string; rate_per_1k: number; posts: number; median_views: number | null; last_post: string | null; days_since: number | null; status: string };
-export type Brief = { id: number; created_at: number; product: string; script_ids: string; rate_per_1k: number; cap_usd: number; deadline_days: number; body: string; status: string };
-export type Payout = { creator: string; video_id: string; url: string; age_days: number; views: number; rate_per_1k: number; owed_usd: number; settled: boolean; paid_usd: number };
 export type Run = { id: number; created_at: number; session_id: string; url: string; niche: string; product: string; note: string };
 
 export type Level = { level: string; n: number; coef: number; se: number; lo: number; hi: number; raw_mean: number; reference: boolean; verdict: string; travels?: boolean };

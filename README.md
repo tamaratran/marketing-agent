@@ -7,7 +7,6 @@ Three modules in one repo, one SQLite store, one CLI (`mkt`):
 |---|---|---|
 | `research/` | Concept radar. Scrapes public TikTok hashtag pages in a real Chrome (no login, no API key), stores every video and its stats over time, ranks by an early-traction score, clusters videos into reusable concepts with an LLM. Polls any public video URL for views/likes/shares (scoreboard input). | working |
 | `classifier/` | Watches a video (frames every 3s + transcript + caption + sound) and returns strict JSON tags: hook type and text, visual style, pacing, concept, product-by-5s, demo score. gpt-5.4 by default (gpt-5.4-mini flips labels between runs). | working |
-| `creators/` | Creator ops. Drafts paid briefs from kept scripts (rate per 1k views, cap, deadline), keeps a roster of human creators, links their posts to briefs and scripts, computes payouts on settled 7-day views, and reports who posts and who stopped. Drafts only: nothing is sent to anyone. | working |
 | `video/` | Remixes a concept to a product (10-20 scripts, 1-3s hook, product on screen by 5s, scored for demoability), generates clips with Seedance 2.5 on fal.ai (Seedance 2.0 fast on Replicate as the cheap fallback), and cuts a captioned 1080x1920 H.264 with ffmpeg. `--provider stub` renders colour cards so the pipeline runs with no key. | working, needs `FAL_KEY` for real clips |
 
 Not in scope by design: automated account warming, bot-run posting accounts, posting via API. Real
@@ -55,12 +54,7 @@ mkt classify                          # tag them (hook, style, concept, demo sco
 mkt concepts tanning                  # cluster into 3-8 reusable formats, flag early ones
 mkt scripts <concept_id> "Glow, ..."  # 12 scripts, keep demo_score >= 3
 mkt render <script_id> --duration 10  # Seedance clip + captions -> data/renders/s<id>.mp4
-mkt creators brief "Glow, ..." --concept 1 --rate 1 --cap 200   # paste into Discord/Sideshift
-mkt creators add @amy --channel discord --rate 1
-mkt creators post @amy https://www.tiktok.com/@amy/video/123 --brief 1 --script 4
 mkt poll <url> ...                    # record stats for posted videos
-mkt creators payouts                  # views/1k x rate, capped, settled after 7 days
-mkt creators report                   # who posts, who stalled
 mkt scoreboard                        # reward per video, hooks/concepts ranked, throttled accounts
 mkt dashboard tanning                 # static HTML (data/site/index.html) with clips copied next to it
 ```

@@ -140,10 +140,10 @@ Then:
 3. Commit the state: cd ../mkt-state && git add -A && git commit -m "state: {day}" \\
    && git push origin HEAD:{state_branch}
 4. Reply with a short summary: concept picked and why, how many scripts kept, renders made and their
-   cost, creator posts polled and payouts owed, top hooks/concepts on the scoreboard, what you fixed,
+   cost, how our posts did, top hooks/concepts on the scoreboard, what you fixed,
    PR links. Attach the rendered mp4s from data/renders/ and the report.
 
-Rules: never post to TikTok, never message creators or anyone, no bot accounts, no account warming,
+Rules: never post to TikTok, never message anyone, no bot accounts, no account warming,
 no purchases, no account or password changes. Do not commit secrets. Do not merge PRs."""
 
 
@@ -178,7 +178,6 @@ class DailyReport:
         return [s["stage"] for s in self.stages if s["status"] == "failed"]
 
     def write(self, path: Path, store: Store) -> Path:
-        from .creators.ops import creator_report, payouts
         from .policy import concept_scores, winning_traits
         from .scoreboard import build
 
@@ -222,22 +221,6 @@ class DailyReport:
             f"- s{r['script_id']}: {r['final_path']} ({r['model']}, ${r['cost_usd'] or 0:.2f})"
             for r in renders
         ] or ["none"]
-
-        lines += ["", "## Creators", ""]
-        pays = payouts(store)
-        if pays:
-            lines += ["| creator | views | owed | settled | url |", "|---|---|---|---|---|"]
-            lines += [
-                f"| {p['creator']} | {p['views']} | ${p['owed_usd']:.2f} | "
-                f"{'yes' if p['settled'] else ''} | {p['url']} |"
-                for p in pays
-            ]
-        stalled = [c for c in creator_report(store) if c["status"] != "active"]
-        if stalled:
-            lines.append("")
-            lines += [f"- {c['handle']}: {c['status']} ({c['days_since']} days)" for c in stalled]
-        if not pays and not stalled:
-            lines.append("no posts tracked")
 
         from .own import own_posts
 

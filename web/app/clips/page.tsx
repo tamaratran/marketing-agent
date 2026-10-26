@@ -9,7 +9,7 @@ export default async function Page() {
   const rows = all.filter((r) => !seen.has(r.script_id) && seen.add(r.script_id));
   return (
     <>
-      <H1 sub="Seedance previews of kept scripts, captions burned in. These are for exploring formats; creators film the real ones.">Clips</H1>
+      <H1 sub="Seedance previews of kept scripts, captions burned in. These are for exploring formats; we film the real ones.">Clips</H1>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {rows.map((r) => (
           <Card key={r.id}>
