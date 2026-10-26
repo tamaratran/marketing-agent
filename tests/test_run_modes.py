@@ -13,7 +13,8 @@ def test_render_mode_only_renders_latest_batch():
         "fitness", ["a"], "P", renders=3, resolution="480p", refs=["x.png"], mode="render"
     )
     assert "mkt render-latest --renders 3 --resolution 480p" in p and '--ref "x.png"' in p
-    assert "mkt daily" not in p and "mkt stage render" in p and "Never post" in p
+    assert "mkt daily" not in p and "mkt stage render" in p
+    assert "never post from any account but ours" in p
 
 
 def test_full_mode_unchanged():
