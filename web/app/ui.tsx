@@ -16,17 +16,23 @@ export function Card({ title, children, className = "" }: { title?: string; chil
   );
 }
 
-export function Stat({ label, value }: { label: string; value: string | number }) {
+export function Stat({ label, value, hint }: { label: string; value: string | number; hint?: string }) {
   return (
     <div className="rounded-lg border border-neutral-800 bg-neutral-900/60 p-4">
       <div className="text-2xl font-semibold tabular-nums">{value}</div>
       <div className="text-xs text-neutral-400">{label}</div>
+      {hint && <div className="mt-1 text-[11px] leading-snug text-neutral-600">{hint}</div>}
     </div>
   );
 }
 
-export function Table({ head, rows }: { head: string[]; rows: React.ReactNode[][] }) {
-  if (!rows.length) return <p className="text-sm text-neutral-500">Nothing yet.</p>;
+/** A short "how to read this" line under a heading or table. */
+export function Note({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return <p className={`text-xs leading-relaxed text-neutral-500 ${className}`}>{children}</p>;
+}
+
+export function Table({ head, rows, empty = "Nothing yet." }: { head: string[]; rows: React.ReactNode[][]; empty?: React.ReactNode }) {
+  if (!rows.length) return <p className="text-sm text-neutral-500">{empty}</p>;
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
@@ -56,5 +62,19 @@ export const input = "rounded border border-neutral-700 bg-neutral-900 px-2 py-1
 export const button = "rounded bg-neutral-100 px-3 py-1 text-sm font-medium text-neutral-900 hover:bg-white disabled:opacity-50";
 export const ghost = "rounded border border-neutral-700 px-2 py-1 text-xs text-neutral-300 hover:bg-neutral-800";
 
-export const reward = (r: number | null | undefined) =>
-  r == null ? <span className="text-neutral-600">no data</span> : <span className={r > 0 ? "text-emerald-300" : "text-red-300"}>{r > 0 ? "+" : ""}{r.toFixed(2)}</span>;
+/** A log10 lift as a plain multiple: +1 means 10x the creator's usual views, -0.3 about half. */
+export const times = (r: number) => {
+  const x = 10 ** r;
+  return x >= 10 ? `${Math.round(x)}x` : x >= 1 ? `${x.toFixed(1)}x` : `${x.toFixed(2)}x`;
+};
+
+export const reward = (r: number | null | undefined, empty = "not scored yet") =>
+  r == null ? <span className="text-neutral-600" title="Videos are scored once they are a day old and the creator has a baseline">{empty}</span> : (
+    <span className={r > 0 ? "text-emerald-300" : "text-red-300"} title={`log10 lift ${r > 0 ? "+" : ""}${r.toFixed(2)}`}>{times(r)} usual</span>
+  );
+
+/** snake_case classifier labels as words. */
+export const human = (s: string | null | undefined) => (s ? s.replaceAll("_", " ") : "");
+
+export const pt = (ts: number) =>
+  new Date(ts * 1000).toLocaleString("en-US", { timeZone: "America/Los_Angeles", weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) + " PT";

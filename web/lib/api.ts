@@ -22,7 +22,7 @@ export type Overview = {
   hooks: { hook_type: string; n: number; mean_reward: number; win_rate: number }[];
   styles: { visual_style: string; n: number; mean_reward: number; win_rate: number }[];
   stuck_accounts: { author: string; n?: number; median_views?: number }[];
-  top_videos: { id: string; url: string; author: string; views: number; reward: number; hook_type: string; visual_style: string; desc: string }[];
+  top_videos: { id: string; url: string; author: string; views: number; reward: number | null; hook_type: string; visual_style: string; desc: string; source_tag?: string; create_time?: number }[];
 };
 export type Concept = { id: number; name: string; description: string; early_score: number; prior: number; mean_reward: number | null; n: number };
 export type Script = { id: number; concept: string; product: string; created_at: number; hook: string; demo_score: number; captions: string[]; body: string; spoken?: string; hook_on_screen?: boolean; sound?: string; sound_url?: string };

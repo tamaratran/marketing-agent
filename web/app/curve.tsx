@@ -6,7 +6,7 @@ const AGES = [1, 6, 24, 72, 168];
 export function Curve({ obs, createTime, baselineLog }: { obs: Observation[]; createTime: number; baselineLog?: number | null }) {
   const pts = obs.filter((o) => o.views && o.views > 0).map((o) => ({ a: Math.max((o.observed_at - createTime) / 3600, 0.1), v: o.views as number }));
   if (pts.length === 0) return <p className="text-sm text-neutral-500">No observations yet.</p>;
-  const W = 640, H = 220, L = 48, B = 28;
+  const W = 640, H = 220, L = 64, B = 28;
   const xs = pts.map((p) => Math.log10(p.a)), ys = pts.map((p) => Math.log10(p.v));
   const x0 = Math.min(-1, ...xs), x1 = Math.max(Math.log10(200), ...xs);
   const y0 = Math.min(0, ...ys, baselineLog ?? 99) - 0.2, y1 = Math.max(...ys, baselineLog ?? 0) + 0.3;
