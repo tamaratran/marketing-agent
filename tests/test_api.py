@@ -258,3 +258,67 @@ def test_renders_carry_the_text_to_type_into_tiktok(tmp_path):
     assert rows[0]["post_path"] == "s1_clean.mp4"
     assert rows[0]["post_text"] == ["POV: cardio finally got fun", "free app on iPhone"]
     assert [r["id"] for r in rows][1] == old and rows[1]["post_path"] is None
+
+
+def test_post_button_starts_one_posting_session(client, monkeypatch):
+    """Post on a clip starts a Devin session told to upload that clip from our account, add the
+    text with TikTok's text tool and register the post; pressing twice does not start another."""
+    import json
+    import time
+
+    from marketing_agent import api, orchestrator
+
+    seen = {}
+
+    def fake_create(self, prompt, **kw):
+        seen["prompt"], seen["kw"] = prompt, kw
+        return {"session_id": "devin-p", "url": "https://app.devin.ai/sessions/p"}
+
+    monkeypatch.setattr(orchestrator.DevinClient, "__init__", lambda self: None)
+    monkeypatch.setattr(orchestrator.DevinClient, "create_session", fake_create)
+    store = api._store()  # noqa: SLF001
+    now = int(time.time())
+    cid = store.insert(
+        "concepts", {"name": "c", "niche": api.DEFAULT_NICHE, "created_at": now, "payload": "{}"}
+    )
+    sid = store.insert(
+        "scripts",
+        {
+            "concept_id": cid,
+            "product": "p",
+            "created_at": now,
+            "hook": "POV: cardio finally got fun",
+            "body": "",
+            "demo_score": 5,
+            "payload": json.dumps(
+                {
+                    "captions": ["POV: cardio", "finally got fun"],
+                    "sound": "SUBWAY SURFERS",
+                    "sound_id": "77",
+                }
+            ),
+        },
+    )
+    assert client.post(f"/renders/{sid}/post", headers=AUTH).status_code == 404
+    rid = store.insert(
+        "renders",
+        {"script_id": sid, "created_at": now, "model": "seedance", "final_path": "s1.mp4"},
+    )
+    r = client.post(f"/renders/{sid}/post", headers=AUTH)
+    assert r.status_code == 400 and "clean copy" in r.text
+    with store.conn() as c:
+        c.execute("UPDATE renders SET post_path='s1_clean.mp4' WHERE id=?", (rid,))
+    r = client.post(f"/renders/{sid}/post", headers=AUTH)
+    assert r.status_code == 200 and r.json()["session_id"] == "devin-p"
+    p = seen["prompt"]
+    assert (
+        f"/s{sid}_clean.mp4" in p and "  1. POV: cardio finally got fun" in p and "  2. " not in p
+    )
+    assert "SUBWAY SURFERS (https://www.tiktok.com/music/x-77)" in p
+    assert "/ours/posts" in p and "do not toggle it" in p
+    assert seen["kw"]["title"].startswith(f"mkt post s{sid}")
+    again = client.post(f"/renders/{sid}/post", headers=AUTH).json()
+    assert again["already"] is True and again["url"].endswith("/p")
+    rend = client.get(f"/renders?niche={api.DEFAULT_NICHE}").json()[0]
+    assert rend["post_session_url"].endswith("/p") and rend["post_requested_at"]
+    assert client.get("/runs").json()[0]["note"].startswith(f"post s{sid}")

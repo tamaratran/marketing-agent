@@ -34,7 +34,7 @@ export type Concept = {
   examples?: { id: string; author: string; url: string; views: number | null }[];
 };
 export type Script = { id: number; concept: string; product: string; created_at: number; hook: string; demo_score: number; captions: string[]; body: string; spoken?: string; hook_on_screen?: boolean; sound?: string; sound_url?: string };
-export type Render = { id: number; script_id: number; created_at: number; model: string; cost_usd: number; hook: string; post_path: string | null; post_text: string[]; hold_reason: string | null };
+export type Render = { id: number; script_id: number; created_at: number; model: string; cost_usd: number; hook: string; post_path: string | null; post_text: string[]; hold_reason: string | null; post_session_url: string | null; post_requested_at: number | null };
 export type Campaign = {
   account: { handle: string; backup_hashtag: string };
   niche: { name: string; hashtags: string[] };

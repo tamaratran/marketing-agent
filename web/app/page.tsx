@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { CLIPS, frameUrl, get, usd, type Concept, type Findings, type Overview, type Render, type Script } from "@/lib/api";
 import type { Ours } from "@/lib/ours";
-import { startRun } from "./actions";
+import { postClip, startRun } from "./actions";
+import { PostButton } from "./post-button";
 import { Download } from "./download";
 import { Thumb } from "./thumb";
 import { button, formatName, Pill, human, reward, times } from "./ui";
@@ -106,6 +107,9 @@ export default async function Page({ searchParams }: { searchParams: Promise<Q> 
               {clip.post_text.map((ln, i) => <p key={i} className="text-sm font-medium">{ln}</p>)}
             </div>
           )}
+          {!posted.has(clip.script_id) && clip.post_path && !clip.hold_reason && (clip.post_session_url
+            ? <p className="mt-3 text-center text-xs text-neutral-400">Devin is posting this one: <a href={clip.post_session_url} target="_blank" className="text-sky-300 hover:underline">watch</a></p>
+            : <div className="mt-3 flex justify-center"><PostButton action={postClip} scriptId={clip.script_id} /></div>)}
           <p className="mt-3 text-center text-xs text-neutral-500">Every clip, with its text and sound: <Link href="/clips" className="text-sky-300 hover:underline">Clips</Link></p>
           {clips.length > 1 && <Others clips={clips} current={clip.script_id} step={4} posted={posted} />}
         </Screen>
