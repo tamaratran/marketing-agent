@@ -38,7 +38,7 @@ export function Table({ head, rows, empty = "Nothing yet." }: { head: string[]; 
       <table className="w-full text-sm">
         <thead>
           <tr className="text-left text-xs text-neutral-500">
-            {head.map((h) => <th key={h} className="pb-2 pr-4 font-medium">{h}</th>)}
+            {head.map((h, i) => <th key={i} className="pb-2 pr-4 font-medium">{h}</th>)}
           </tr>
         </thead>
         <tbody>

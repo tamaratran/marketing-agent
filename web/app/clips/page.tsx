@@ -16,7 +16,7 @@ export default async function Page() {
     <>
       <H1 sub={`AI preview clips (Seedance) of the best scripts, captions burned in. A person posts them${account ? ` from @${account}` : ""}; nothing is posted automatically.`}>Clips</H1>
       <Note className="mb-4">
-        To post one: download it, upload it to TikTok, and pick the sound listed under the clip in TikTok&apos;s sound library. The next sync matches the post to its script by caption, and its views start counting toward that concept.
+        To post one: download it, upload it to TikTok, and add the sound listed under the clip from TikTok&apos;s sound library (if none is listed, use a trending sound from the concept&apos;s research videos). The next sync matches the post to its script by caption, and its views start counting toward that concept.
       </Note>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {rows.map((r) => {
@@ -31,7 +31,7 @@ export default async function Page() {
               </div>
               <p className="mt-2 text-sm font-medium">{r.hook}</p>
               {s?.concept && <p className="text-xs text-neutral-400">concept: {s.concept}</p>}
-              {s?.sound && <p className="text-xs text-neutral-400">sound: {s.sound_url ? <a className="underline" href={s.sound_url} target="_blank">{s.sound}</a> : s.sound}</p>}
+              <p className="text-xs text-neutral-400">sound: {s?.sound ? (s.sound_url ? <a className="underline" href={s.sound_url} target="_blank">{s.sound}</a> : s.sound) : <span className="text-neutral-600">none picked, use a trending one</span>}</p>
               <p className="mt-1 text-xs text-neutral-500"><Link href="/scripts" className="hover:underline">script #{r.script_id}</Link> · {dateOf(r.created_at)} · {usd(r.cost_usd)}</p>
             </Card>
           );
