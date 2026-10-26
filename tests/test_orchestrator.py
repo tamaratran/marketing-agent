@@ -120,4 +120,4 @@ def test_daily_report_only_counts_this_runs_scripts_and_renders(tmp_path):
 
 def test_daily_prompt_passes_reference_images():
     p = daily_prompt("fitness", ["immersiveworkout"], "an app", refs=["https://x/icon.png"])
-    assert '--resolution 480p --ref "https://x/icon.png"' in p
+    assert '--resolution 720p --ref "https://x/icon.png"' in p

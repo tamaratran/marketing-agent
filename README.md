@@ -138,18 +138,18 @@ mkt devin status <session_id>
 ```
 
 State is kept out of `main`: the sqlite db and `reports/` live on the `state` branch, which each
-session checks out as a worktree (`MKT_DB` points the CLI at it). Schedule the kickoff with cron or a
-Devin Automation and the loop runs itself; humans still do the posting.
+session checks out as a worktree (`MKT_DB` points the CLI at it). Humans still do the posting.
 
-The hosted cron is a Modal function (`deploy/modal_cron.py`, app `mkt-daily-kickoff`, workspace
-twerk) that calls `mkt devin kickoff` at 14:17 UTC daily; niche, tags and product come from the
-`mkt-devin` Modal secret (`MKT_NICHE`, `MKT_TAGS`, `MKT_PRODUCT`, `MKT_RENDERS`) next to
-`DEVIN_API_KEY` and `DEVIN_ORG_ID`. `modal run deploy/modal_cron.py --dry-run` prints the prompt
-without starting a session; `modal deploy deploy/modal_cron.py` ships a change.
+Nothing runs on a schedule. The site's Runs page has one "Run cycle" button: it calls `POST /runs`
+on the API with an empty body, and the API starts the Devin session with its own config, set as Fly
+secrets on `mkt-api`: `MKT_NICHE`, `MKT_TAGS`, `MKT_PRODUCT`, `MKT_PRODUCT_TAGS`, `MKT_REFS`
+(space separated), `MKT_RENDERS` (default 5), `MKT_RESOLUTION` (default 720p), `MKT_MAX_ACU`, next
+to `DEVIN_API_KEY` and `DEVIN_ORG_ID`. The 2-hourly cohort re-poll (`deploy/modal_repoll.py`) is
+the only scheduled job; it measures, it does not create or post anything.
 
 ## Format cloning
 
-`mkt daily ... --product-tag immersiveworkout --product-tag subwaysurfers` (cron: `MKT_PRODUCT_TAGS`)
+`mkt daily ... --product-tag immersiveworkout --product-tag subwaysurfers` (API: `MKT_PRODUCT_TAGS`)
 makes the run watch the product's own best-performing TikToks in the db (any age, ranked by views
 discounted for account size, frames + transcript) and store their beat sheet as a `format` concept:
 hook shot and delivery, shot order with timings, pacing, on-screen text budget, shared sound. The

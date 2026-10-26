@@ -19,13 +19,8 @@ async function post(path: string, body?: unknown) {
 
 
 
-export async function startRun(form: FormData) {
-  await post("/runs", {
-    niche: form.get("niche") || process.env.MKT_NICHE || "wearables",
-    tags: String(form.get("tags") || "smartring whoop ouraring").split(/[\s,]+/).filter(Boolean),
-    product: form.get("product"),
-    renders: Number(form.get("renders") || 1),
-  });
+export async function startRun() {
+  await post("/runs", {});
   revalidatePath("/runs");
 }
 

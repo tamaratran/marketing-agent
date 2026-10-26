@@ -137,22 +137,45 @@ def runs(limit: int = 30):
     return _store().rows("SELECT * FROM runs ORDER BY id DESC LIMIT ?", (limit,))
 
 
+def _env_list(name: str, default: str = "") -> list[str]:
+    return os.environ.get(name, default).split()
+
+
 class RunIn(BaseModel):
+    """One cycle of the loop. Every field defaults to the API's MKT_* env (the same config the old
+    daily cron carried), so the site's Run cycle button posts an empty body."""
+
     niche: str = DEFAULT_NICHE
-    tags: list[str] = ["smartring", "whoop", "ouraring"]
-    product: str
-    renders: int = 1
-    max_acu: int = 10
+    tags: list[str] = _env_list("MKT_TAGS", "smartring whoop ouraring")
+    product: str = os.environ.get(
+        "MKT_PRODUCT", "a smart ring that tracks sleep, stress and recovery"
+    )
+    product_tags: list[str] = _env_list("MKT_PRODUCT_TAGS")
+    refs: list[str] = _env_list("MKT_REFS")
+    renders: int = int(os.environ.get("MKT_RENDERS", "5"))
+    resolution: str = os.environ.get("MKT_RESOLUTION", "720p")
+    max_acu: int = int(os.environ.get("MKT_MAX_ACU", "10"))
 
 
 @app.post("/runs", dependencies=[Depends(_auth)])
-def runs_start(body: RunIn):
-    """Start a Devin session that runs `mkt daily` (same as `mkt devin kickoff`)."""
+def runs_start(body: RunIn | None = None):
+    """Start a Devin session that runs one cycle (`mkt daily`, same as `mkt devin kickoff`): analyse
+    the sources and our posts, write scripts, render clips. Nothing is posted; humans do that."""
     from .orchestrator import DEFAULT_REPO, DevinClient, daily_prompt
 
+    body = body or RunIn()
+
     s = DevinClient().create_session(
-        daily_prompt(body.niche, body.tags, body.product, body.renders),
-        title=f"mkt daily {body.niche} {time.strftime('%Y-%m-%d')}",
+        daily_prompt(
+            body.niche,
+            body.tags,
+            body.product,
+            body.renders,
+            body.resolution,
+            refs=body.refs,
+            product_tags=body.product_tags,
+        ),
+        title=f"mkt cycle {body.niche} {time.strftime('%Y-%m-%d')}",
         tags=["marketing-agent", body.niche, "api"],
         repos=[DEFAULT_REPO],
         max_acu_limit=body.max_acu,
@@ -165,7 +188,7 @@ def runs_start(body: RunIn):
             "url": s["url"],
             "niche": body.niche,
             "product": body.product,
-            "note": "",
+            "note": f"{body.renders} clips at {body.resolution}",
         },
     )
     return {"ok": True, "id": rid, "session_id": s["session_id"], "url": s["url"]}

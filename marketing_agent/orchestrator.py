@@ -3,7 +3,7 @@ session (or a human) reads afterwards.
 
 `mkt daily` is the deterministic part: every stage in order, failures recorded instead of raised,
 one markdown report at the end. The Devin session is the judgment part: it runs `mkt daily`, reads
-the report, fixes a stage that broke, pushes the state branch and summarises the day."""
+the report, fixes a stage that broke, pushes the state branch and summarises the cycle."""
 
 import os
 import time
@@ -92,7 +92,7 @@ def daily_prompt(
     tags: list[str],
     product: str,
     renders: int = 1,
-    resolution: str = "480p",
+    resolution: str = "720p",
     repo: str = DEFAULT_REPO,
     state_branch: str = STATE_BRANCH,
     refs: list[str] | None = None,
@@ -103,13 +103,14 @@ def daily_prompt(
     tag_str = " ".join(tags)
     ref_str = "".join(f' --ref "{r}"' for r in refs or [])
     ref_str += "".join(f' --product-tag "{t}"' for t in product_tags or [])
-    return f"""Repo: {repo}. Run today's ({day}) loop of the marketing agent and report on it.
+    return f"""Repo: {repo}. Run one cycle ({day}) of the marketing agent and report on it.
 
 Setup (in the repo):
   uv venv && . .venv/bin/activate && uv pip install -e ".[dev]"
   ffmpeg must be on PATH (apt-get install -y ffmpeg if missing).
   export OPENAI_API_KEY="$ANSWERSNAP_OPENAI_KEY"   # the personal OpenAI key has no credits
-  FAL_KEY is in your environment; renders cost about $0.22/s at 480p, keep to --renders {renders}.
+  FAL_KEY is in your environment; renders cost about $0.22/s at 480p, $0.47/s at 720p, $0.80/s at
+  1080p. Keep to --renders {renders} at {resolution}.
   The scraper drives the Chrome already running in your VM at http://localhost:29229.
   Own-post discovery requires a TikTok session in that Chrome. `mkt own login` reuses a verified
   login or submits TIKTOK_POST_HANDLE and TIKTOK_POST_PASSWORD from protected environment secrets.

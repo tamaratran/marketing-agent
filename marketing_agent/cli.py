@@ -637,7 +637,7 @@ def format_cmd(niche, product_tags, limit):
 )
 @click.option("--top", default=8)
 @click.option("--renders", default=1, help="Render the N best scripts written this run (0 = skip)")
-@click.option("--resolution", default="480p")
+@click.option("--resolution", default="720p")
 @click.option(
     "--ref", "refs", multiple=True, help="Reference image URL/path (product shots) for renders"
 )
@@ -819,7 +819,7 @@ def devin():
 @click.argument("tags", nargs=-1, required=True)
 @click.option("--product", required=True)
 @click.option("--renders", default=1)
-@click.option("--resolution", default="480p")
+@click.option("--resolution", default="720p")
 @click.option("--repo", default=None, help="owner/repo (default MKT_REPO)")
 @click.option("--max-acu", default=10, help="ACU cap for the session")
 @click.option("--wait/--no-wait", default=False, help="Block until the session settles")
