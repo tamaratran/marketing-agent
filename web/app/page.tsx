@@ -18,7 +18,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<Q> 
     get<Overview>("/overview"), get<Concept[]>("/concepts"), get<Script[]>("/scripts?days=60&limit=500"),
     get<Render[]>("/renders"), get<Ours>("/ours"), get<Findings>("/findings"),
   ]);
-  const step = Math.min(Math.max(Number(q.step) || 1, 1), STEPS.length);
+  const step = Math.min(Math.max(Math.floor(Number(q.step)) || 1, 1), STEPS.length);
   const account = ours.accounts[0]?.handle;
   const posted = new Map(ours.posts.filter((p) => p.script_id).map((p) => [p.script_id as number, p]));
   const clips = renders.filter((r, i) => renders.findIndex((x) => x.script_id === r.script_id) === i);
