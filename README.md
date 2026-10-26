@@ -152,3 +152,13 @@ twerk) that calls `mkt devin kickoff` at 14:17 UTC daily; niche, tags and produc
 `mkt-devin` Modal secret (`MKT_NICHE`, `MKT_TAGS`, `MKT_PRODUCT`, `MKT_RENDERS`) next to
 `DEVIN_API_KEY` and `DEVIN_ORG_ID`. `modal run deploy/modal_cron.py --dry-run` prints the prompt
 without starting a session; `modal deploy deploy/modal_cron.py` ships a change.
+
+## Format cloning
+
+`mkt daily ... --product-tag immersiveworkout --product-tag subwaysurfers` (cron: `MKT_PRODUCT_TAGS`)
+makes the run watch the product's own best-performing TikToks in the db (any age, ranked by views
+discounted for account size, frames + transcript) and store their beat sheet as a `format` concept:
+hook shot and delivery, shot order with timings, pacing, on-screen text budget, shared sound. The
+picker takes it ahead of the fresh niche concepts until our own posts say otherwise, and the scripts
+written from it follow it beat for beat and carry the sound the poster should pick in TikTok.
+Without `--product-tag` (or before the db has product videos) the niche concepts are used as before.

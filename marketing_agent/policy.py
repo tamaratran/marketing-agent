@@ -3,6 +3,7 @@ script writer is told has worked. Thompson-style sampling over concepts (mean re
 from the radar's early score) keeps roughly a quarter of picks exploring instead of always taking
 the current leader."""
 
+import json
 import math
 import random
 
@@ -10,6 +11,7 @@ from .scoreboard import build
 from .store import Store
 
 EXPLORE_SD = 0.35
+FORMAT_PRIOR = 3.0  # market priors top out near 1.0; 4 sd above them with EXPLORE_SD noise
 
 
 def controlled_traits(store: Store, outcome: str = "lift_72h") -> str:
@@ -121,7 +123,7 @@ def concept_scores(store: Store, niche: str, tag: str | None = None) -> list[dic
 
     ours = own_rewards(store)
     rows = store.rows(
-        "SELECT id, name, description, early_score FROM concepts WHERE niche=? ORDER BY created_at DESC",
+        "SELECT id, name, description, early_score, payload FROM concepts WHERE niche=? ORDER BY created_at DESC",
         (niche,),
     )
     seen, out = set(), []
@@ -129,11 +131,20 @@ def concept_scores(store: Store, niche: str, tag: str | None = None) -> list[dic
         if c["name"] in seen:
             continue
         seen.add(c["name"])
+        try:
+            kind = json.loads(c.pop("payload") or "{}").get("kind", "")
+        except ValueError:
+            kind = ""
         prior = math.log10((c["early_score"] or 0) + 1) / 3  # ~0..1 for 1..1000 early score
+        if kind == "format":
+            # A beat sheet of the product's own proven videos beats any fresh-niche cluster until
+            # our posts say otherwise: sits above the market range plus the exploration noise.
+            prior = FORMAT_PRIOR
         obs = ours.get(c["id"])
         out.append(
             {
                 **c,
+                "kind": kind,
                 "prior": round(prior, 3),
                 "mean_reward": obs["mean_reward"] if obs else None,
                 "n": obs["n"] if obs else 0,

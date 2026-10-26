@@ -148,7 +148,7 @@ def captions_from_script(hook: str, lines: list[str], total_s: float) -> list[Ca
     Never shows a line for less than MIN_LINE_S, so short clips drop trailing lines
     instead of flashing all of them.
     """
-    caps = [Caption(strip_label(hook), 0, min(HOOK_S, total_s))]
+    caps = [Caption(strip_label(hook), 0, min(HOOK_S, total_s))] if hook.strip() else []
     lines = [TIMESTAMP_RE.sub("", ln.strip(" -•")) for ln in lines if ln.strip()][:6]
     max_lines = int((total_s - HOOK_S) // MIN_LINE_S)
     lines = lines[:max_lines]
