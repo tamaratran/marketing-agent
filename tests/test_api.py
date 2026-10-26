@@ -201,3 +201,9 @@ def test_logic_lists_scored_videos_and_picker_constants(client):
     out = client.get("/logic").json()
     assert out["explore_sd"] == policy.EXPLORE_SD and out["format_prior"] == policy.FORMAT_PRIOR
     assert isinstance(out["videos"], list)
+
+
+def test_learnings_endpoints(client):
+    assert client.get("/learnings").json() == []
+    md = client.get("/learnings.md")
+    assert md.status_code == 200 and md.text.startswith("# Learnings")

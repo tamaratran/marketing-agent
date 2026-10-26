@@ -753,6 +753,7 @@ def daily(
     stage("scoreboard", lambda: ctx.invoke(scoreboard, tag=None, top=15, group="both"))
     stage("compare", lambda: ctx.invoke(compare_cmd, tag=None, top=20))
     stage("policy", lambda: ctx.invoke(policy, niche=niche))
+    stage("learn", lambda: _learn_cycle(niche, product, rep.stages))
 
     report = (
         Path(report)
@@ -893,6 +894,57 @@ def devin_kickoff(niche, tags, product, renders, resolution, repo, max_acu, wait
         console.print(f"{s.get('status')} / {s.get('status_detail')}")
         for pr in s.get("pull_requests") or []:
             console.print(f"PR {pr.get('pr_url')} [{pr.get('pr_state')}]")
+
+
+def _learn_cycle(niche, product, stages):
+    from .learnings import write_cycle
+
+    lid = write_cycle(_store(), niche, product, stages)
+    return f"learnings entry {lid}"
+
+
+@cli.group()
+def learn():
+    """What the agent has learned, in plain words (Learnings page on the site)."""
+
+
+@learn.command("write")
+@click.argument("niche", required=False)
+@click.option("--product", default=None)
+def learn_write(niche, product):
+    """Write this cycle's entry from what is in the db (what the sources showed, what the picker
+    leaned on, how our posts did, what changed). `mkt daily` does this as its last stage."""
+    from . import campaign as campaign_cfg
+
+    c = campaign_cfg.load()
+    console.print(_learn_cycle(niche or c.niche.name, product or c.product.description, None))
+
+
+@learn.command("add")
+@click.argument("title")
+@click.option("--body", default=None, help="Markdown; omitted = read stdin")
+@click.argument("niche", required=False)
+def learn_add(title, body, niche):
+    """Add an observation in your own words (the session running a cycle does this: what it saw
+    in the videos, what was wrong, what it changed)."""
+    import sys
+
+    from . import campaign as campaign_cfg
+    from .learnings import add
+
+    c = campaign_cfg.load()
+    body = body if body is not None else sys.stdin.read()
+    lid = add(_store(), niche or c.niche.name, c.product.description, title, body)
+    console.print(f"learnings entry {lid}")
+
+
+@learn.command("show")
+@click.argument("niche", required=False)
+def learn_show(niche):
+    """Print learnings.md."""
+    from .learnings import document
+
+    click.echo(document(_store(), niche))
 
 
 @cli.command("campaign")

@@ -4,7 +4,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 
 const pages: [string, string][] = [
   ["/overview", "Overview"], ["/concepts", "Formats"], ["/findings", "Findings"], ["/scripts", "Scripts"],
-  ["/clips", "Clips"], ["/ours", "Our posts"], ["/runs", "Runs"],
+  ["/clips", "Clips"], ["/ours", "Our posts"], ["/learnings", "Learnings"], ["/runs", "Runs"],
 ];
 
 export function Nav() {

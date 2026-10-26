@@ -137,10 +137,14 @@ Then:
    smallest fix, rerun that stage (the individual mkt commands are in the README), and open one PR
    against main per fix with the failure and the fix in the description. If it failed for a missing
    key, credit or network reason, do not work around it; say so in your summary.
-2. Push the finished db to the API: mkt sync push
-3. Commit the state: cd ../mkt-state && git add -A && git commit -m "state: {day}" \\
+2. Write down what you noticed, in plain words, for the Learnings page (the cycle's measured
+   entry is already written by `mkt daily`; this is your reading of it): what the source videos
+   actually do that the scripts should copy, what came out wrong and why, what you changed.
+   2 to 8 sentences, no filler:  mkt learn add "<short title>" --body "<markdown>"
+3. Push the finished db to the API: mkt sync push
+4. Commit the state: cd ../mkt-state && git add -A && git commit -m "state: {day}" \\
    && git push origin HEAD:{state_branch}
-4. Reply with a short summary: concept picked and why, how many scripts kept, renders made and their
+5. Reply with a short summary: concept picked and why, how many scripts kept, renders made and their
    cost, how our posts did and how they compare with the market, top hooks/concepts on the scoreboard, what you fixed,
    PR links. Attach the rendered mp4s from data/renders/ and the report.
 
