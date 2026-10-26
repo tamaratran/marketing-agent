@@ -198,6 +198,23 @@ def _tag_traits(tags: dict) -> dict:
     }
 
 
+def concept_examples(store: Store, video_ids: list[str], n: int = 3) -> list[dict]:
+    """The most-viewed member videos of a concept (id, author, url, latest views), so the site
+    can show what a format looks like instead of only naming it."""
+    if not video_ids:
+        return []
+    marks = ",".join("?" * len(video_ids))
+    rows = store.rows(
+        f"""SELECT v.id, v.author, v.url,
+                   (SELECT o.views FROM observations o WHERE o.video_id=v.id
+                    ORDER BY o.observed_at DESC LIMIT 1) AS views
+            FROM videos v WHERE v.id IN ({marks})""",
+        tuple(video_ids),
+    )
+    rows.sort(key=lambda r: r["views"] or 0, reverse=True)
+    return rows[:n]
+
+
 def concept_traits(store: Store, video_ids: list[str]) -> dict:
     """What a concept looks like: the most common value of each trait over its classified
     member videos. A trait is None when no member has been classified."""
@@ -327,7 +344,10 @@ def concept_scores(store: Store, niche: str, tag: str | None = None) -> list[dic
             continue
         seen.add(k)
         c.pop("payload", None)
-        c.pop("video_ids", None)
+        try:
+            c["examples"] = concept_examples(store, json.loads(c.pop("video_ids", None) or "[]"))
+        except ValueError:
+            c["examples"] = []
         prior = math.log10((c["early_score"] or 0) + 1) / 3  # ~0..1 for 1..1000 early score
         hits = by_name.get(k, [])
         n = sum(h["n"] for h in hits)
