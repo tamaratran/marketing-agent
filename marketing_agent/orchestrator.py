@@ -209,7 +209,7 @@ def record_stage(store: Store, niche: str, name: str, status: str, note: str = "
     import json
 
     rows = store.rows(
-        "SELECT id, stages FROM runs WHERE niche=? AND stages IS NOT NULL ORDER BY id DESC LIMIT 1",
+        "SELECT id, stages FROM runs WHERE niche=? ORDER BY id DESC LIMIT 1",
         (niche,),
     )
     if not rows:
