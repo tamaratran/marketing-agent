@@ -52,7 +52,7 @@ export default async function Page() {
       </Card>
       <Card title="What the picker has learned from our posts" className="mt-4">
         {Object.keys(o.rewards).length === 0 ? <p className="text-sm text-neutral-500">Nothing yet. Until one of our posts has results, the daily pick follows what is working for other accounts, with some exploring.</p> : (
-          <Table head={["concept", "average vs our usual", "posts"]} rows={Object.entries(o.rewards).map(([cid, r]) => [conceptName.get(cid) ?? `#${cid}`, reward(r.mean_reward), r.n])} />
+          <Table head={["concept", "average vs videos like it, age-weighted", "posts"]} rows={Object.entries(o.rewards).map(([cid, r]) => [conceptName.get(cid) ?? `#${cid}`, reward(r.mean_reward), r.n])} />
         )}
       </Card>
     </>
