@@ -69,7 +69,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<Q> 
           <ul className="mt-2 space-y-1 text-sm text-neutral-400">
             {concepts.filter((c) => c.id !== concept.id).slice(0, 4).map((c) => <li key={c.id}>{formatName(c.name)}</li>)}
           </ul>
-          <Aside>Formats with more early views get picked more often. Once our own posts have results, the ones that work for us get picked more.</Aside>
+          <Aside>Formats with more early views get picked more often. Once our own posts have results, the ones that work for us get picked more. <Link href="/how" className="text-sky-300 hover:underline">See how it decides</Link></Aside>
         </Screen>
       )}
 

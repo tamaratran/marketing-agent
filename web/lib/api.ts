@@ -61,3 +61,9 @@ export type CreatorDetail = {
 };
 export const ageH = (createTime: number, at: number) => (at - createTime) / 3600;
 export const fmt = (n: number | null | undefined, d = 2) => (n === null || n === undefined ? "" : n.toFixed(d));
+
+export type Logic = {
+  niche: string;
+  videos: { id: string; author: string; views: number | null; followers: number | null; create_time: number; log_views: number; baseline: number; reward: number | null }[];
+  explore_sd: number; format_prior: number; min_age_h: number; winsor_pct: number;
+};
