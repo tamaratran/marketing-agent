@@ -19,7 +19,15 @@ import re
 import time
 
 from .cohort import snapshot_creator, views_at
-from .scoreboard import MIN_AGE_H_FOR_OWN, curve_points, expected_log, fit_curve
+from .scoreboard import (
+    ENGAGEMENT_WEIGHT,
+    MIN_AGE_H_FOR_OWN,
+    curve_points,
+    engagement_lift,
+    engagement_per_1k,
+    expected_log,
+    fit_curve,
+)
 from .store import Store
 
 MIGRATIONS = [
@@ -263,14 +271,18 @@ def own_posts(store: Store) -> list[dict]:
     ref = store.latest(None, limit=500, group="reference")
     curves: dict[str | None, dict | None] = {}
     offsets: dict[str | None, dict[str, float]] = {}
+    niche_rows: dict[str | None, list[dict]] = {}
     for v in rows:
         niche = v.get("niche")
         if niche not in curves:
+            tags = store.niche_tags(niche) if niche else []
+            niche_rows[niche] = [r for r in ref if r["source_tag"] in tags] if tags else ref
             curves[niche] = _niche_curve(store, ref, niche, now)
             offsets[niche] = _account_offsets(store, curves[niche], now) if curves[niche] else {}
         curve = curves[niche]
         obs = store.rows(
-            "SELECT observed_at, views FROM observations WHERE video_id=? ORDER BY observed_at",
+            "SELECT observed_at, views, shares, saves FROM observations WHERE video_id=? "
+            "ORDER BY observed_at",
             (v["id"],),
         )
         curve_pts = [((o["observed_at"] - v["create_time"]) / 3600, o["views"]) for o in obs]
@@ -297,6 +309,18 @@ def own_posts(store: Store) -> list[dict]:
         v["lift_now"] = (math.log10(latest) - base) if latest and base is not None else None
         v["n_obs"] = len(obs)
         v["account_offset"] = offsets[niche].get(v["author"], 0.0)
+        last = obs[-1] if obs else {}
+        v["engagement_per_1k"] = round(engagement_per_1k(last), 2) if obs else None
+        v["engagement_lift"] = (
+            engagement_lift(
+                niche_rows[niche],
+                last.get("views") or 0,
+                last.get("shares") or 0,
+                last.get("saves") or 0,
+            )
+            if obs
+            else None
+        )
         if curve and obs and latest:
             age_obs = (obs[-1]["observed_at"] - v["create_time"]) / 3600
             exp = expected_log(curve, age_obs, followers) + v["account_offset"]
@@ -342,7 +366,8 @@ def _account_offsets(store: Store, curve: dict, now: int) -> dict[str, float]:
 
 def own_post_rewards(store: Store) -> list[dict]:
     """One row per post of ours the picker may learn from: video_id, concept_id and the reward
-    (age-matched lift, discounted by age so a 6h-old post counts about 30% of a 72h one). Posts
+    (age-matched view lift plus ENGAGEMENT_WEIGHT times the shares+saves lift, discounted by age
+    so a 6h-old post counts about 30% of a 72h one). Posts
     under MIN_AGE_H_FOR_OWN are skipped as noise. Without a reference curve (nothing scraped yet)
     the lift over the account's usual views stands in."""
     out = []
@@ -351,7 +376,8 @@ def own_post_rewards(store: Store) -> list[dict]:
             continue
         weight = min(1.0, (p["age_h"] / 72) ** 0.5)
         if p["lift_matched"] is not None:
-            r = p["lift_matched"] * weight
+            eng = p.get("engagement_lift") or 0.0
+            r = (p["lift_matched"] + ENGAGEMENT_WEIGHT * eng) * weight
         elif p["lift_72h"] is not None:
             r = p["lift_72h"]
         elif p["lift_now"] is not None:

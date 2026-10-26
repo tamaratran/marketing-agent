@@ -17,6 +17,7 @@ from collections import defaultdict
 from .store import Store
 
 MIN_FOR_OWN_BASELINE = 3
+ENGAGEMENT_WEIGHT = 0.5  # shares+saves per 1k views count half as much as views themselves
 WINSOR_PCT = 0.95
 SHADOWBAN_MIN_POSTS = 3
 SHADOWBAN_VIEW_CEILING = 1000
@@ -104,8 +105,27 @@ def reference_curve(rows: list[dict], now: int | None = None) -> dict | None:
     return fit_curve([(a, min(v, 10**cap - 1), f) for a, v, f in curve_points(rows, now)])
 
 
+def engagement_per_1k(r: dict) -> float:
+    """Shares + saves per 1k views: the closest public TikTok gets to 'people kept this'."""
+    views = r.get("views") or 0
+    return ((r.get("shares") or 0) + (r.get("saves") or 0)) / views * 1000 if views else 0.0
+
+
+def engagement_lift(rows: list[dict], views: int, shares: int, saves: int) -> float | None:
+    """log10(shares+saves per 1k + 1) of one video against the median of `rows` (the niche)."""
+    if not views:
+        return None
+    logs = [math.log10(engagement_per_1k(r) + 1) for r in rows if (r.get("views") or 0) > 0]
+    if not logs:
+        return None
+    mine = math.log10(engagement_per_1k({"views": views, "shares": shares, "saves": saves}) + 1)
+    return round(mine - statistics.median(logs), 3)
+
+
 def rewards(rows: list[dict], now: int | None = None) -> list[dict]:
-    """Attach `log_views`, `expected`, `baseline`, `reward` and `engagement_per_1k` to each row.
+    """Attach `log_views`, `expected`, `baseline`, `reward`, `engagement_per_1k`,
+    `engagement_lift` (vs the niche median, log10) and `reward_total` (reward plus
+    ENGAGEMENT_WEIGHT times the engagement lift) to each row.
     Rows need views/author/create_time (followers and observed_at help); videos younger than
     MIN_AGE_H_FOR_JUDGEMENT get reward=None. The baseline is the age- and size-matched
     expectation plus the creator's own track record when MIN_FOR_OWN_BASELINE of their videos
@@ -128,6 +148,8 @@ def rewards(rows: list[dict], now: int | None = None) -> list[dict]:
     by_author: dict[str, list[dict]] = defaultdict(list)
     for r in rows:
         by_author[r.get("author") or ""].append(r)
+    eng_logs = [math.log10(engagement_per_1k(r) + 1) for r in rows if (r.get("views") or 0) > 0]
+    eng_median = statistics.median(eng_logs) if eng_logs else 0.0
     out = []
     for r in rows:
         others = [o["residual"] for o in by_author[r.get("author") or ""] if o is not r]
@@ -138,10 +160,14 @@ def rewards(rows: list[dict], now: int | None = None) -> list[dict]:
         r["creator_offset"] = round(offset, 3)
         r["baseline"] = round(base, 3)
         r["reward"] = round(r["log_views"] - base, 3) if age_h >= MIN_AGE_H_FOR_JUDGEMENT else None
-        r["engagement_per_1k"] = (
-            round(((r.get("shares") or 0) + (r.get("saves") or 0)) / views * 1000, 2)
-            if views
-            else 0
+        r["engagement_per_1k"] = round(engagement_per_1k(r), 2)
+        r["engagement_lift"] = (
+            round(math.log10(r["engagement_per_1k"] + 1) - eng_median, 3) if views else None
+        )
+        r["reward_total"] = (
+            round(r["reward"] + ENGAGEMENT_WEIGHT * r["engagement_lift"], 3)
+            if r["reward"] is not None and r["engagement_lift"] is not None
+            else r["reward"]
         )
         out.append(r)
     for r in out:

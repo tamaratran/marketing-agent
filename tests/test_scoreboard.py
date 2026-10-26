@@ -173,3 +173,76 @@ def test_posts_under_six_hours_do_not_move_the_picker(tmp_path):
     snapshot_creator(store, "ours")
     assert own_posts(store)[0]["lift_now"] > 1
     assert own_rewards(store) == {}
+
+
+def test_shares_and_saves_count_half_against_the_niche_median():
+    from marketing_agent.scoreboard import ENGAGEMENT_WEIGHT, engagement_lift
+
+    now = int(time.time())
+    rows = []
+    for i, (age, views, followers) in enumerate(_points(80)):
+        r = _video(i, f"c{i}", age, int(views), followers)
+        r["observed_at"] = now
+        r["shares"], r["saves"] = int(views) // 200, int(views) // 200  # 10 per 1k everywhere
+        rows.append(r)
+    kept = _video(900, "kept", 48, 10_000, 5000)
+    kept["observed_at"], kept["shares"], kept["saves"] = now, 500, 500  # 100 per 1k
+    rows.append(kept)
+    scored = {r["id"]: r for r in rewards(rows, now)}
+    big = str(max(range(80), key=lambda i: rows[i]["views"]))  # enough views for whole shares
+    assert abs(scored[big]["engagement_per_1k"] - 10.0) < 0.5
+    assert abs(scored[big]["engagement_lift"]) < 0.05
+    assert abs(scored[big]["reward_total"] - scored[big]["reward"]) < 0.03
+    k = scored["900"]
+    assert k["engagement_per_1k"] == 100.0 and abs(k["engagement_lift"] - 0.96) < 0.05
+    assert abs(k["reward_total"] - (k["reward"] + ENGAGEMENT_WEIGHT * k["engagement_lift"])) < 0.002
+    assert abs(engagement_lift(rows, 10_000, 500, 500) - k["engagement_lift"]) < 0.02
+    assert engagement_lift(rows, 0, 0, 0) is None
+
+
+def test_own_post_reward_includes_engagement(tmp_path):
+    from marketing_agent.own import own_post_rewards
+    from marketing_agent.scoreboard import ENGAGEMENT_WEIGHT
+
+    store = Store(tmp_path / "t.sqlite")
+    now = int(time.time())
+    for i, (age, views, followers) in enumerate(_points(80)):
+        v = _video(i, f"c{i}", age, int(views), followers)
+        v["shares"], v["saves"] = int(views) // 200, int(views) // 200
+        store.upsert_video(v)
+    curve = fit_curve(_points(80))
+    cid = store.insert(
+        "concepts",
+        {
+            "niche": "wearables",
+            "name": "Demo",
+            "description": "",
+            "early_score": 10,
+            "created_at": now,
+            "payload": "{}",
+        },
+    )
+    sid = store.insert(
+        "scripts",
+        {
+            "concept_id": cid,
+            "product": "ring",
+            "created_at": now,
+            "hook": "h",
+            "body": "",
+            "demo_score": 5,
+            "payload": "{}",
+        },
+    )
+    views = int(10 ** expected_log(curve, 72, 500))  # exactly usual views...
+    post = _video(999, "ours", 72, views, 500)
+    post["shares"], post["saves"] = views // 20, views // 20  # ...but 100 per 1k shares+saves
+    store.upsert_video(post)
+    with store.conn() as c:
+        c.execute("UPDATE videos SET ours=1, script_id=?, cohort_at=? WHERE id='999'", (sid, now))
+    p = own_posts(store)[0]
+    assert (
+        abs(p["lift_matched"]) < 0.05 and p["engagement_per_1k"] > 99 and p["engagement_lift"] > 0.9
+    )
+    (r,) = own_post_rewards(store)
+    assert abs(r["reward"] - (p["lift_matched"] + ENGAGEMENT_WEIGHT * p["engagement_lift"])) < 0.01

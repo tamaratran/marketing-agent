@@ -110,6 +110,7 @@ def logic(niche: str = DEFAULT_NICHE):
         "min_age_h": scoreboard.MIN_AGE_H_FOR_JUDGEMENT,
         "min_age_h_own": scoreboard.MIN_AGE_H_FOR_OWN,
         "winsor_pct": scoreboard.WINSOR_PCT,
+        "engagement_weight": scoreboard.ENGAGEMENT_WEIGHT,
         "curve": sb["curve"],
     }
 
