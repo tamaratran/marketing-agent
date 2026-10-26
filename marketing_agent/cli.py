@@ -667,18 +667,38 @@ def daily(ctx, niche, tags, product, top, renders, resolution, report, dashboard
     elif not os.environ.get("FAL_KEY"):
         rep.skip("render", "FAL_KEY not set")
     else:
-        stage(
-            "render",
-            lambda: ctx.invoke(
-                render,
-                script_ids=tuple(todays[:renders]),
-                provider=None,
-                duration=12,
-                resolution=resolution,
-                sound=None,
-                ref=(),
-            ),
-        )
+
+        def render_best():
+            """Render the N best scripts; a script fal's moderation rejects is skipped (not
+            billed) and the next-ranked one takes its place, so the day still yields N clips."""
+            made, rejected = [], []
+            for sid in todays:
+                if len(made) >= renders:
+                    break
+                try:
+                    ctx.invoke(
+                        render,
+                        script_ids=(sid,),
+                        provider=None,
+                        duration=12,
+                        resolution=resolution,
+                        sound=None,
+                        ref=(),
+                    )
+                    made.append(sid)
+                except Exception as e:  # noqa: BLE001 - only moderation is skippable
+                    if "content_policy_violation" not in str(e):
+                        raise
+                    rejected.append(sid)
+                    console.print(f"[yellow]s{sid} rejected by fal moderation, trying next")
+            note = f"rendered {', '.join(f's{i}' for i in made) or 'nothing'}"
+            if rejected:
+                note += f"; moderation rejected {', '.join(f's{i}' for i in rejected)}"
+            if len(made) < renders:
+                raise RuntimeError(f"{note}; wanted {renders}")
+            return note
+
+        stage("render", render_best)
 
     def poll_posts():
         urls = [r["url"] for r in store.rows("SELECT url FROM posts")]
