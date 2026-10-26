@@ -369,6 +369,67 @@ def frames(out):
     console.print(f"frames: {poster_frames(_store(), out)} new in {out}")
 
 
+@cli.command("render-latest")
+@click.option("--renders", default=None, type=int, help="Clips to make; default campaign.toml")
+@click.option("--resolution", default=None, help="480p, 720p or 1080p; default campaign.toml")
+@click.option("--ref", "refs", multiple=True, help="Reference images; default campaign.toml")
+@click.pass_context
+def render_latest(ctx, renders, resolution, refs):
+    """Render the best not-yet-rendered scripts of the latest batch (the scripts the last cycle
+    wrote, by demo score). The site's Generate clips button runs this in a Devin session. A fal
+    moderation rejection skips to the next script; a locked account stops with 'needs a top-up'."""
+    from .video.generate import fal_locked
+
+    c = _campaign()
+    renders = renders if renders is not None else c.cycle.clips
+    resolution = resolution or c.cycle.resolution
+    refs = tuple(refs) or tuple(c.product.references)
+    store = _store()
+    latest = store.rows(
+        "SELECT MAX(created_at) AS t FROM scripts WHERE product=?", (c.product.description,)
+    )
+    if not latest or latest[0]["t"] is None:
+        raise click.ClickException("no scripts yet; run a cycle first")
+    day_start = latest[0]["t"] - 6 * 3600
+    todo = [
+        r["id"]
+        for r in store.rows(
+            "SELECT s.id FROM scripts s LEFT JOIN renders r ON r.script_id=s.id "
+            "WHERE s.product=? AND s.created_at>=? AND r.id IS NULL "
+            "ORDER BY s.demo_score DESC, s.id",
+            (c.product.description, day_start),
+        )
+    ]
+    if not todo:
+        raise click.ClickException("every script in the latest batch is already rendered")
+    if (lock := fal_locked()) is not None:
+        raise click.ClickException(f"needs a top-up at fal.ai/dashboard/billing: {lock}")
+    made = []
+    for sid in todo:
+        if len(made) >= renders:
+            break
+        try:
+            ctx.invoke(
+                render,
+                script_ids=(sid,),
+                provider=None,
+                duration=12,
+                resolution=resolution,
+                sound=None,
+                ref=refs,
+            )
+            made.append(sid)
+        except Exception as e:  # noqa: BLE001 - only moderation is skippable
+            if "Exhausted balance" in str(e) or "User is locked" in str(e):
+                raise click.ClickException(
+                    f"rendered {', '.join(f's{i}' for i in made) or 'nothing'}; fal balance ran "
+                    f"out, needs a top-up at fal.ai/dashboard/billing (wanted {renders})"
+                ) from e
+            if "content_policy_violation" not in str(e):
+                raise
+    console.print(f"rendered {len(made)} of {renders}: {' '.join(f's{i}' for i in made)}")
+
+
 @cli.command()
 @click.argument("name")
 @click.argument("status", type=click.Choice(["ok", "failed", "skipped"]))

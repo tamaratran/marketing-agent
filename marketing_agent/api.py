@@ -251,6 +251,7 @@ class RunIn(BaseModel):
     renders: int = CAMPAIGN.cycle.clips
     resolution: str = CAMPAIGN.cycle.resolution
     max_acu: int = CAMPAIGN.cycle.max_acu
+    mode: str = "full"  # full | research (no renders, no fal spend) | render (latest batch only)
 
 
 @app.post("/runs", dependencies=[Depends(_auth)])
@@ -270,8 +271,9 @@ def runs_start(body: RunIn | None = None):
             body.resolution,
             refs=body.refs,
             product_tags=body.product_tags,
+            mode=body.mode,
         ),
-        title=f"mkt cycle {body.niche} {time.strftime('%Y-%m-%d')}",
+        title=f"mkt {body.mode if body.mode != 'full' else 'cycle'} {body.niche} {time.strftime('%Y-%m-%d')}",
         tags=["marketing-agent", body.niche, "api"],
         repos=[DEFAULT_REPO],
         max_acu_limit=body.max_acu,
@@ -284,7 +286,10 @@ def runs_start(body: RunIn | None = None):
             "url": s["url"],
             "niche": body.niche,
             "product": body.product,
-            "note": f"{body.renders} clips at {body.resolution}",
+            "note": {
+                "research": "research only, no clips",
+                "render": f"clips only: {body.renders} at {body.resolution}",
+            }.get(body.mode, f"{body.renders} clips at {body.resolution}"),
         },
     )
     return {"ok": True, "id": rid, "session_id": s["session_id"], "url": s["url"]}
