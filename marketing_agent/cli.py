@@ -355,7 +355,7 @@ def stage(name, status, note):
     the Runs page shows the rerun's result instead of the first attempt's error."""
     from .orchestrator import record_stage
 
-    rid = record_stage(_store(), campaign_cfg.load().niche.name, name, status, note)
+    rid = record_stage(_store(), _campaign().niche.name, name, status, note)
     console.print(f"run {rid}: {name} {status}" if rid else "no recorded run to update")
 
 
