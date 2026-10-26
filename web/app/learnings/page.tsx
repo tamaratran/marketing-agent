@@ -3,7 +3,7 @@ import { API, get, type Campaign, type CycleFacts, type Learning, type Overview,
 import { startRenders, startResearch } from "../actions";
 import { TraitBars, Trend, type RankRow } from "../charts";
 import { Markdown } from "../md";
-import { Card, H1, Note, Pill, button, formatName, ghost, times } from "../ui";
+import { Card, Fold, H1, NextStep, Note, Pill, button, formatName, ghost, times } from "../ui";
 
 export const dynamic = "force-dynamic";
 
@@ -106,21 +106,23 @@ export default async function Page() {
         The same text as one file: <a href={`${API}/learnings.md`} className="text-sky-300 hover:underline" target="_blank">learnings.md</a>
       </Note>
       {rows.length === 0 && <Card><Note>Nothing yet. The first cycle writes the first entry.</Note></Card>}
-      <div className="space-y-4">
-        {rows.map((e) => (
-          <Card key={e.id}>
-            <div className="mb-2 flex flex-wrap items-center gap-2">
+      <div className="space-y-2">
+        {rows.map((e, i) => (
+          <Fold key={e.id} open={i === 0} summary={
+            <span className="flex flex-wrap items-center gap-2">
               <span className="font-semibold text-neutral-100">{e.title}</span>
               <Pill tone={e.kind === "cycle" ? "neutral" : "good"}>{e.kind === "cycle" ? "measured" : "observation"}</Pill>
               <span className="text-xs text-neutral-500">{when(e.created_at)} · {e.niche}</span>
               {e.kind === "cycle" && e.facts?.n_scored != null && (
                 <span className="text-xs text-neutral-500">· {e.facts.n_scored} scored · {e.facts.n_tagged ?? 0} classified · {e.facts.own_posts ?? 0} of ours{e.facts.own_mean_lift != null && <>, mean {times(e.facts.own_mean_lift)}</>}</span>
               )}
-            </div>
+            </span>
+          }>
             <Markdown text={formatName(e.body)} />
-          </Card>
+          </Fold>
         ))}
       </div>
+      <NextStep from="/learnings" />
     </>
   );
 }

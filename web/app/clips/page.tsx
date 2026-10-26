@@ -2,7 +2,7 @@ import Link from "next/link";
 import { CLIPS, dateOf, get, usd, type Render, type Script, frameUrl } from "@/lib/api";
 import type { Ours } from "@/lib/ours";
 import { Download } from "../download";
-import { Card, H1, Note, Pill, formatName } from "../ui";
+import { Card, H1, NextStep, Note, Pill, formatName } from "../ui";
 import { holdClip, postClip, releaseClip } from "../actions";
 import { PostButton } from "../post-button";
 
@@ -57,6 +57,7 @@ export default async function Page() {
         })}
         {!rows.length && <p className="text-sm text-neutral-500">No clips yet. The daily run renders the best scripts.</p>}
       </div>
+      <NextStep from="/clips" />
     </>
   );
 }
