@@ -5,6 +5,7 @@ import json
 import os
 import time
 from pathlib import Path
+from urllib.parse import quote_plus
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -163,7 +164,7 @@ def scripts(
                 "spoken": payload.get("spoken", ""),
                 "hook_on_screen": payload.get("hook_on_screen", True),
                 "sound": payload.get("sound", ""),
-                "sound_url": f"https://www.tiktok.com/music/x-{sound_id}" if sound_id else "",
+                "sound_url": _sound_url(payload.get("sound", ""), sound_id),
             }
         )
     return out
@@ -220,6 +221,14 @@ CLIPS_URL = os.environ.get("MKT_CLIPS_URL", "https://mkt-dashboard-eta.vercel.ap
 API_PUBLIC_URL = os.environ.get("MKT_API_URL", "https://mkt-api.fly.dev")
 
 
+def _sound_url(name: str, sound_id: str) -> str:
+    """The sound's TikTok page when the research kept its id, else a TikTok search for its title
+    (older scripts carry only the name), so the poster can always click through to find it."""
+    if sound_id:
+        return f"https://www.tiktok.com/music/x-{sound_id}"
+    return f"https://www.tiktok.com/search?q={quote_plus(name)}" if name else ""
+
+
 def _post_text(hook: str, payload: dict) -> list[str]:
     hook = strip_label(hook or "") if payload.get("hook_on_screen", True) else ""
     caps = [ln.strip() for ln in payload.get("captions") or [] if ln.strip()]
@@ -265,9 +274,7 @@ def post_render(script_id: int):
             text,
             caption,
             payload.get("sound") or "",
-            f"https://www.tiktok.com/music/x-{payload['sound_id']}"
-            if payload.get("sound_id")
-            else "",
+            _sound_url(payload.get("sound") or "", payload.get("sound_id") or ""),
             CAMPAIGN.account.handle,
             API_PUBLIC_URL,
         ),

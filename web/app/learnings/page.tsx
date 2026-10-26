@@ -76,6 +76,7 @@ export default async function Page() {
             <Trend points={ownPts} label="Our posts, mean lift" fmt={(v) => `${times(v)} videos like them`} />
             <Trend points={clonePts} label="Clone format's pick share" fmt={(v) => `${Math.round(v * 100)}%`} />
           </div>
+          {scoredPts.length + taggedPts.length + clonePts.length === 0 && <Note className="mt-2">No cycle has recorded these counts yet; entries written before the counts existed have nothing to plot. The next cycle adds the first point.</Note>}
           {ownPts.length === 0 && <Note className="mt-2">Our posts have no measured lift yet (a post counts once it is 6 hours old).</Note>}
         </Card>
       )}

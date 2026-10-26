@@ -16,6 +16,7 @@ export default async function Page() {
       <div className="grid gap-3 md:grid-cols-2">
         {rows.map((s) => (
           <Card key={s.id}>
+            <div id={`s${s.id}`} className="scroll-mt-4" />
             <div className="mb-1 flex flex-wrap items-center gap-2 text-xs text-neutral-500">
               <span>#{s.id}</span><span>{dateOf(s.created_at)}</span><Pill>{formatName(s.concept)}</Pill>
               <Pill tone={s.demo_score >= 4 ? "good" : "warn"}>demo {s.demo_score}/5</Pill>
