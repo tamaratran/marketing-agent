@@ -12,8 +12,10 @@ export const dynamic = "force-dynamic";
 
 const views = (n: number | null | undefined) => (n == null ? "" : n.toLocaleString("en-US"));
 const POST_RETRY_AFTER_S = 3600;
+const MAX_POST_ATTEMPTS = 4;
 const hoursSince = (t: number | null) => Math.round((Date.now() / 1000 - (t ?? 0)) / 3600);
 const stale = (r: Render) => !!r.post_session_url && hoursSince(r.post_requested_at) >= POST_RETRY_AFTER_S / 3600;
+const gaveUp = (r: Render) => stale(r) && (r.post_attempts ?? 0) >= MAX_POST_ATTEMPTS;
 
 export default async function Page() {
   const [all, scripts, ours, overview] = await Promise.all([
@@ -51,9 +53,10 @@ export default async function Page() {
                   <div className="min-w-0 text-sm">
                     {p && <PostStats p={p} />}
                     {p && <WhyFold why={explain(p, details.get(p.id) ?? null, overview)} />}
-                    {!p && !r.hold_reason && clean && (!r.post_session_url || stale(r)) && <PostButton action={postClip} scriptId={r.script_id} account={account} />}
-                    {!p && r.post_session_url && !stale(r) && <p className="text-xs text-neutral-400">Devin is posting this from @{account}: <a href={r.post_session_url} target="_blank" className="text-sky-300 hover:underline">watch</a></p>}
-                    {!p && r.post_session_url && stale(r) && <p className="text-xs text-neutral-400">Handed over {hoursSince(r.post_requested_at)}h ago, no post registered: <a href={r.post_session_url} target="_blank" className="text-sky-300 hover:underline">see why</a></p>}
+                    {!p && !r.hold_reason && clean && (!r.post_session_url || gaveUp(r)) && <PostButton action={postClip} scriptId={r.script_id} account={account} />}
+                    {!p && r.post_session_url && !stale(r) && <p className="text-xs text-neutral-400">Devin is posting this from @{account}{r.post_attempts > 1 ? `, try ${r.post_attempts} of ${MAX_POST_ATTEMPTS}` : ""}: <a href={r.post_session_url} target="_blank" className="text-sky-300 hover:underline">watch</a></p>}
+                    {!p && r.post_session_url && stale(r) && !gaveUp(r) && <p className="text-xs text-neutral-400">No post after try {r.post_attempts} of {MAX_POST_ATTEMPTS} (TikTok login, most likely); handed back within 30 min: <a href={r.post_session_url} target="_blank" className="text-sky-300 hover:underline">see why</a></p>}
+                    {!p && gaveUp(r) && <p className="text-xs text-neutral-400">Gave up after {MAX_POST_ATTEMPTS} tries over {hoursSince(r.post_requested_at)}h: <a href={r.post_session_url ?? "#"} target="_blank" className="text-sky-300 hover:underline">see why</a></p>}
                     {r.hold_reason && <p className="text-xs text-red-200">{r.hold_reason}</p>}
                     {!p && r.hold_reason && (
                       <form action={releaseClip} className="mt-2"><input type="hidden" name="script_id" value={r.script_id} /><button className="text-xs text-neutral-400 hover:text-neutral-100">Release</button></form>
@@ -109,7 +112,7 @@ function Summary({ r, p }: { r: Render; p?: OursPost }) {
     <span className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1 text-sm">
       <span className="text-xs text-neutral-500">s{r.script_id}</span>
       <span className="font-medium text-neutral-100">{r.hook}</span>
-      {p ? <Pill tone="good">posted</Pill> : r.hold_reason ? <Pill tone="bad">on hold</Pill> : r.post_session_url && !stale(r) ? <Pill tone="neutral">posting</Pill> : r.post_path ? <Pill tone="neutral">ready</Pill> : null}
+      {p ? <Pill tone="good">posted</Pill> : r.hold_reason ? <Pill tone="bad">on hold</Pill> : r.post_session_url && !stale(r) ? <Pill tone="neutral">posting</Pill> : r.post_session_url && !gaveUp(r) ? <Pill tone="neutral">waiting</Pill> : r.post_path ? <Pill tone="neutral">ready</Pill> : null}
       {p && (
         <>
           <span className="tabular-nums text-neutral-100">{views(p.views_now)} <span className="text-xs text-neutral-500">views</span></span>
