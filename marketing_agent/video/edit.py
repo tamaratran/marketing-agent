@@ -10,6 +10,17 @@ from dataclasses import dataclass
 from pathlib import Path
 
 FONT = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+# DejaVu has no emoji, so drawtext paints them as empty boxes; script hooks copy TikTok hooks and
+# often end in one or two ("After 402 calories 😵💦").
+EMOJI_RE = re.compile(
+    "[\U0001f000-\U0001faff\U00002600-\U000027bf\U0001f900-\U0001f9ff\u2b00-\u2bff"
+    "\ufe0f\u200d\U0001f3fb-\U0001f3ff]+"
+)
+
+
+def drawable(text: str) -> str:
+    """Caption text the font can actually render: emoji and their modifiers removed."""
+    return re.sub(r"  +", " ", EMOJI_RE.sub("", text)).strip()
 
 
 @dataclass
@@ -27,7 +38,7 @@ def drawtext_filters(
     parts = []
     for i, c in enumerate(captions):
         tf = workdir / f"cap{i}.txt"
-        tf.write_text("\n".join(textwrap.wrap(c.text, wrap)) or " ")
+        tf.write_text("\n".join(textwrap.wrap(drawable(c.text), wrap)) or " ")
         parts.append(
             f"drawtext=fontfile={FONT}:textfile={tf}:fontsize={fontsize}:fontcolor=white:"
             f"borderw=4:bordercolor=black:line_spacing=10:x=(w-text_w)/2:y=h*0.68:"
