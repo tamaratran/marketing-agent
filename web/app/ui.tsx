@@ -68,9 +68,9 @@ export const times = (r: number) => {
   return x >= 10 ? `${Math.round(x)}x` : x >= 1 ? `${x.toFixed(1)}x` : `${x.toFixed(2)}x`;
 };
 
-export const reward = (r: number | null | undefined, empty = "not scored yet") =>
+export const reward = (r: number | null | undefined, empty = "not scored yet", suffix = "usual") =>
   r == null ? <span className="text-neutral-600" title="Videos are scored once they are a day old and the creator has a baseline">{empty}</span> : (
-    <span className={r > 0 ? "text-emerald-300" : "text-red-300"} title={`log10 lift ${r > 0 ? "+" : ""}${r.toFixed(2)}`}>{times(r)} usual</span>
+    <span className={r > 0 ? "text-emerald-300" : "text-red-300"} title={`log10 lift ${r > 0 ? "+" : ""}${r.toFixed(2)}`}>{times(r)} {suffix}</span>
   );
 
 /** Concept names without the research agent's "Clone:" prefix. */
