@@ -111,9 +111,13 @@ def reference_traits(store: Store, tag: str | None = None, top: int = 3) -> str:
 
 
 def winning_traits(store: Store, tag: str | None = None, top: int = 3) -> str:
-    """Short text for the script prompt: our own posts first, then the reference videos, each
-    labelled so the writer knows which is which. Empty when nothing is scored."""
-    return "\n\n".join(t for t in (our_traits(store, top), reference_traits(store, tag, top)) if t)
+    """Short text for the script prompt: our own posts first, then the reference videos, then
+    where the two disagree, each labelled so the writer knows which is which. Empty when nothing
+    is scored."""
+    from .compare import compare_text
+
+    parts = (our_traits(store, top), reference_traits(store, tag, top), compare_text(store, tag))
+    return "\n\n".join(t for t in parts if t)
 
 
 def concept_scores(store: Store, niche: str, tag: str | None = None) -> list[dict]:
