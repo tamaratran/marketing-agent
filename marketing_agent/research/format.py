@@ -32,9 +32,9 @@ FORMAT_KIND = "format"
 
 def _mentions(row: dict, needles: list[str]) -> bool:
     """Does the caption (text or hashtags) name the product? The scrape's source_tag is not
-    enough: a #subwaysurfers search returns plain gameplay, a #immersiveworkout search returns
-    anything the ranking felt like. A needle written `a+b` requires every part (so
-    `subwaysurfers+cardio` is the cardio format, not the game)."""
+    enough: a hashtag search returns whatever the ranking felt like, including videos that only
+    borrow the tag. A needle written `a+b` requires every part (so `game+cardio` matches the
+    workout format, not plain gameplay)."""
     try:
         hashtags = json.loads(row.get("hashtags") or "[]")
     except (TypeError, ValueError):
@@ -145,7 +145,7 @@ speech the hook is on-screen text or the picture, never spoken. Frames are every
 
 
 # Mean absolute pixel change between consecutive frames at 10 fps on a 96x160 grey frame. Measured
-# on the Immersive Workout sources: real-time footage (talking head, person on a walking pad,
+# on the product's source videos: real-time footage (talking head, person on a walking pad,
 # our Seedance clips) scores 4-7; the same kind of footage played back sped up scores 10-14.
 MOTION_REALTIME = 7.0
 MOTION_SPED_UP = 9.5

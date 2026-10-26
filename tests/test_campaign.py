@@ -15,7 +15,7 @@ def test_repo_campaign_file_is_complete():
 
 def test_missing_file_falls_back_to_defaults(tmp_path):
     c = campaign.load(tmp_path / "none.toml")
-    assert c.path == "" and c.niche.name == "wearables" and c.account.handle == ""
+    assert c.path == "" and c.niche.name == "" and c.account.handle == ""
 
 
 def test_env_overrides_single_fields(tmp_path, monkeypatch):
