@@ -363,6 +363,7 @@ def runs_start(body: RunIn | None = None):
             refs=body.refs,
             product_tags=body.product_tags,
             mode=body.mode,
+            api_url=API_PUBLIC_URL,
         ),
         title=f"mkt {body.mode if body.mode != 'full' else 'cycle'} {body.niche} {time.strftime('%Y-%m-%d')}",
         tags=["marketing-agent", body.niche, "api"],
