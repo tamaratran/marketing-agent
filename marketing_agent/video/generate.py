@@ -24,13 +24,26 @@ CASTING = (
 )
 
 
+REF_SCREEN = (
+    " Every TV, monitor or phone screen in the shot shows the app from the reference images"
+    " ({refs}) and keeps showing that same game for the entire clip, start to finish; it never"
+    " switches to a different game, menu, runner, tunnel or program."
+)
+
+
 def video_prompt(req: "GenRequest") -> str:
     """The model prompt: the script's beats, the standing rules from clip review (what must or
     must not happen on screen), a casting note (attractive but natural; polished AI-looking
-    people underperform) and a standing ban on generated text, because the editor burns the real
-    captions in and generated text comes out as gibberish."""
+    people underperform), a standing ban on generated text, because the editor burns the real
+    captions in and generated text comes out as gibberish, and, when reference images are given,
+    an order to keep the screen on that app the whole clip (s114 and s125 drifted to a generic
+    runner game after the first seconds)."""
     rules = "".join(f" {r.rstrip('.')}." for r in req.rules if r.strip())
-    return req.prompt.rstrip() + rules + CASTING + NO_TEXT
+    screen = ""
+    if req.reference_images:
+        refs = ", ".join(f"@Image{i}" for i in range(1, len(req.reference_images) + 1))
+        screen = REF_SCREEN.format(refs=refs)
+    return req.prompt.rstrip() + rules + screen + CASTING + NO_TEXT
 
 
 @dataclass
