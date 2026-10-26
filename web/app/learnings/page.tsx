@@ -3,7 +3,7 @@ import { API, get, type Campaign, type CycleFacts, type Findings, type Learning,
 import { startRenders, startResearch } from "../actions";
 import { Trend, traitValue, type RankRow } from "../charts";
 import { Markdown } from "../md";
-import { Card, Fold, H1, NextStep, Note, Pill, button, formatName, ghost, times } from "../ui";
+import { Card, Fold, H1, NextStep, Note, button, formatName, ghost, times } from "../ui";
 
 export const dynamic = "force-dynamic";
 
@@ -35,6 +35,7 @@ export default async function Page() {
   const now = nowSec();
   const running = runs.find((r) => !r.finished_at && now - r.created_at < 3 * 3600);
   const cycles = rows.filter((e) => e.kind === "cycle" && e.facts).sort((a, b) => a.created_at - b.created_at);
+  const notes = rows.filter((e) => e.kind !== "cycle"), cycleRows = rows.filter((e) => e.kind === "cycle");
   const latest = cycles[cycles.length - 1]?.facts;
   const prev = cycles[cycles.length - 2]?.facts;
   const scoredPts = cycles.filter((c) => c.facts.n_scored != null).map((c) => ({ t: c.created_at, v: c.facts.n_scored as number }));
@@ -57,7 +58,7 @@ export default async function Page() {
 
       <Card title="What the data says">
         <Note>
-          {latest ? <>From the cycle of {when(cycles[cycles.length - 1].created_at)}: {latest.n_scored ?? 0} research videos scored against videos of the same age and account size, {latest.n_tagged ?? 0} of them classified by trait. </> : null}
+          {latest ? <>As of {when(cycles[cycles.length - 1].created_at)}: {latest.n_scored ?? 0} research videos scored against videos of the same age and account size, {latest.n_tagged ?? 0} of them classified by trait. Every run adds to these numbers; they are never reset. </> : null}
           What wins now is on <Link href="/" className="text-sky-300 hover:underline">Formats</Link>.
         </Note>
         {!latest ? (
@@ -65,32 +66,20 @@ export default async function Page() {
         ) : (
           <>
             <TraitTables latest={latest} prev={prev} minN={minN} />
-            {prev && (
-              <>
-                <h3 className="mt-5 text-sm font-medium text-neutral-200">Since the cycle of {when(cycles[cycles.length - 2].created_at)}</h3>
-                <dl className="mt-2 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-5">
-                  <Delta label="Videos scored" was={prev.n_scored} now={latest.n_scored} fmt={(v) => String(Math.round(v))} />
-                  <Delta label="Videos classified" was={prev.n_tagged} now={latest.n_tagged} fmt={(v) => String(Math.round(v))} />
-                  <Delta label="Our posts measured" was={prev.own_posts} now={latest.own_posts} fmt={(v) => String(Math.round(v))} />
-                  <Delta label="Our posts, mean lift" was={prev.own_mean_lift} now={latest.own_mean_lift} fmt={(v) => `${times(v)} videos like them`} />
-                  <Delta label="Clone format's pick share" was={cloneShare(prev)} now={cloneShare(latest)} fmt={(v) => `${Math.round(v * 100)}%`} />
-                </dl>
-              </>
-            )}
           </>
         )}
       </Card>
 
       {cycles.length > 0 && (
-        <Card title="Cycle to cycle" className="mt-4">
-
+        <Card title="Over time" className="mt-4">
+          <Note>One point per run, oldest left.</Note>
           <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <Trend points={scoredPts} label="Research videos scored" fmt={(v) => String(Math.round(v))} />
             <Trend points={taggedPts} label="Videos classified" fmt={(v) => String(Math.round(v))} />
-            <Trend points={ownPts} label="Our posts, mean lift" fmt={(v) => `${times(v)} videos like them`} />
+            <Trend points={ownPts} label="Our posts, views vs videos like them" fmt={(v) => pct(v)} />
             <Trend points={clonePts} label="Clone format's pick share" fmt={(v) => `${Math.round(v * 100)}%`} />
           </div>
-          {scoredPts.length + taggedPts.length + clonePts.length === 0 && <Note className="mt-2">Nothing to plot yet; the next cycle adds the first point.</Note>}
+          {scoredPts.length + taggedPts.length + clonePts.length === 0 && <Note className="mt-2">Nothing to plot yet; the next run adds the first point.</Note>}
           {ownPts.length === 0 && <Note className="mt-2">No post is 6 hours old yet.</Note>}
         </Card>
       )}
@@ -129,25 +118,47 @@ export default async function Page() {
       </Card>
 
       <Note className="my-4">
-        The same text as one file: <a href={`${API}/learnings.md`} className="text-sky-300 hover:underline" target="_blank">learnings.md</a>
+        Everything on this page as one file: <a href={`${API}/learnings.md`} className="text-sky-300 hover:underline" target="_blank">learnings.md</a>
       </Note>
-      {rows.length === 0 && <Card><Note>Nothing yet. The first cycle writes the first entry.</Note></Card>}
-      <div className="space-y-2">
-        {rows.map((e, i) => (
-          <Fold key={e.id} open={i === 0} summary={
-            <span className="flex flex-wrap items-center gap-2">
-              <span className="font-semibold text-neutral-100">{e.title}</span>
-              <Pill tone={e.kind === "cycle" ? "neutral" : "good"}>{e.kind === "cycle" ? "measured" : "observation"}</Pill>
-              <span className="text-xs text-neutral-500">{when(e.created_at)} · {e.niche}</span>
-              {e.kind === "cycle" && e.facts?.n_scored != null && (
-                <span className="text-xs text-neutral-500">· {e.facts.n_scored} scored · {e.facts.n_tagged ?? 0} classified · {e.facts.own_posts ?? 0} of ours{e.facts.own_mean_lift != null && <>, mean {times(e.facts.own_mean_lift)}</>}</span>
-              )}
-            </span>
-          }>
-            <Markdown text={formatName(e.body)} />
-          </Fold>
-        ))}
-      </div>
+      {rows.length === 0 && <Card><Note>Nothing yet. The first run writes the first entry.</Note></Card>}
+      {notes.length > 0 && (
+        <Card title="Observations" className="mt-4">
+          <Note>What a person or session noticed watching the clips and sources, newest first. These are read by the script writer, not by the picker.</Note>
+          <div className="mt-3 space-y-2">
+            {notes.map((e, i) => (
+              <Fold key={e.id} open={i === 0} summary={
+                <span className="flex flex-wrap items-center gap-2">
+                  <span className="font-semibold text-neutral-100">{e.title}</span>
+                  <span className="text-xs text-neutral-500">{when(e.created_at)}</span>
+                </span>
+              }>
+                <Markdown text={formatName(e.body)} />
+              </Fold>
+            ))}
+          </div>
+        </Card>
+      )}
+      {cycleRows.length > 0 && (
+        <Card title={`Run log, ${cycleRows.length} ${cycleRows.length === 1 ? "run" : "runs"}`} className="mt-4">
+          <Note>What each run measured, one line each; the tables above already hold the latest totals. Open a line for the full write-up.</Note>
+          <div className="mt-3 space-y-2">
+            {cycleRows.map((e) => (
+              <Fold key={e.id} summary={
+                <span className="flex flex-wrap items-center gap-2 text-sm">
+                  <span className="text-neutral-200">{when(e.created_at)}</span>
+                  {e.facts?.n_scored != null ? (
+                    <span className="text-xs text-neutral-500">{e.facts.n_scored} scored · {e.facts.n_tagged ?? 0} classified · {e.facts.own_posts ?? 0} of ours{e.facts.own_mean_lift != null && <>, {pct(e.facts.own_mean_lift)} views vs videos like them</>}</span>
+                  ) : (
+                    <span className="text-xs text-neutral-500">no counts recorded</span>
+                  )}
+                </span>
+              }>
+                <Markdown text={formatName(e.body)} />
+              </Fold>
+            ))}
+          </div>
+        </Card>
+      )}
       <NextStep from="/learnings" />
     </>
   );
@@ -181,23 +192,6 @@ function Why({ s }: { s: Script }) {
         <p className="text-neutral-500">Written before the picker stored its reasons; the next batch carries them.</p>
       )}
       <p className="text-xs text-neutral-500">Demo {s.demo_score}/5 is the writer grading whether the product shows within 5 seconds; it gates a script, it does not predict views. <Link href={`/scripts#s${s.id}`} className="hover:underline">Full script</Link></p>
-    </div>
-  );
-}
-
-const cloneShare = (f: CycleFacts) => f.picks?.find((x) => /clone/i.test(x.name))?.share;
-
-function Delta({ label, was, now, fmt }: { label: string; was?: number | null; now?: number | null; fmt: (v: number) => string }) {
-  const has = (v?: number | null): v is number => v != null;
-  return (
-    <div className="rounded-lg border border-neutral-800 px-3 py-2">
-      <dt className="text-xs text-neutral-500">{label}</dt>
-      <dd className="mt-0.5 text-neutral-100">
-        {has(now) ? fmt(now) : "none yet"}
-        {has(was) && has(now) && was !== now && <span className={`ml-2 text-xs ${now > was ? "text-emerald-300" : "text-red-300"}`}>was {fmt(was)}</span>}
-        {has(was) && has(now) && was === now && <span className="ml-2 text-xs text-neutral-500">unchanged</span>}
-        {!has(was) && has(now) && <span className="ml-2 text-xs text-neutral-500">first measurement</span>}
-      </dd>
     </div>
   );
 }
