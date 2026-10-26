@@ -97,12 +97,11 @@ export function Fold({ summary, children, open = false, className = "" }: { summ
   );
 }
 
-/** The four steps of the loop, in order; the nav and the Next buttons read this. */
+/** The three steps of the loop, in order; the nav and the Next buttons read this. */
 export const STEPS: { href: string; label: string; what: string }[] = [
   { href: "/", label: "Formats", what: "what works in the niche" },
   { href: "/learnings", label: "Learnings", what: "what we learned, what to make next" },
-  { href: "/clips", label: "Clips", what: "what got made, post it" },
-  { href: "/ours", label: "Our posts", what: "how it went, back into step 1" },
+  { href: "/clips", label: "Clips", what: "what got made, how it is doing, back into step 1" },
 ];
 
 /** The button at the foot of each step page pointing at the next one. */

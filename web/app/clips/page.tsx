@@ -1,63 +1,158 @@
 import Link from "next/link";
-import { CLIPS, dateOf, get, usd, type Render, type Script, frameUrl } from "@/lib/api";
-import type { Ours } from "@/lib/ours";
+import { CLIPS, dateOf, get, usd, type Concept, type Render, type Script, frameUrl } from "@/lib/api";
+import type { Ours, OursPost } from "@/lib/ours";
 import { Download } from "../download";
-import { Card, H1, NextStep, Note, Pill, formatName } from "../ui";
-import { holdClip, postClip, releaseClip } from "../actions";
+import { Card, Fold, H1, NextStep, Pill, Stat, Table, reward, formatName } from "../ui";
+import { Thumb } from "../thumb";
+import { addPost, holdClip, postClip, releaseClip } from "../actions";
 import { PostButton } from "../post-button";
 
 export const dynamic = "force-dynamic";
 
+// Mirrors scoreboard.MIN_AGE_H_FOR_OWN: younger posts are not judged.
+const MIN_AGE_H_OWN = 6;
+
+const views = (n: number | null | undefined) => (n == null ? "" : n.toLocaleString("en-US"));
+
 export default async function Page() {
-  const [all, scripts, ours] = await Promise.all([get<Render[]>("/renders"), get<Script[]>("/scripts?days=60&limit=500"), get<Ours>("/ours")]);
+  const [all, scripts, ours, concepts] = await Promise.all([
+    get<Render[]>("/renders"), get<Script[]>("/scripts?days=60&limit=500"), get<Ours>("/ours"), get<Concept[]>("/concepts"),
+  ]);
   const seen = new Set<number>();
   const rows = all.filter((r) => !seen.has(r.script_id) && seen.add(r.script_id));
   const byId = new Map(scripts.map((s) => [s.id, s]));
   const posts = new Map(ours.posts.filter((p) => p.script_id).map((p) => [p.script_id as number, p]));
   const account = ours.accounts[0]?.handle;
+  const conceptName = new Map(concepts.map((c) => [String(c.id), formatName(c.name)]));
+  const posted = rows.filter((r) => posts.has(r.script_id)).length;
+  const held = rows.filter((r) => r.hold_reason && !posts.has(r.script_id)).length;
+  const measured = ours.posts.filter((p) => p.age_h >= MIN_AGE_H_OWN && p.lift_matched != null);
+  const beat = measured.filter((p) => (p.lift_matched ?? 0) > 0).length;
+  const unmatched = ours.posts.filter((p) => !p.script_id);
   return (
     <>
-      <H1 sub={`AI preview clips (Seedance) of the best scripts. The preview has the text burned in; the file to post is the clean one, with the text added in TikTok. Press Post on a clip you approve and Devin posts it${account ? ` from @${account}` : ""}; nothing is posted without that press.`}>Clips</H1>
-      <Note className="mb-4">
-        Post uploads the clean clip through TikTok&apos;s own web uploader, adds the lines under &quot;text to add&quot; with TikTok&apos;s text tool (TikTok reads its own text; text baked into the pixels is just picture to it), picks the listed sound, and registers the post so its views count toward that format. TikTok decides its own AI-generated label. To post by hand instead, download the clean clip and do the same.
-      </Note>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <H1 sub={account ? `Each clip, whether it is on @${account}, and how it is doing.` : "Each clip and how it is doing."}>Clips</H1>
+      <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-4">
+        <Stat label="clips" value={rows.length} />
+        <Stat label="posted" value={posted} />
+        <Stat label="on hold" value={held} />
+        <Stat label="ahead of videos like them" value={measured.length ? `${beat} of ${measured.length}` : "none measured yet"} />
+      </div>
+      <ul className="space-y-2">
         {rows.map((r) => {
-          const s = byId.get(r.script_id), p = posts.get(r.script_id), src = `${CLIPS}/s${r.script_id}.mp4`, clean = r.post_path ? `${CLIPS}/s${r.script_id}_clean.mp4` : null;
+          const s = byId.get(r.script_id), p = posts.get(r.script_id);
+          const src = `${CLIPS}/s${r.script_id}.mp4`, clean = r.post_path ? `${CLIPS}/s${r.script_id}_clean.mp4` : null;
           return (
-            <Card key={r.id}>
-              <div id={`s${r.script_id}`} className="scroll-mt-4" />
-              <video poster={frameUrl(`s${r.script_id}`)} controls preload="metadata" className="aspect-[9/16] w-full rounded bg-black" src={src} />
-              <div className="mt-2 flex items-center gap-2">
-                {p ? <a href={p.url} target="_blank"><Pill tone="good">posted</Pill></a> : r.hold_reason ? <Pill tone="bad">on hold</Pill> : r.post_session_url ? <a href={r.post_session_url} target="_blank"><Pill tone="neutral">posting...</Pill></a> : <Pill tone="warn">ready to post</Pill>}
-                {clean ? <Download src={clean} className="text-xs text-sky-300 hover:underline">download clean clip to post</Download> : <Download src={src} className="text-xs text-sky-300 hover:underline">download</Download>}
-              </div>
-              {!p && !r.hold_reason && clean && !r.post_session_url && <PostButton action={postClip} scriptId={r.script_id} account={account} />}
-              {!p && r.post_session_url && <p className="mt-2 text-xs text-neutral-400">Devin is posting this from @{account}: <a href={r.post_session_url} target="_blank" className="text-sky-300 hover:underline">watch</a>. It shows as posted once the post is found on the profile.</p>}
-              {r.hold_reason && <p className="mt-2 text-xs text-red-200">{r.hold_reason}</p>}
-              {!p && (r.hold_reason ? (
-                <form action={releaseClip} className="mt-2"><input type="hidden" name="script_id" value={r.script_id} /><button className="text-xs text-neutral-400 hover:text-neutral-100">Release</button></form>
-              ) : (
-                <form action={holdClip} className="mt-2 flex gap-1"><input type="hidden" name="script_id" value={r.script_id} /><input name="reason" required placeholder="why hold it" className="min-w-0 flex-1 rounded border border-neutral-800 bg-neutral-900 px-2 py-1 text-xs" /><button className="rounded border border-neutral-700 px-2 py-1 text-xs text-neutral-300 hover:bg-neutral-800">Hold</button></form>
-              ))}
-              {clean && r.post_text.length ? (
-                <div className="mt-2 rounded border border-neutral-800 p-2">
-                  <p className="text-[11px] uppercase tracking-wide text-neutral-500">text to add in TikTok</p>
-                  {r.post_text.map((ln, i) => <p key={i} className="text-sm font-medium">{ln}</p>)}
+            <li key={r.id} id={`s${r.script_id}`} className="scroll-mt-4">
+              <Fold summary={<Summary r={r} p={p} />}>
+                <div className="grid gap-4 sm:grid-cols-[12rem_1fr]">
+                  <video poster={frameUrl(`s${r.script_id}`)} controls preload="metadata" className="aspect-[9/16] w-full rounded bg-black" src={src} />
+                  <div className="min-w-0 text-sm">
+                    {p && <PostStats p={p} />}
+                    {!p && !r.hold_reason && clean && !r.post_session_url && <PostButton action={postClip} scriptId={r.script_id} account={account} />}
+                    {!p && r.post_session_url && <p className="text-xs text-neutral-400">Devin is posting this from @{account}: <a href={r.post_session_url} target="_blank" className="text-sky-300 hover:underline">watch</a></p>}
+                    {r.hold_reason && <p className="text-xs text-red-200">{r.hold_reason}</p>}
+                    {!p && (r.hold_reason ? (
+                      <form action={releaseClip} className="mt-2"><input type="hidden" name="script_id" value={r.script_id} /><button className="text-xs text-neutral-400 hover:text-neutral-100">Release</button></form>
+                    ) : (
+                      <form action={holdClip} className="mt-2 flex gap-1"><input type="hidden" name="script_id" value={r.script_id} /><input name="reason" required placeholder="why hold it" className="min-w-0 flex-1 rounded border border-neutral-700 bg-neutral-900 px-2 py-1 text-xs" /><button className="rounded border border-neutral-700 px-2 py-1 text-xs text-neutral-300 hover:bg-neutral-800">Hold</button></form>
+                    ))}
+                    {clean && r.post_text.length > 0 && (
+                      <div className="mt-3 rounded border border-neutral-800 p-2">
+                        <p className="text-[11px] uppercase tracking-wide text-neutral-500">text to add in TikTok</p>
+                        {r.post_text.map((ln, i) => <p key={i} className="font-medium">{ln}</p>)}
+                      </div>
+                    )}
+                    <p className="mt-3 text-xs text-neutral-400">
+                      {s?.concept && <>format: {formatName(s.concept)} · </>}
+                      sound: {s?.sound ? (s.sound_url ? <a className="underline" href={s.sound_url} target="_blank">{s.sound}</a> : s.sound) : <span className="text-neutral-600">none picked</span>}
+                    </p>
+                    <p className="mt-1 text-xs text-neutral-500">
+                      <Link href="/scripts" className="hover:underline">script #{r.script_id}</Link> · {dateOf(r.created_at)} · {usd(r.cost_usd)} ·{" "}
+                      {clean ? <Download src={clean} className="text-sky-300 hover:underline">clean clip</Download> : <Download src={src} className="text-sky-300 hover:underline">download</Download>}
+                    </p>
+                  </div>
                 </div>
-              ) : (
-                <p className="mt-2 text-sm font-medium">{r.hook}</p>
-              )}
-              {clean && <p className="mt-1 text-[11px] text-neutral-500">preview above has the text burned in; the clean clip has none</p>}
-              {s?.concept && <p className="text-xs text-neutral-400">format: {formatName(s.concept)}</p>}
-              <p className="text-xs text-neutral-400">sound: {s?.sound ? (s.sound_url ? <a className="underline" href={s.sound_url} target="_blank">{s.sound}</a> : s.sound) : <span className="text-neutral-600">none picked, use a trending one</span>}</p>
-              <p className="mt-1 text-xs text-neutral-500"><Link href="/scripts" className="hover:underline">script #{r.script_id}</Link> · {dateOf(r.created_at)} · {usd(r.cost_usd)}</p>
-            </Card>
+              </Fold>
+            </li>
           );
         })}
-        {!rows.length && <p className="text-sm text-neutral-500">No clips yet. The daily run renders the best scripts.</p>}
-      </div>
+        {!rows.length && <p className="text-sm text-neutral-500">No clips yet. Generate clips on Learnings renders the best scripts.</p>}
+      </ul>
+
+      {unmatched.length > 0 && (
+        <Card title="Posts without a clip" className="mt-6">
+          <Table head={["", "posted", "post", "views", "vs videos like it"]} rows={unmatched.map((p) => [
+            <Thumb key={`t${p.id}`} id={p.id} href={`/videos/${p.id}`} />,
+            dateOf(p.create_time),
+            <Link key={p.id} href={`/videos/${p.id}`} className="text-sky-300 hover:underline">{(p.desc || p.id).slice(0, 60)}</Link>,
+            views(p.views_now),
+            lift(p),
+          ])} />
+        </Card>
+      )}
+
+      <Fold summary={<span className="text-sm text-neutral-300">What the picker has learned from our posts</span>} className="mt-6">
+        {Object.keys(ours.rewards).length === 0 ? <p className="text-sm text-neutral-500">Nothing yet. Until one post is measured, the picker follows the market.</p> : (
+          <Table head={["format", "vs videos like it", "posts"]} rows={Object.entries(ours.rewards).map(([cid, r]) => [conceptName.get(cid) ?? `#${cid}`, reward(r.mean_reward), r.n])} />
+        )}
+      </Fold>
+      <Fold summary={<span className="text-sm text-neutral-300">I posted a clip myself</span>} className="mt-2">
+        <form action={addPost} className="flex flex-wrap items-center gap-2">
+          <input name="url" required placeholder="https://www.tiktok.com/@handle/video/..." className="min-w-[18rem] flex-1 rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm" />
+          <input name="caption" placeholder="caption you used (optional)" className="min-w-[18rem] flex-1 rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm" />
+          <button className="rounded-md bg-sky-600 px-3 py-2 text-sm font-medium text-white hover:bg-sky-500">Add post</button>
+        </form>
+      </Fold>
+      {ours.accounts.length === 0 && <p className="mt-3 text-sm text-amber-200">No posting account yet: <code>mkt own login</code>, then <code>mkt own add @handle</code>.</p>}
       <NextStep from="/clips" />
     </>
+  );
+}
+
+const lift = (p: OursPost) =>
+  p.age_h < MIN_AGE_H_OWN
+    ? <span key="early" className="text-neutral-500" title={`Posts under ${MIN_AGE_H_OWN} hours are noise and do not move the picker`}>too early, {p.age_h.toFixed(1)}h</span>
+    : reward(p.lift_matched, p.views_now ? "no reference videos yet" : "no views yet", "videos like it");
+
+function Summary({ r, p }: { r: Render; p?: OursPost }) {
+  return (
+    <span className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1 text-sm">
+      <span className="text-xs text-neutral-500">s{r.script_id}</span>
+      <span className="font-medium text-neutral-100">{r.hook}</span>
+      {p ? <Pill tone="good">posted</Pill> : r.hold_reason ? <Pill tone="bad">on hold</Pill> : r.post_session_url ? <Pill tone="neutral">posting</Pill> : r.post_path ? <Pill tone="neutral">ready</Pill> : null}
+      {p && (
+        <>
+          <span className="tabular-nums text-neutral-100">{views(p.views_now)} <span className="text-xs text-neutral-500">views</span></span>
+          <span className="text-xs">{lift(p)}</span>
+          <span className="text-xs text-neutral-500">{p.age_h < 48 ? `${Math.round(p.age_h)}h` : `${Math.round(p.age_h / 24)}d`} up</span>
+        </>
+      )}
+    </span>
+  );
+}
+
+function PostStats({ p }: { p: OursPost }) {
+  return (
+    <div className="mb-3">
+      <p className="text-xs text-neutral-500">
+        <a href={p.url} target="_blank" className="text-sky-300 hover:underline">on TikTok</a> · posted {dateOf(p.create_time)} · <Link href={`/videos/${p.id}`} className="hover:underline">history, {p.n_obs} polls</Link>
+      </p>
+      <dl className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <Figure label="views now" value={views(p.views_now) || "none yet"} />
+        <Figure label="vs videos like it" value={lift(p)} />
+        <Figure label="shares+saves per 1k" value={p.engagement_per_1k != null ? <>{p.engagement_per_1k}{p.engagement_lift != null && <span className="ml-1 text-xs text-neutral-500">{p.engagement_lift > 0 ? "+" : ""}{p.engagement_lift.toFixed(2)} vs niche</span>}</> : "none yet"} />
+        <Figure label="views at 3 days" value={p.views_72h ? views(Math.round(p.views_72h)) : "not yet"} />
+      </dl>
+    </div>
+  );
+}
+
+function Figure({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="rounded-lg border border-neutral-800 px-3 py-2">
+      <dt className="text-xs text-neutral-500">{label}</dt>
+      <dd className="mt-0.5 tabular-nums text-neutral-100">{value}</dd>
+    </div>
   );
 }
