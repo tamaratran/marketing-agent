@@ -160,8 +160,8 @@ def ols(rows: list[dict], outcome: str, trait: str, controls: list[str]) -> dict
 def analyze(store: Store, niches: list[str] | None = None) -> dict:
     """Pooled and per-niche fits for every trait and outcome, plus a status block that says how
     much of the panel has reached each age, so the UI can say 'collecting' instead of showing
-    thin numbers."""
-    rows = features(store)
+    thin numbers. Reference videos only; our posts are judged in own.own_posts."""
+    rows = features(store, group="reference")
     niches = niches or sorted({r["niche"] for r in rows})
     now = int(time.time())
     reached = {f"{a}h": sum(1 for r in rows if r.get(f"views_{a}h")) for a in (1, 6, 24, 72, 168)}

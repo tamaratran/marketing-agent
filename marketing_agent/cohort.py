@@ -46,9 +46,12 @@ def migrate(store: Store) -> None:
 
 
 def enroll(store: Store, niche: str, rows: list[dict], now: int | None = None) -> list[dict]:
-    """Mark scraped rows younger than COHORT_MAX_AGE_H as cohort members of the niche."""
+    """Mark scraped rows younger than COHORT_MAX_AGE_H as cohort members of the niche. Our own
+    posts are skipped: the cohort is the reference panel the analysis learns the market from."""
     now = now or int(time.time())
     fresh = [r for r in rows if (now - r["create_time"]) / 3600 <= COHORT_MAX_AGE_H]
+    ours = store.ours_ids([r["id"] for r in fresh])
+    fresh = [r for r in fresh if r["id"] not in ours]
     with store.conn() as c:
         for r in fresh:
             c.execute(
@@ -240,11 +243,14 @@ def build_features(store: Store, niche: str | None = None) -> int:
     return n
 
 
-def features(store: Store, niche: str | None = None) -> list[dict]:
-    sql = "SELECT payload FROM features"
+def features(store: Store, niche: str | None = None, group: str | None = None) -> list[dict]:
+    from .store import group_filter
+
+    sql = "SELECT f.payload FROM features f JOIN videos v ON v.id=f.video_id WHERE 1=1"
+    sql += group_filter(group)
     args: tuple = ()
     if niche:
-        sql += " WHERE niche=?"
+        sql += " AND f.niche=?"
         args = (niche,)
     return [json.loads(r["payload"]) for r in store.rows(sql, args)]
 

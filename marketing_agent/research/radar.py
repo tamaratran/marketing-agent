@@ -23,8 +23,13 @@ def early_score(row: dict, now: int | None = None) -> float:
 
 
 def rank(store: Store, tag: str | None = None, max_age_h: int = 72, limit: int = 40) -> list[dict]:
+    """Reference videos only: our own posts never become research concepts."""
     now = int(time.time())
-    rows = [r for r in store.latest(tag) if (now - r["create_time"]) / 3600 <= max_age_h]
+    rows = [
+        r
+        for r in store.latest(tag, group="reference")
+        if (now - r["create_time"]) / 3600 <= max_age_h
+    ]
     for r in rows:
         r["early_score"] = early_score(r, now)
         r["age_h"] = round((now - r["create_time"]) / 3600, 1)

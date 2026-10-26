@@ -118,6 +118,22 @@ CREATE TABLE IF NOT EXISTS payouts (
 """
 
 
+# Videos from our side: posts by our registered accounts (campaign and historical) and posts by
+# creators we briefed. Everything else is a reference video scraped for research.
+OURS_SQL = """(v.ours=1 OR lower(v.author) IN (SELECT handle FROM own_accounts)
+               OR v.id IN (SELECT video_id FROM posts))"""
+GROUPS = ("reference", "ours")
+
+
+def group_filter(group: str | None) -> str:
+    """SQL condition (on alias v) for one group of videos; empty for both."""
+    if group is None:
+        return ""
+    if group not in GROUPS:
+        raise ValueError(f"group must be one of {GROUPS}")
+    return f" AND {OURS_SQL}" if group == "ours" else f" AND NOT {OURS_SQL}"
+
+
 class Store:
     def __init__(self, path: Path):
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -176,11 +192,15 @@ class Store:
                 (video_id, model, int(time.time()), json.dumps(payload)),
             )
 
-    def latest(self, tag: str | None = None, limit: int = 500) -> list[dict]:
-        """Videos with their most recent observation, newest-first."""
+    def latest(
+        self, tag: str | None = None, limit: int = 500, group: str | None = None
+    ) -> list[dict]:
+        """Videos with their most recent observation, newest-first. `group` is "reference"
+        (scraped for research), "ours" (our accounts and briefed creators) or None for both."""
         q = """SELECT v.*, o.views, o.likes, o.comments, o.shares, o.saves, o.observed_at
                FROM videos v JOIN observations o ON o.video_id=v.id
                WHERE o.observed_at = (SELECT MAX(observed_at) FROM observations WHERE video_id=v.id)"""
+        q += group_filter(group)
         args: list = []
         if tag:
             q += " AND v.source_tag=?"
@@ -202,6 +222,18 @@ class Store:
     def niche_tags(self, niche: str) -> list[str]:
         with self.conn() as c:
             return [r[0] for r in c.execute("SELECT tag FROM niche_tags WHERE niche=?", (niche,))]
+
+    def ours_ids(self, ids: list[str]) -> set[str]:
+        """The subset of `ids` that are our videos."""
+        if not ids:
+            return set()
+        qs = ",".join("?" * len(ids))
+        return {
+            r["id"]
+            for r in self.rows(
+                f"SELECT v.id FROM videos v WHERE v.id IN ({qs}){group_filter('ours')}", tuple(ids)
+            )
+        }
 
     def untagged(self, limit: int = 50) -> list[dict]:
         with self.conn() as c:
