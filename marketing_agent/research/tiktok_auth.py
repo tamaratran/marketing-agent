@@ -90,7 +90,10 @@ async def ensure_login(cdp_url: str, handle: str | None = None) -> str:
             leave_open = True
             try:
                 await page.wait_for_url(
-                    lambda url: url.hostname == "www.tiktok.com" and "/login" not in url.path,
+                    lambda url: (
+                        urlsplit(url).hostname == "www.tiktok.com"
+                        and "/login" not in urlsplit(url).path
+                    ),
                     timeout=20000,
                 )
             except PlaywrightTimeoutError:
