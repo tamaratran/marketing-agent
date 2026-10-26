@@ -2,6 +2,7 @@
 `run` chains the research half."""
 
 import json
+import re
 import time
 from pathlib import Path
 
@@ -373,6 +374,12 @@ def frames(out):
     console.print(f"frames: {poster_frames(_store(), out)} new in {out}")
 
 
+def _transient(e: BaseException) -> bool:
+    """A provider-side failure worth one retry: fal 5xx, downstream_service_error, timeouts."""
+    msg = str(e)
+    return bool(re.search(r"\b5\d\d\b|downstream_service_error|timed? ?out|temporarily", msg, re.I))
+
+
 @cli.command("render-latest")
 @click.option("--renders", default=None, type=int, help="Clips to make; default campaign.toml")
 @click.option("--resolution", default=None, help="480p, 720p or 1080p; default campaign.toml")
@@ -412,8 +419,9 @@ def render_latest(ctx, renders, resolution, refs):
         raise click.ClickException("every script in the latest batch is already rendered")
     if (lock := fal_locked()) is not None:
         raise click.ClickException(f"needs a top-up at fal.ai/dashboard/billing: {lock}")
-    made = []
-    for sid in todo:
+    made: list[int] = []
+    retried: dict[int, bool] = {}
+    for sid in todo:  # a retried script is appended to the end and seen again
         if len(made) >= renders:
             break
         try:
@@ -433,8 +441,13 @@ def render_latest(ctx, renders, resolution, refs):
                     f"rendered {', '.join(f's{i}' for i in made) or 'nothing'}; fal balance ran "
                     f"out, needs a top-up at fal.ai/dashboard/billing (wanted {renders})"
                 ) from e
-            if "content_policy_violation" not in str(e):
+            if "content_policy_violation" in str(e):
+                continue
+            if retried.get(sid) or not _transient(e):
                 raise
+            retried[sid] = True
+            console.print(f"[yellow]s{sid}: {e}; retrying once")
+            todo.append(sid)
     console.print(f"rendered {len(made)} of {renders}: {' '.join(f's{i}' for i in made)}")
 
 
