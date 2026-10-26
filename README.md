@@ -121,8 +121,7 @@ Without profile access, that fallback can miss posts without those hashtags.
 and the rest still runs:
 
 ```bash
-MKT_DB=../mkt-state/mkt.sqlite mkt daily wearables smartring whoop ouraring \
-  --product "a smart ring that tracks sleep, stress and recovery" --renders 1 --report ../mkt-state/reports/today.md
+MKT_DB=../mkt-state/mkt.sqlite mkt daily --report ../mkt-state/reports/today.md   # everything from campaign.toml
 ```
 
 `mkt devin kickoff` starts a Devin session through the Devin API that does the judgment part: runs
@@ -141,11 +140,27 @@ State is kept out of `main`: the sqlite db and `reports/` live on the `state` br
 session checks out as a worktree (`MKT_DB` points the CLI at it). Humans still do the posting.
 
 Nothing runs on a schedule. The site's Runs page has one "Run cycle" button: it calls `POST /runs`
-on the API with an empty body, and the API starts the Devin session with its own config, set as Fly
-secrets on `mkt-api`: `MKT_NICHE`, `MKT_TAGS`, `MKT_PRODUCT`, `MKT_PRODUCT_TAGS`, `MKT_REFS`
-(space separated), `MKT_RENDERS` (default 5), `MKT_RESOLUTION` (default 720p), `MKT_MAX_ACU`, next
-to `DEVIN_API_KEY` and `DEVIN_ORG_ID`. The 2-hourly cohort re-poll (`deploy/modal_repoll.py`) is
-the only scheduled job; it measures, it does not create or post anything.
+on the API with an empty body, and the API starts the Devin session with the campaign below.
+`mkt daily` and `mkt devin kickoff` take the same defaults, so `mkt daily` alone runs a full cycle.
+The 2-hourly cohort re-poll (`deploy/modal_repoll.py`) is the only scheduled job; it measures, it
+does not create or post anything.
+
+## campaign.toml
+
+One file says what the loop is for; the API (`GET /campaign`, shown on Runs), the CLI (`mkt
+campaign` prints it) and the Devin session all read it:
+
+- `[account]` the TikTok handle a person posts from. Registered in the db at the start of every
+  cycle; its results are the only ones that count as ours.
+- `[niche]` name and hashtags whose fresh videos are measured and clustered into concepts.
+- `[product]` name, site, App Store link, the description scripts are written to, the hashtags of
+  the product's own TikToks (their format gets cloned) and reference images for the renders.
+- `[cycle]` clips per cycle, resolution, ACU cap for the Devin session.
+
+To market a different app, edit the file and merge; the API is redeployed from it. `MKT_*`
+environment variables (`MKT_ACCOUNT`, `MKT_NICHE`, `MKT_TAGS`, `MKT_PRODUCT`, `MKT_PRODUCT_TAGS`,
+`MKT_REFS`, `MKT_RENDERS`, `MKT_RESOLUTION`, `MKT_MAX_ACU`) override single fields for tests and
+one-off runs and are otherwise unset. `MKT_CAMPAIGN` points at another file.
 
 ## Format cloning
 

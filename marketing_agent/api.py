@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
+from . import campaign as campaign_cfg
 from .analysis import analyze, latest_findings, save_findings
 from .cohort import build_features, features, latest_snapshot, repoll
 from .config import settings
@@ -21,7 +22,8 @@ from .scoreboard import build
 from .store import Store
 from .video.edit import strip_label
 
-DEFAULT_NICHE = os.environ.get("MKT_NICHE", "wearables")
+CAMPAIGN = campaign_cfg.load()
+DEFAULT_NICHE = CAMPAIGN.niche.name
 
 
 def _store() -> Store:
@@ -137,24 +139,25 @@ def runs(limit: int = 30):
     return _store().rows("SELECT * FROM runs ORDER BY id DESC LIMIT ?", (limit,))
 
 
-def _env_list(name: str, default: str = "") -> list[str]:
-    return os.environ.get(name, default).split()
+@app.get("/campaign")
+def campaign():
+    """What the loop is for: the account a person posts from, the niche watched, the product and
+    how many clips a cycle makes. Comes from campaign.toml in the repo."""
+    return CAMPAIGN.model_dump()
 
 
 class RunIn(BaseModel):
-    """One cycle of the loop. Every field defaults to the API's MKT_* env (the same config the old
-    daily cron carried), so the site's Run cycle button posts an empty body."""
+    """One cycle of the loop. Every field defaults to campaign.toml, so the site's Run cycle
+    button posts an empty body."""
 
-    niche: str = DEFAULT_NICHE
-    tags: list[str] = _env_list("MKT_TAGS", "smartring whoop ouraring")
-    product: str = os.environ.get(
-        "MKT_PRODUCT", "a smart ring that tracks sleep, stress and recovery"
-    )
-    product_tags: list[str] = _env_list("MKT_PRODUCT_TAGS")
-    refs: list[str] = _env_list("MKT_REFS")
-    renders: int = int(os.environ.get("MKT_RENDERS", "5"))
-    resolution: str = os.environ.get("MKT_RESOLUTION", "720p")
-    max_acu: int = int(os.environ.get("MKT_MAX_ACU", "10"))
+    niche: str = CAMPAIGN.niche.name
+    tags: list[str] = CAMPAIGN.niche.hashtags
+    product: str = CAMPAIGN.product.description
+    product_tags: list[str] = CAMPAIGN.product.hashtags
+    refs: list[str] = CAMPAIGN.product.references
+    renders: int = CAMPAIGN.cycle.clips
+    resolution: str = CAMPAIGN.cycle.resolution
+    max_acu: int = CAMPAIGN.cycle.max_acu
 
 
 @app.post("/runs", dependencies=[Depends(_auth)])

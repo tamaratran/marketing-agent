@@ -1,0 +1,37 @@
+# What the loop is for. One file, read by the Run cycle button (API), `mkt daily` and
+# `mkt devin kickoff`. To market a different app, edit this file and merge; nothing else changes.
+# Nothing here posts to TikTok: a person posts from the account below, the agent only measures it.
+
+[account]
+# The TikTok account a human posts our clips from. It is the only account whose results count as
+# ours; every other account is research. Registered in the db on each cycle (`mkt own add`).
+handle = "kriscaroll"
+backup_hashtag = ""   # optional hashtag for discovery if the profile cannot be read
+
+[niche]
+# Where the agent looks for what is working right now: these hashtags' fresh videos are the
+# cohort it measures and clusters into concepts.
+name = "fitness"
+hashtags = ["immersiveworkout", "subwaysurfers", "cardioworkout", "homeworkout", "immersiveinteractivewarmup"]
+
+[product]
+name = "Immersive Workout"
+developer = "Vir Reality Labs"
+website = "https://immersiveworkouts.com"
+app_store = "https://apps.apple.com/us/app/id6755501310"
+# How the scripts describe it. Written for the script writer, not for users.
+description = "Immersive Workout, a free iPhone app (immersiveworkouts.com) that turns your body into the game controller: prop the phone up, cast the game to your TV, and flap, duck and reach to play, starting with a flappy bird game; cardio that feels like a game"
+# Hashtags of the product's own TikToks (other people's). Their best videos are watched and their
+# format (hook, pacing, text budget, sound) is what the scripts clone.
+hashtags = ["immersiveworkout", "subwaysurfers", "immersiveinteractivewarmup"]
+# Reference images fed to the video model so the real app and setup appear in the clips.
+references = [
+  "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/a1/16/11/a11611d9-02c7-6c39-a71b-4505ba47ad80/AppIcon-0-0-1x_U007epad-0-1-85-220.png/512x512bb.jpg",
+  "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/b6/e2/48/b6e2484a-d9e8-2a37-e8fa-3a239db589d4/3_-_screenshot_1.png/1290x2796bb.png",
+  "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/fb/0f/2f/fb0f2fe2-f235-0812-b472-6ecf4d22ed7a/4_-_screenshot_2.png/1290x2796bb.png",
+]
+
+[cycle]
+clips = 5             # clips rendered per cycle, for a person to post
+resolution = "720p"   # 480p, 720p or 1080p; about $2.65 / $5.70 / $9.60 per 12s clip on fal
+max_acu = 10          # cap on the Devin session that runs the cycle
