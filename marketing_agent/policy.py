@@ -187,13 +187,13 @@ def concept_scores(store: Store, niche: str, tag: str | None = None) -> list[dic
             by_name.setdefault(key(c), []).append(ours[c["id"]])
     seen, out = set(), []
     for c in rows:
-        if key(c) in seen:
+        k, kind = key(c), kind_of(c)
+        if k in seen:
             continue
-        seen.add(key(c))
-        kind = kind_of(c)
+        seen.add(k)
         c.pop("payload", None)
         prior = math.log10((c["early_score"] or 0) + 1) / 3  # ~0..1 for 1..1000 early score
-        hits = by_name.get(key(c), [])
+        hits = by_name.get(k, [])
         n = sum(h["n"] for h in hits)
         obs = (
             {"mean_reward": round(sum(h["mean_reward"] * h["n"] for h in hits) / n, 3), "n": n}
