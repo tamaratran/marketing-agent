@@ -340,14 +340,14 @@ def _account_offsets(store: Store, curve: dict, now: int) -> dict[str, float]:
     }
 
 
-def own_rewards(store: Store) -> dict[int, dict]:
-    """concept_id -> {mean_reward, n} from our posts. The age-matched lift, discounted by age (a
-    6h-old post counts about 30% of a 72h one) so early posts nudge the picker without dominating
-    it; posts under MIN_AGE_H_FOR_OWN are skipped as noise. Without a reference curve (nothing
-    scraped yet) it falls back to the lift over the account's usual views."""
-    agg: dict[int, list[float]] = {}
+def own_post_rewards(store: Store) -> list[dict]:
+    """One row per post of ours the picker may learn from: video_id, concept_id and the reward
+    (age-matched lift, discounted by age so a 6h-old post counts about 30% of a 72h one). Posts
+    under MIN_AGE_H_FOR_OWN are skipped as noise. Without a reference curve (nothing scraped yet)
+    the lift over the account's usual views stands in."""
+    out = []
     for p in own_posts(store):
-        if p["concept_id"] is None or p["age_h"] < MIN_AGE_H_FOR_OWN:
+        if p["age_h"] < MIN_AGE_H_FOR_OWN:
             continue
         weight = min(1.0, (p["age_h"] / 72) ** 0.5)
         if p["lift_matched"] is not None:
@@ -358,5 +358,14 @@ def own_rewards(store: Store) -> dict[int, dict]:
             r = p["lift_now"] * weight
         else:
             continue
-        agg.setdefault(p["concept_id"], []).append(r)
+        out.append({"video_id": p["id"], "concept_id": p["concept_id"], "reward": round(r, 3)})
+    return out
+
+
+def own_rewards(store: Store) -> dict[int, dict]:
+    """concept_id -> {mean_reward, n} over own_post_rewards, for posts matched to a concept."""
+    agg: dict[int, list[float]] = {}
+    for p in own_post_rewards(store):
+        if p["concept_id"] is not None:
+            agg.setdefault(p["concept_id"], []).append(p["reward"])
     return {cid: {"mean_reward": round(sum(v) / len(v), 3), "n": len(v)} for cid, v in agg.items()}
