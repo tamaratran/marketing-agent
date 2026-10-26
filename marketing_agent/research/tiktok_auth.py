@@ -1,4 +1,8 @@
-"""Use the user's Chrome session; never export cookies or automate verification challenges."""
+"""Use the user's Chrome session; never automate verification challenges.
+
+The signed-in session can be saved (cookies only, for tiktok.com) and loaded into another Chrome,
+so a poster session on a fresh VM is the same signed-in browser to TikTok instead of a new login,
+which TikTok throttles. The saved cookies go only to the API, encrypted at rest, over the token."""
 
 import asyncio
 import os
@@ -119,3 +123,53 @@ async def ensure_login(cdp_url: str, handle: str | None = None) -> str:
 
 def ensure_login_sync(cdp_url: str, handle: str | None = None) -> str:
     return asyncio.run(ensure_login(cdp_url, handle))
+
+
+def _is_tiktok(cookie: dict) -> bool:
+    return cookie.get("domain", "").lstrip(".").endswith("tiktok.com")
+
+
+async def export_session(cdp_url: str, handle: str | None = None) -> list[dict]:
+    """The tiktok.com cookies of a Chrome verified to be signed in as our handle."""
+    handle = normalize_handle(handle or os.environ.get("TIKTOK_POST_HANDLE", ""))
+    async with async_playwright() as p:
+        browser = await p.chromium.connect_over_cdp(cdp_url)
+        context = browser.contexts[0]
+        page = await context.new_page()
+        try:
+            if not await _verify_profile(page, handle):
+                raise LoginRequired(f"Chrome is not signed in as @{handle}; nothing saved.")
+            cookies = [c for c in await context.cookies() if _is_tiktok(c)]
+        finally:
+            await page.close()
+    if not cookies:
+        raise LoginRequired("No tiktok.com cookies in this Chrome; nothing saved.")
+    return cookies
+
+
+async def import_session(cdp_url: str, cookies: list[dict], handle: str | None = None) -> bool:
+    """Load saved cookies into this Chrome and say whether TikTok now shows us signed in."""
+    handle = normalize_handle(handle or os.environ.get("TIKTOK_POST_HANDLE", ""))
+    cookies = [c for c in cookies if _is_tiktok(c)]
+    if not cookies:
+        raise LoginRequired("Saved session has no tiktok.com cookies.")
+    async with async_playwright() as p:
+        browser = await p.chromium.connect_over_cdp(cdp_url)
+        context = browser.contexts[0]
+        page = await context.new_page()
+        try:
+            if await _verify_profile(page, handle):
+                return True
+            await context.clear_cookies()
+            await context.add_cookies(cookies)
+            return await _verify_profile(page, handle)
+        finally:
+            await page.close()
+
+
+def export_session_sync(cdp_url: str, handle: str | None = None) -> list[dict]:
+    return asyncio.run(export_session(cdp_url, handle))
+
+
+def import_session_sync(cdp_url: str, cookies: list[dict], handle: str | None = None) -> bool:
+    return asyncio.run(import_session(cdp_url, cookies, handle))
