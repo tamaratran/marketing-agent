@@ -1,6 +1,7 @@
 # What the loop is for. One file, read by the Run cycle button (API), `mkt daily` and
 # `mkt devin kickoff`. To market a different app, edit this file and merge; nothing else changes.
-# Nothing here posts to TikTok: a person posts from the account below, the agent only measures it.
+# A cycle never posts. Posting is the Post button on /clips: a person approves one clip and a Devin
+# session posts it from the account below; the agent measures the result.
 
 [account]
 # The TikTok account a human posts our clips from. It is the only account whose results count as

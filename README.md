@@ -10,7 +10,8 @@ Three modules in one repo, one SQLite store, one CLI (`mkt`):
 | `video/` | Remixes a concept to a product (10-20 scripts, 1-3s hook, product on screen by 5s, scored for demoability), generates clips with Seedance 2.5 on fal.ai (Seedance 2.0 fast on Replicate as the cheap fallback), and cuts a captioned 1080x1920 H.264 with ffmpeg. `--provider stub` renders colour cards so the pipeline runs with no key. | working, needs `FAL_KEY` for real clips |
 
 Not in scope by design: automated account warming, bot-run posting accounts, posting via API. Real
-humans post from real accounts; the agent runs everything around them.
+each clip is posted from a real account only after a person presses Post on it; the agent runs
+everything around that.
 
 ## Two kinds of video
 
@@ -190,7 +191,7 @@ marked measured or untested, plus a warning while fewer than 3 posts are measure
 One file says what the loop is for; the API (`GET /campaign`, shown on Runs), the CLI (`mkt
 campaign` prints it) and the Devin session all read it:
 
-- `[account]` the TikTok handle a person posts from. Registered in the db at the start of every
+- `[account]` the TikTok handle our clips are posted from. Registered in the db at the start of every
   cycle; its results are the only ones that count as ours.
 - `[niche]` name and hashtags whose fresh videos are measured and clustered into concepts.
 - `[product]` name, site, App Store link, the description scripts are written to, the hashtags of

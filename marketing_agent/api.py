@@ -311,7 +311,7 @@ def learnings_md(niche: str | None = None):
 
 @app.get("/campaign")
 def campaign():
-    """What the loop is for: the account a person posts from, the niche watched, the product and
+    """What the loop is for: the account we post from, the niche watched, the product and
     how many clips a cycle makes. Comes from campaign.toml in the repo."""
     return CAMPAIGN.model_dump()
 
@@ -334,7 +334,8 @@ class RunIn(BaseModel):
 @app.post("/runs", dependencies=[Depends(_auth)])
 def runs_start(body: RunIn | None = None):
     """Start a Devin session that runs one cycle (`mkt daily`, same as `mkt devin kickoff`): analyse
-    the sources and our posts, write scripts, render clips. Nothing is posted; humans do that."""
+    the sources and our posts, write scripts, render clips. A cycle posts nothing; posting is the
+    Post button on each clip (POST /renders/{script_id}/post), one approved clip at a time."""
     from .orchestrator import DEFAULT_REPO, DevinClient, daily_prompt
 
     body = body or RunIn()
