@@ -743,14 +743,32 @@ def daily(
 
         return fal_locked()
 
+    class Skipped(Exception):
+        """A stage that cannot run on this machine for a reason that is not a bug."""
+
     def stage(name, fn):
         t0 = time.time()
         try:
             note = fn()
             rep.ok(name, time.time() - t0, note or "")
+        except Skipped as e:
+            rep.skip(name, str(e))
+            console.print(f"[yellow]{name} skipped: {e}")
         except Exception as e:  # noqa: BLE001 - every stage must be reported, not raised
             rep.fail(name, e)
             console.print(f"[red]{name} failed: {e!r}")
+
+    def own_stage():
+        """Profile sync needs a TikTok login in this machine's Chrome. Without one it is skipped,
+        not failed: posts a person makes are registered through the site's Our posts form and
+        re-polled by the measure stage, so the cycle is still complete."""
+        try:
+            return ctx.invoke(own_sync, niche=niche, tags=tags)
+        except click.ClickException as e:
+            raise Skipped(
+                f"no TikTok login on this machine ({e.message}); posts are registered through "
+                "the site's Our posts form instead"
+            ) from e
 
     if c.account.handle:
         from .own import add_account
@@ -760,7 +778,7 @@ def daily(
             lambda: add_account(_store(), c.account.handle, c.account.backup_hashtag, product),
         )
     stage("measure", lambda: ctx.invoke(repoll, max_age_days=8.0, niche=None))
-    stage("own", lambda: ctx.invoke(own_sync, niche=niche, tags=tags))
+    stage("own", own_stage)
     stage(
         "run",
         lambda: ctx.invoke(
