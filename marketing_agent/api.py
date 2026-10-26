@@ -101,6 +101,8 @@ def logic(niche: str = DEFAULT_NICHE):
         "videos": [{k: v.get(k) for k in keys} for v in sb["videos"]],
         "explore_sd": policy.EXPLORE_SD,
         "format_edge": policy.FORMAT_EDGE,
+        "shrink_k": policy.SHRINK_K,
+        "market_trait_weight": policy.MARKET_TRAIT_WEIGHT,
         "format_prior": clone["prior"] if clone else None,
         "min_age_h": scoreboard.MIN_AGE_H_FOR_JUDGEMENT,
         "min_age_h_own": scoreboard.MIN_AGE_H_FOR_OWN,

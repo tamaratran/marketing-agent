@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { get, type Concept, type Findings, type Logic, type Overview, type Render, type Script } from "@/lib/api";
+import { get, type Concept, type TraitDetail, type Findings, type Logic, type Overview, type Render, type Script } from "@/lib/api";
 import type { Ours } from "@/lib/ours";
 import { H1, Note, formatName, pt, times } from "../ui";
 
@@ -43,7 +43,7 @@ export default async function How() {
   const beat = scored.filter((v) => (v.reward as number) > 0).length;
 
   const formats = concepts.map((c) => ({
-    c, mean: c.prior + (c.mean_reward ?? 0), sd: lg.explore_sd / Math.sqrt(1 + c.n),
+    c, mean: c.prior + (c.learned ?? c.mean_reward ?? 0), sd: lg.explore_sd / Math.sqrt(1 + c.n),
   }));
   const chances = pickChances(formats);
   const ranked = formats.map((f, i) => ({ ...f, p: chances[i] })).sort((a, b) => b.p - a.p);
@@ -55,7 +55,10 @@ export default async function How() {
   const research = ranked.find((r) => r.c.kind !== "format");
   const whatIf = (target: typeof ranked[number] | undefined, lift: number) => {
     if (!target) return null;
-    const next = formats.map((f) => f.c.id === target.c.id ? { ...f, mean: f.c.prior + ((f.c.mean_reward ?? 0) * f.c.n + lift) / (f.c.n + 1), sd: lg.explore_sd / Math.sqrt(2 + f.c.n) } : f);
+    const K = lg.shrink_k ?? 0;
+    const next = formats.map((f) => f.c.id === target.c.id
+      ? { ...f, mean: f.c.prior + (K * (f.c.trait_bonus ?? 0) + (f.c.mean_reward ?? 0) * f.c.n + lift) / (K + f.c.n + 1), sd: lg.explore_sd / Math.sqrt(2 + f.c.n) }
+      : f);
     const i = formats.findIndex((f) => f.c.id === target.c.id);
     return { name: formatName(target.c.name), before: target.p, after: pickChances(next)[i], lift };
   };
@@ -102,8 +105,8 @@ export default async function How() {
           the clone, is built from the product&apos;s own best TikToks.
         </p>
         <p className="mt-2 text-sm text-neutral-300">
-          Early traction sets each format&apos;s head start (the dot). A bit of random noise is added (the line shows
-          its usual range) and the highest score wins. The noise is what lets a weaker format win now and then, so the
+          Early traction sets each format&apos;s head start, then what we have learned about its traits moves it (the dot, see step 4).
+          A bit of random noise is added (the line shows its usual range) and the highest score wins. The noise is what lets a weaker format win now and then, so the
           agent keeps testing instead of copying the leader forever.
           {lg.format_edge != null && (
             <> The clone starts {lg.format_edge} above the best research format: it is the safest bet, so it wins most picks, but the rest still get tested.</>
@@ -120,10 +123,17 @@ export default async function How() {
 
       <Section n={4} title="Learn: how our posts change the pick">
         <p className="text-sm text-neutral-300">
-          Once a post from {account ? `@${account}` : "our account"} is matched to its script, its result is added to that
-          format&apos;s head start: a post that does 10x what videos like it (same age, same account size, this niche) have adds 1, one that does a tenth takes 1 away.
+          Once a post from {account ? `@${account}` : "our account"} is matched to its script, its result moves the pick two ways.
+          Its own format&apos;s score moves directly: a post that does 10x what videos like it (same age, same account size, this niche) have adds 1, one that does a tenth takes 1 away.
+          And every format sharing its traits moves a little: each format is a bundle of a hook type, a visual style, whether the product is on screen in the first 5 seconds, and a pace,
+          and each of those earns its own running score from our posts, averaged over the four (what the niche&apos;s videos show counts {lg.market_trait_weight != null ? `${Math.round(lg.market_trait_weight * 100)}%` : "a quarter"} as much).
+          So a format we have never posted still inherits what similar ones taught us, and a format that comes back under a new name after the next research run keeps its lessons.
+        </p>
+        <p className="mt-2 text-sm text-neutral-300">
+          A format&apos;s own posts take over from the trait guess as they accumulate: with {lg.shrink_k ?? 2} posts the two count equally, after that its own results dominate.
           The more posts a format has, the less noise it gets, so proven formats settle and untested ones still get tries.
         </p>
+        <TraitTable concepts={concepts} />
         <WhatIf rows={scenarios} />
         <Note className="mt-3">
           Worked out on today&apos;s numbers. A post under {lg.min_age_h_own ?? 6} hours old does not count at all; after that it counts partly (a 6 hour old result counts about 30%, 3 days counts fully), so early posts nudge the pick without deciding it.
@@ -205,6 +215,32 @@ function Histogram({ videos }: { videos: Logic["videos"] }) {
       ))}
       <text x={W / 2} y={H} fontSize={11} fill="#a3a3a3" textAnchor="middle">views vs videos like it</text>
     </svg>
+  );
+}
+
+function TraitTable({ concepts }: { concepts: Concept[] }) {
+  const rows = concepts.filter((c) => c.trait_detail && c.trait_detail.length).map((c) => ({ c, d: c.trait_detail as TraitDetail[] }));
+  if (!rows.length) return <Note className="mt-3">No format has classified member videos yet, so there are no traits to learn on.</Note>;
+  const label = (d: TraitDetail) => d.trait === "product_on_screen_by_5s" ? (d.value ? "product by 5s" : "no product by 5s") : `${String(d.value).replace(/_/g, " ")}${d.trait === "pacing_bucket" ? " pace" : ""}`;
+  return (
+    <div className="mt-4 overflow-x-auto">
+      <table className="w-full text-xs">
+        <thead className="text-neutral-500">
+          <tr><th className="py-1 text-left font-normal">format</th><th className="py-1 text-left font-normal">traits</th><th className="py-1 text-right font-normal">from our posts</th><th className="py-1 text-right font-normal">from the niche</th><th className="py-1 text-right font-normal">head start moves by</th></tr>
+        </thead>
+        <tbody>
+          {rows.map(({ c, d }) => (
+            <tr key={c.id} className="border-t border-neutral-800 align-top">
+              <td className="py-1.5 pr-3 text-neutral-200">{formatName(c.name)}</td>
+              <td className="py-1.5 pr-3 text-neutral-400">{d.map(label).join(" · ")}</td>
+              <td className="py-1.5 pr-3 text-right tabular-nums">{(d.reduce((a, x) => a + x.ours, 0) / d.length).toFixed(2)} <span className="text-neutral-600">({Math.max(...d.map((x) => x.ours_n))} post{Math.max(...d.map((x) => x.ours_n)) === 1 ? "" : "s"})</span></td>
+              <td className="py-1.5 pr-3 text-right tabular-nums">{(d.reduce((a, x) => a + x.market, 0) / d.length).toFixed(2)} <span className="text-neutral-600">({Math.max(...d.map((x) => x.market_n))} videos)</span></td>
+              <td className={`py-1.5 text-right tabular-nums ${(c.trait_bonus ?? 0) > 0 ? "text-emerald-300" : (c.trait_bonus ?? 0) < 0 ? "text-red-300" : "text-neutral-500"}`}>{(c.trait_bonus ?? 0) > 0 ? "+" : ""}{(c.trait_bonus ?? 0).toFixed(2)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 

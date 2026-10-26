@@ -72,10 +72,15 @@ posts all sit under 1k views are flagged as possibly throttled.
 ## Feedback loop
 
 `mkt run ... --product X` no longer scripts the concept with the highest early score. `policy.pick_concept`
-samples a score per concept from the radar prior plus the scoreboard's observed mean reward (noise
-shrinks with n), so with no data it follows the radar, with data it follows what earned views, and
-it still explores. `mkt scripts` passes the scoreboard's winning and losing hooks, concepts and
-styles into the prompt. `mkt policy <niche>` shows what the loop has learned.
+samples a score per concept from the radar prior plus what has been learned about it (noise shrinks
+with n). "Learned" is `(SHRINK_K * trait bonus + sum of its own posts' rewards) / (SHRINK_K + n)`:
+each concept is a bundle of traits (hook type, visual style, product on screen by 5s, pace, the
+majority over its classified member videos), and every trait value keeps a running, shrunk score
+from our posts (plus a quarter-weight one from the niche's reference videos). So a concept we never
+posted inherits what similar ones taught us, a concept that comes back under a new name after the
+next research run keeps its lessons, and with no data at all it follows the radar. `mkt scripts`
+passes the scoreboard's winning and losing hooks, concepts and styles into the prompt.
+`mkt policy <niche>` shows what the loop has learned.
 
 ## Known limits
 
