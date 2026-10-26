@@ -143,7 +143,7 @@ Nothing runs on a schedule. The site's Runs page has one "Run cycle" button: it 
 on the API with an empty body, and the API starts the Devin session with the campaign below.
 `mkt daily` and `mkt devin kickoff` take the same defaults, so `mkt daily` alone runs a full cycle.
 Nothing is scheduled. Measuring happens live: the first stage of every cycle re-polls our posts
-and the cohort, so the pick that follows uses fresh numbers; the site's "Update view counts now"
+and the cohort, so the pick that follows uses fresh numbers; the site's "Check post performance"
 button does the same on demand.
 
 ## Learnings
