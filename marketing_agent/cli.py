@@ -504,6 +504,32 @@ def _scoreboard_group(tag, top, group):
         console.print(t)
 
 
+@cli.command("compare")
+@click.option("--tag", default=None)
+@click.option("--top", default=20)
+def compare_cmd(tag, top):
+    """Our posts next to the market: each hook, style and concept with its lift on reference
+    videos and on our posts, disagreements first."""
+    from .compare import compare
+
+    rows = compare(_store(), tag)
+    if not rows:
+        console.print("[dim]nothing scored on either side yet")
+        return
+    t = Table("trait", "value", "market", "n", "ours", "n", "read")
+    for r in rows[:top]:
+        t.add_row(
+            r["trait"],
+            str(r["value"])[:40],
+            "" if r["market"] is None else f"{r['market']:+.2f}",
+            str(r["market_n"]),
+            "" if r["ours"] is None else f"{r['ours']:+.2f}",
+            str(r["ours_n"]),
+            r["verdict"],
+        )
+    console.print(t)
+
+
 @cli.command()
 @click.argument("niche")
 def policy(niche):
@@ -624,7 +650,7 @@ def daily(
     ctx, niche, tags, product, product_tags, top, renders, resolution, refs, report, dashboard_out
 ):
     """The whole loop in order with a report at the end: run (scrape, classify, concepts, pick,
-    scripts), render, our posts, scoreboard, policy. A failed stage is recorded
+    scripts), render, our posts, scoreboard, compare (ours vs market), policy. A failed stage is recorded
     and the rest still runs."""
     import os
 
@@ -708,6 +734,7 @@ def daily(
 
     stage("own_research", lambda: ctx.invoke(own_research, limit=20, model=None))
     stage("scoreboard", lambda: ctx.invoke(scoreboard, tag=None, top=15, group="both"))
+    stage("compare", lambda: ctx.invoke(compare_cmd, tag=None, top=20))
     stage("policy", lambda: ctx.invoke(policy, niche=niche))
 
     report = (

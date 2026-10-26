@@ -140,7 +140,7 @@ Then:
 3. Commit the state: cd ../mkt-state && git add -A && git commit -m "state: {day}" \\
    && git push origin HEAD:{state_branch}
 4. Reply with a short summary: concept picked and why, how many scripts kept, renders made and their
-   cost, how our posts did, top hooks/concepts on the scoreboard, what you fixed,
+   cost, how our posts did and how they compare with the market, top hooks/concepts on the scoreboard, what you fixed,
    PR links. Attach the rendered mp4s from data/renders/ and the report.
 
 Rules: never post to TikTok, never message anyone, no bot accounts, no account warming,
@@ -266,6 +266,25 @@ class DailyReport:
                     f"| {r[key]} | {r['n']} | {r['mean_reward']:+.2f} | {r['win_rate']:.0%} |"
                     for r in sb[name][:6]
                 ]
+
+        from .compare import compare
+
+        cmp = compare(store)
+        lines += ["", "## Ours vs market", ""]
+        if cmp:
+            lines += [
+                "| trait | value | market | n | ours | n | read |",
+                "|---|---|---|---|---|---|---|",
+            ]
+            for r in cmp[:15]:
+                m = "" if r["market"] is None else f"{r['market']:+.2f}"
+                o = "" if r["ours"] is None else f"{r['ours']:+.2f}"
+                lines.append(
+                    f"| {r['trait']} | {str(r['value'])[:60]} | {m} | {r['market_n']} | {o} | "
+                    f"{r['ours_n']} | {r['verdict']} |"
+                )
+        else:
+            lines.append("Nothing scored on either side yet.")
 
         lines += ["", "## Policy", ""]
         traits = winning_traits(store)

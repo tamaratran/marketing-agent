@@ -56,6 +56,7 @@ mkt scripts <concept_id> "Glow, ..."  # 12 scripts, keep demo_score >= 3
 mkt render <script_id> --duration 10  # Seedance clip + captions -> data/renders/s<id>.mp4
 mkt poll <url> ...                    # record stats for posted videos
 mkt scoreboard                        # reward per video, hooks/concepts ranked, throttled accounts
+mkt compare                           # our posts vs the market: each hook/style/concept side by side
 mkt dashboard tanning                 # static HTML (data/site/index.html) with clips copied next to it
 ```
 
