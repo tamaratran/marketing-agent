@@ -27,6 +27,13 @@ export type Overview = {
 export type Concept = { id: number; name: string; description: string; early_score: number; prior: number; mean_reward: number | null; n: number };
 export type Script = { id: number; concept: string; product: string; created_at: number; hook: string; demo_score: number; captions: string[]; body: string; spoken?: string; hook_on_screen?: boolean; sound?: string; sound_url?: string };
 export type Render = { id: number; script_id: number; created_at: number; model: string; cost_usd: number; hook: string };
+export type Campaign = {
+  account: { handle: string; backup_hashtag: string };
+  niche: { name: string; hashtags: string[] };
+  product: { name: string; developer: string; website: string; app_store: string; description: string; hashtags: string[]; references: string[] };
+  cycle: { clips: number; resolution: string; max_acu: number };
+  path: string;
+};
 export type Run = { id: number; created_at: number; session_id: string; url: string; niche: string; product: string; note: string };
 
 export type Level = { level: string; n: number; coef: number; se: number; lo: number; hi: number; raw_mean: number; reference: boolean; verdict: string; travels?: boolean };

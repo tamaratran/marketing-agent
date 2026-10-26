@@ -181,3 +181,15 @@ def test_run_cycle_with_empty_body_uses_api_config(client, monkeypatch):
     )
     assert r.status_code == 200
     assert '--renders 2 --resolution 1080p --ref "https://x/i.png"' in seen["prompt"]
+
+
+def test_campaign_endpoint_is_the_run_config(client):
+    """The Runs page shows exactly what an empty POST /runs would run."""
+    from marketing_agent.api import RunIn
+
+    c = client.get("/campaign").json()
+    assert c["account"]["handle"] == "kriscaroll"
+    assert c["product"]["name"] == "Immersive Workout"
+    body = RunIn()
+    assert body.niche == c["niche"]["name"] and body.tags == c["niche"]["hashtags"]
+    assert body.refs == c["product"]["references"] and body.renders == c["cycle"]["clips"]

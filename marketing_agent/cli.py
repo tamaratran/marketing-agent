@@ -626,9 +626,9 @@ def format_cmd(niche, product_tags, limit):
 
 
 @cli.command()
-@click.argument("niche")
-@click.argument("tags", nargs=-1, required=True)
-@click.option("--product", required=True)
+@click.argument("niche", required=False)
+@click.argument("tags", nargs=-1)
+@click.option("--product", default=None, help="Default: campaign.toml [product].description")
 @click.option(
     "--product-tag",
     "product_tags",
@@ -636,8 +636,8 @@ def format_cmd(niche, product_tags, limit):
     help="Hashtags/keywords of the product's own TikToks; the format to clone comes from them",
 )
 @click.option("--top", default=8)
-@click.option("--renders", default=1, help="Render the N best scripts written this run (0 = skip)")
-@click.option("--resolution", default="720p")
+@click.option("--renders", default=None, type=int, help="Clips to render (default campaign.toml)")
+@click.option("--resolution", default=None, help="480p, 720p or 1080p (default campaign.toml)")
 @click.option(
     "--ref", "refs", multiple=True, help="Reference image URL/path (product shots) for renders"
 )
@@ -649,13 +649,23 @@ def format_cmd(niche, product_tags, limit):
 def daily(
     ctx, niche, tags, product, product_tags, top, renders, resolution, refs, report, dashboard_out
 ):
-    """The whole loop in order with a report at the end: run (scrape, classify, concepts, pick,
-    scripts), render, our posts, scoreboard, compare (ours vs market), policy. A failed stage is recorded
-    and the rest still runs."""
+    """One cycle, every stage in order with a report at the end: our account, run (scrape,
+    classify, concepts, pick, scripts), cohort, analyze, render, our posts, scoreboard, compare
+    (ours vs market), policy. Anything not given comes from campaign.toml. A failed stage is
+    recorded and the rest still runs."""
     import os
 
+    from . import campaign as campaign_cfg
     from .orchestrator import DailyReport
 
+    c = campaign_cfg.load()
+    niche = niche or c.niche.name
+    tags = tuple(tags) or tuple(c.niche.hashtags)
+    product = product or c.product.description
+    product_tags = tuple(product_tags) or tuple(c.product.hashtags)
+    refs = tuple(refs) or tuple(c.product.references)
+    renders = c.cycle.clips if renders is None else renders
+    resolution = resolution or c.cycle.resolution
     rep = DailyReport(niche, product)
 
     def stage(name, fn):
@@ -667,6 +677,13 @@ def daily(
             rep.fail(name, e)
             console.print(f"[red]{name} failed: {e!r}")
 
+    if c.account.handle:
+        from .own import add_account
+
+        stage(
+            "account",
+            lambda: add_account(_store(), c.account.handle, c.account.backup_hashtag, product),
+        )
     stage("own", lambda: ctx.invoke(own_sync, niche=niche, tags=tags))
     stage(
         "run",
@@ -815,20 +832,39 @@ def devin():
 
 
 @devin.command("kickoff")
-@click.argument("niche")
-@click.argument("tags", nargs=-1, required=True)
-@click.option("--product", required=True)
-@click.option("--renders", default=1)
-@click.option("--resolution", default="720p")
+@click.argument("niche", required=False)
+@click.argument("tags", nargs=-1)
+@click.option("--product", default=None, help="Default: campaign.toml")
+@click.option("--renders", default=None, type=int)
+@click.option("--resolution", default=None)
 @click.option("--repo", default=None, help="owner/repo (default MKT_REPO)")
-@click.option("--max-acu", default=10, help="ACU cap for the session")
+@click.option("--max-acu", default=None, type=int, help="ACU cap for the session")
 @click.option("--wait/--no-wait", default=False, help="Block until the session settles")
 @click.option("--dry-run", is_flag=True, help="Print the prompt, start nothing")
 def devin_kickoff(niche, tags, product, renders, resolution, repo, max_acu, wait, dry_run):
+    """Start one cycle as a Devin session (what the site's Run cycle button does). Everything not
+    given comes from campaign.toml."""
+    from . import campaign as campaign_cfg
     from .orchestrator import DEFAULT_REPO, DevinClient, daily_prompt
 
+    c = campaign_cfg.load()
+    niche = niche or c.niche.name
+    tags = list(tags) or c.niche.hashtags
+    product = product or c.product.description
+    renders = c.cycle.clips if renders is None else renders
+    resolution = resolution or c.cycle.resolution
+    max_acu = c.cycle.max_acu if max_acu is None else max_acu
     repo = repo or DEFAULT_REPO
-    prompt = daily_prompt(niche, list(tags), product, renders, resolution, repo)
+    prompt = daily_prompt(
+        niche,
+        tags,
+        product,
+        renders,
+        resolution,
+        repo,
+        refs=c.product.references,
+        product_tags=c.product.hashtags,
+    )
     if dry_run:
         click.echo(prompt)
         return
@@ -857,6 +893,25 @@ def devin_kickoff(niche, tags, product, renders, resolution, repo, max_acu, wait
         console.print(f"{s.get('status')} / {s.get('status_detail')}")
         for pr in s.get("pull_requests") or []:
             console.print(f"PR {pr.get('pr_url')} [{pr.get('pr_state')}]")
+
+
+@cli.command("campaign")
+def campaign_show():
+    """Print what the loop is for (campaign.toml plus any MKT_* overrides)."""
+    from . import campaign as campaign_cfg
+
+    c = campaign_cfg.load()
+    console.print(f"[dim]{c.path or 'no campaign.toml, built-in defaults'}")
+    console.print(f"account   @{c.account.handle or '(none registered)'}")
+    console.print(f"niche     {c.niche.name}: {' '.join('#' + t for t in c.niche.hashtags)}")
+    console.print(f"product   {c.product.name or c.product.description}")
+    console.print(
+        f"          clones {' '.join('#' + t for t in c.product.hashtags) or '(no product TikToks)'}"
+    )
+    console.print(f"          {len(c.product.references)} reference images")
+    console.print(
+        f"cycle     {c.cycle.clips} clips at {c.cycle.resolution}, {c.cycle.max_acu} ACU cap"
+    )
 
 
 @devin.command("status")

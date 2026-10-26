@@ -1,6 +1,6 @@
 FROM python:3.12-slim
 WORKDIR /app
-COPY pyproject.toml README.md ./
+COPY pyproject.toml README.md campaign.toml ./
 COPY marketing_agent ./marketing_agent
 RUN pip install --no-cache-dir ".[api]"
 ENV MKT_DATA_DIR=/data PORT=8080
