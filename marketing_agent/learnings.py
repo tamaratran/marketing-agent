@@ -165,12 +165,33 @@ def _lift(p: dict) -> float | None:
     return p["lift_72h"] if p["lift_72h"] is not None else p["lift_now"]
 
 
+TRAIT_TABLES = {
+    "hooks": "Hook type",
+    "styles": "Visual style",
+    "pacing": "Pacing (cuts per 10s)",
+    "sound": "Sound",
+    "product_early": "Product on screen by 5s",
+}
+_TRAIT_COLUMN = {
+    "hooks": "hook_type",
+    "styles": "visual_style",
+    "pacing": "pacing_bucket",
+    "sound": "music_role",
+    "product_early": "product_on_screen_by_5s",
+}
+
+
+def _trait_value(v) -> str:
+    return {"True": "yes", "False": "no"}.get(str(v), str(v).replace("_", " "))
+
+
 def write_cycle(store: Store, niche: str, product: str, stages: list[dict] | None = None) -> int:
     """Compose this cycle's entry from the db and store it. Deterministic: every statement comes
     from a stored measurement or score, so the file is a record, not a guess."""
     from .compare import compare
     from .own import own_posts
-    from .policy import concept_scores
+    from .policy import concept_scores, pick_shares
+    from .scoreboard import build
 
     facts: dict = {}
     lines: list[str] = []
@@ -216,11 +237,40 @@ def write_cycle(store: Store, niche: str, product: str, stages: list[dict] | Non
             " concepts instead of a cloned format."
         )
 
+    sb = build(store, tags=store.niche_tags(niche) or None)
+    facts["n_videos"] = len(sb["videos"])
+    facts["n_scored"] = sb["n_scored"]
+    facts["n_tagged"] = sb["n_tagged"]
+    facts["curve"] = sb["curve"]
+    facts["traits"] = {k: sb[k][:8] for k in TRAIT_TABLES}
+    lines += ["", "### What the data says", ""]
+    lines.append(
+        f"{facts['n_videos']} {niche} videos tracked, {facts['n_scored']} scored (a day old, views"
+        f" against {niche} videos of the same age and account size), {facts['n_tagged']} classified."
+        " Mean lift per trait value is log10: +1 is 10x. n is videos with that trait and a score."
+    )
+    for key, label in TRAIT_TABLES.items():
+        table = sb[key]
+        if not table:
+            continue
+        lines += ["", f"{label}:", "", "| value | mean lift | n | win rate |", "|---|---|---|---|"]
+        for t in table[:6]:
+            lines.append(
+                f"| {_trait_value(t[_TRAIT_COLUMN[key]])} | {t['mean_reward']:+.2f}"
+                f" ± {t['stderr']:.2f} | {t['n']} | {round(t['win_rate'] * 100)}% |"
+            )
+    if not any(sb[k] for k in TRAIT_TABLES):
+        lines.append("No trait has two scored videos yet, so no trait table.")
+
     lines += ["", "### What the picker leaned on", ""]
     cs = concept_scores(store, niche)
     if cs:
         top = cs[0]
         facts["top_concept"] = top["name"]
+        facts["picks"] = [
+            {"name": c["name"], "share": round(p, 3), "n": c["n"]}
+            for c, p in zip(cs, pick_shares(cs), strict=False)
+        ][:8]
         with_data = [c for c in cs if c["n"]]
         lines.append(
             f"{len(cs)} concepts in the niche, {len(with_data)} with results from our own posts."
@@ -239,6 +289,19 @@ def write_cycle(store: Store, niche: str, product: str, stages: list[dict] | Non
 
     posts = own_posts(store)
     facts["own_posts"] = len(posts)
+    facts["own"] = [
+        {
+            "url": p["url"],
+            "concept": p["concept"],
+            "age_h": p["age_h"],
+            "views": p["views_now"],
+            "lift": _lift(p),
+            "engagement_per_1k": p.get("engagement_per_1k"),
+        }
+        for p in posts[:12]
+    ]
+    lifts = [_lift(p) for p in posts if _lift(p) is not None]
+    facts["own_mean_lift"] = round(sum(lifts) / len(lifts), 3) if lifts else None
     lines += ["", "### How our posts did", ""]
     if posts:
         lines += [
@@ -294,6 +357,28 @@ def write_cycle(store: Store, niche: str, product: str, stages: list[dict] | Non
         if pf.get("top_concept") != facts.get("top_concept"):
             changes.append(
                 f"top concept is now {facts.get('top_concept')} (was {pf.get('top_concept')})"
+            )
+        if (facts.get("n_scored") or 0) != (pf.get("n_scored") or 0):
+            changes.append(
+                f"{facts.get('n_scored') or 0} research videos scored (was {pf.get('n_scored') or 0})"
+            )
+        for key, label in TRAIT_TABLES.items():
+            now = (facts.get("traits") or {}).get(key) or []
+            was = (pf.get("traits") or {}).get(key) or []
+            if now and was and now[0][_TRAIT_COLUMN[key]] != was[0][_TRAIT_COLUMN[key]]:
+                changes.append(
+                    f"best {label.lower()} is now {_trait_value(now[0][_TRAIT_COLUMN[key]])}"
+                    f" ({now[0]['mean_reward']:+.2f}, n={now[0]['n']}), was"
+                    f" {_trait_value(was[0][_TRAIT_COLUMN[key]])} ({was[0]['mean_reward']:+.2f})"
+                )
+        if (
+            facts.get("own_mean_lift") is not None
+            and pf.get("own_mean_lift") is not None
+            and abs(facts["own_mean_lift"] - pf["own_mean_lift"]) >= 0.05
+        ):
+            changes.append(
+                f"our posts' mean lift is {facts['own_mean_lift']:+.2f}"
+                f" (was {pf['own_mean_lift']:+.2f})"
             )
         if (facts.get("own_posts") or 0) > (pf.get("own_posts") or 0):
             changes.append(

@@ -9,7 +9,7 @@ const pages: [string, string][] = [
   ["/clips", "Clips"], ["/ours", "Our posts"], ["/learnings", "Learnings"], ["/runs", "Runs"],
 ];
 
-const quick: [string, string][] = [["/clips", "Clips"], ["/learnings", "Learnings"], ["/runs", "Runs"]];
+const quick: [string, string][] = [["/learnings", "Learnings"], ["/clips", "Clips"], ["/runs", "Runs"]];
 
 export function Nav() {
   const key = usePathname() + useSearchParams().toString();

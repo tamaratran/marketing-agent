@@ -298,6 +298,23 @@ def _trait_bonus(traits: dict, effects: dict) -> tuple[float, float, list[dict]]
     return mean(own), mean(market), detail
 
 
+def pick_shares(concepts: list[dict], draws: int = 4000, seed: int = 0) -> list[float]:
+    """How often each concept would win the picker's draw, by simulating it `draws` times with a
+    fixed seed. Same noise as pick(): EXPLORE_SD shrinking with the concept's own post count."""
+    if not concepts:
+        return []
+    rng = random.Random(seed)
+    wins = [0] * len(concepts)
+    for _ in range(draws):
+        best, best_i = -1e9, 0
+        for i, c in enumerate(concepts):
+            x = rng.gauss(c["prior"] + c["learned"], EXPLORE_SD / math.sqrt(1 + c["n"]))
+            if x > best:
+                best, best_i = x, i
+        wins[best_i] += 1
+    return [w / draws for w in wins]
+
+
 def concept_scores(store: Store, niche: str, tag: str | None = None) -> list[dict]:
     """Each stored concept for the niche with a prior (log early score, scaled) and what has
     been learned about it: `learned` = (SHRINK_K * trait bonus + sum of its own posts' rewards)
