@@ -133,7 +133,10 @@ frames sampled every {every_s}s in order, and the audio transcript. Describe the
 (what the camera shows, when, at what speed, what is said, how much text is on screen), not the
 topic. Be concrete and literal: 'sweaty person in a living room, chest up, talking to the camera'
 beats 'engaging hook'. If the videos differ, describe the one with the most views and note the
-difference in `dont` or `summary`. Timings in `beats` should fit a {clip_s} second clip."""
+difference in `dont` or `summary`. Playback speed matters: frames are {every_s}s apart, so if the
+person covers far more movement between frames than real time allows, or the sound is a sped-up
+remix, the footage is sped up and `pacing` must say so. Say whether the hook is spoken (check the
+transcript) or only on screen. Timings in `beats` should fit a {clip_s} second clip."""
 
 
 def _frames_b64(video: Path, every_s: float, width: int, max_frames: int) -> list[str]:

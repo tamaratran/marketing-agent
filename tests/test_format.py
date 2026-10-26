@@ -83,13 +83,8 @@ def test_product_sources_rank_any_age_small_accounts_first(tmp_path: Path):
     store.upsert_video(_vid("9", "game", 47_000_000, 1_000, hashtags=[]))
     store.upsert_video(_vid("10", "carnaval", 12_000_000, 8_000, desc="#subwaysurfers #carnaval"))
     out = product_sources(store, ["subwaysurfers"], limit=6)
-    assert [r["id"] for r in out] == [
-        "1",
-        "2",
-        "10",
-        "8",
-        "3",
-    ]  # 9: the search tag alone is not a mention
+    # 9 is out: the search tag alone is not a mention; 10 tops 1 on log views minus size
+    assert [r["id"] for r in out] == ["10", "1", "2", "8", "3"]
     out = product_sources(store, ["subwaysurfers+cardio"], limit=5)
     assert [r["id"] for r in out] == ["8"]
     assert source_score(3_700_000, 1_400) > source_score(3_700_000, 2_000_000)
