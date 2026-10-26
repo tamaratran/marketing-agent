@@ -12,6 +12,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from . import campaign as campaign_cfg
+from . import policy, scoreboard
 from .analysis import analyze, latest_findings, save_findings
 from .cohort import build_features, features, latest_snapshot, repoll
 from .config import settings
@@ -70,6 +71,23 @@ def overview(niche: str = DEFAULT_NICHE):
         "concept_rank": sb["concepts"][:8],
         "stuck_accounts": build(store, group="ours")["stuck_accounts"],
         "top_videos": [v for v in sb["videos"] if v.get("hook_type")][:20],
+    }
+
+
+@app.get("/logic")
+def logic(niche: str = DEFAULT_NICHE):
+    """What the "How it decides" page draws: every research video's views against its creator's
+    usual (both log10, as scored) and the picker's constants, so the page never hardcodes them."""
+    store = _store()
+    sb = build(store, tags=store.niche_tags(niche) or None)
+    keys = ("id", "author", "views", "followers", "create_time", "log_views", "baseline", "reward")
+    return {
+        "niche": niche,
+        "videos": [{k: v.get(k) for k in keys} for v in sb["videos"]],
+        "explore_sd": policy.EXPLORE_SD,
+        "format_prior": policy.FORMAT_PRIOR,
+        "min_age_h": scoreboard.MIN_AGE_H_FOR_JUDGEMENT,
+        "winsor_pct": scoreboard.WINSOR_PCT,
     }
 
 
