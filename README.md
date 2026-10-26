@@ -104,7 +104,11 @@ that existed when they were posted, in the same niche/product. Unmatched posts e
 reward. Caption similarity is heuristic, not proof of attribution.
 
 `mkt daily` syncs own posts before selecting the next concept. No new post means no new reward.
-Historical lifetime-view baselines are not age-matched 72-hour controls; early lift is provisional.
+Our posts are judged two ways. "vs our usual" is the account's median views over all its posts, for
+reference only. The picker learns from the age-matched lift: views against what a niche video of the
+same age from an account of the same size typically has (a curve fitted on the reference videos,
+`scoreboard.fit_curve`), plus the account's own track record once it has 3 posts from the last 180
+days. Posts under 6 hours old do not move the picker; after that they count partly until 72 hours.
 Hashtag discovery remains an explicit fallback:
 `mkt own add @youraccount --tag yourtag`, then `mkt own sync --source hashtag`.
 Without profile access, that fallback can miss posts without those hashtags.

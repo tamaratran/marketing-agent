@@ -19,6 +19,7 @@ import re
 import time
 
 from .cohort import snapshot_creator, views_at
+from .scoreboard import MIN_AGE_H_FOR_OWN, curve_points, expected_log, fit_curve
 from .store import Store
 
 MIGRATIONS = [
@@ -28,6 +29,7 @@ MIGRATIONS = [
          handle TEXT PRIMARY KEY, campaign_tag TEXT, product TEXT, added_at INTEGER)""",
 ]
 MIN_MATCH = 0.45
+OWN_HISTORY_DAYS = 180  # older posts of ours say little about what the account gets today
 
 
 def migrate(store: Store) -> None:
@@ -242,23 +244,39 @@ def sync_own(
 
 
 def own_posts(store: Store) -> list[dict]:
-    """Every post from our accounts with its script, concept, baseline and current lift."""
+    """Every post from our accounts with its script, concept, baseline and current lift.
+
+    Two baselines per post. `lift_now`/`lift_72h` compare with the account's usual views (median
+    over its posts, whatever their age), kept for display. `lift_matched` compares with what a
+    niche video of the same age from an account of the same size typically has right now (the
+    reference curve, see scoreboard.fit_curve), plus the account's own track record against that
+    curve when it has MIN_FOR_OWN_BASELINE posts from the last OWN_HISTORY_DAYS. That is the
+    number the picker learns from: a 3 hour old post is judged against 3 hour old videos."""
     migrate(store)
     rows = store.rows(
         """SELECT v.id, v.url, v.author, v.desc, v.create_time, v.duration, v.source_tag, v.niche,
-                  v.script_id, s.hook, s.concept_id, c.name concept
+                  v.followers, v.script_id, s.hook, s.concept_id, c.name concept
            FROM videos v LEFT JOIN scripts s ON s.id=v.script_id
            LEFT JOIN concepts c ON c.id=s.concept_id WHERE v.ours=1 ORDER BY v.create_time DESC"""
     )
     now = int(time.time())
+    ref = store.latest(None, limit=500, group="reference")
+    curves: dict[str | None, dict | None] = {}
+    offsets: dict[str | None, dict[str, float]] = {}
     for v in rows:
+        niche = v.get("niche")
+        if niche not in curves:
+            curves[niche] = _niche_curve(store, ref, niche, now)
+            offsets[niche] = _account_offsets(store, curves[niche], now) if curves[niche] else {}
+        curve = curves[niche]
         obs = store.rows(
             "SELECT observed_at, views FROM observations WHERE video_id=? ORDER BY observed_at",
             (v["id"],),
         )
-        curve = [((o["observed_at"] - v["create_time"]) / 3600, o["views"]) for o in obs]
+        curve_pts = [((o["observed_at"] - v["create_time"]) / 3600, o["views"]) for o in obs]
         snap = store.rows(
-            "SELECT median_log_views, n_posts FROM creator_snapshots WHERE author=? ORDER BY taken_at DESC LIMIT 1",
+            "SELECT median_log_views, n_posts, followers FROM creator_snapshots WHERE author=? "
+            "ORDER BY taken_at DESC LIMIT 1",
             (v["author"],),
         )
         base = (
@@ -266,9 +284,11 @@ def own_posts(store: Store) -> list[dict]:
             if snap and snap[0]["median_log_views"] is not None
             else None
         )
+        followers = v.get("followers") or (snap[0]["followers"] if snap else None)
+        v["followers"] = followers
         v["age_h"] = round((now - v["create_time"]) / 3600, 1)
         v["views_now"] = obs[-1]["views"] if obs else None
-        v["views_72h"] = views_at(curve, 72)
+        v["views_72h"] = views_at(curve_pts, 72)
         v["baseline_log"] = base
         v["lift_72h"] = (
             (math.log10(v["views_72h"]) - base) if v["views_72h"] and base is not None else None
@@ -276,21 +296,66 @@ def own_posts(store: Store) -> list[dict]:
         latest = v["views_now"]
         v["lift_now"] = (math.log10(latest) - base) if latest and base is not None else None
         v["n_obs"] = len(obs)
+        v["account_offset"] = offsets[niche].get(v["author"], 0.0)
+        if curve and obs and latest:
+            age_obs = (obs[-1]["observed_at"] - v["create_time"]) / 3600
+            exp = expected_log(curve, age_obs, followers) + v["account_offset"]
+            v["expected_log"] = round(exp, 3)
+            v["lift_matched"] = round(math.log10(latest) - exp, 3)
+        else:
+            v["expected_log"] = None
+            v["lift_matched"] = None
     return rows
 
 
+def _niche_curve(store: Store, ref: list[dict], niche: str | None, now: int) -> dict | None:
+    """The reference curve for one niche (its hashtags' videos), or over every reference video
+    when the niche alone has too few."""
+    tags = store.niche_tags(niche) if niche else []
+    own = [r for r in ref if r["source_tag"] in tags] if tags else ref
+    return fit_curve(curve_points(own, now)) or fit_curve(curve_points(ref, now))
+
+
+def _account_offsets(store: Store, curve: dict, now: int) -> dict[str, float]:
+    """Per account, the median of how its recent posts (last OWN_HISTORY_DAYS) sit against the
+    reference curve, once it has MIN_FOR_OWN_BASELINE of them. Its usual, age-matched."""
+    from .scoreboard import MIN_FOR_OWN_BASELINE
+
+    rows = store.latest(None, limit=500, group="ours")
+    resid: dict[str, list[float]] = {}
+    for r in rows:
+        if not r.get("views") or not r.get("create_time"):
+            continue
+        if now - r["create_time"] > OWN_HISTORY_DAYS * 86400:
+            continue
+        age_h = ((r.get("observed_at") or now) - r["create_time"]) / 3600
+        if age_h < MIN_AGE_H_FOR_OWN:
+            continue
+        exp = expected_log(curve, age_h, r.get("followers"))
+        resid.setdefault(r["author"], []).append(math.log10(r["views"]) - exp)
+    return {
+        a: round(sorted(v)[len(v) // 2], 3)
+        for a, v in resid.items()
+        if len(v) >= MIN_FOR_OWN_BASELINE
+    }
+
+
 def own_rewards(store: Store) -> dict[int, dict]:
-    """concept_id -> {mean_reward, n} from our posts. 72h lift when available, else the latest
-    lift discounted by age (a 6h-old post counts a third of a 72h one) so early posts nudge the
-    picker without dominating it."""
+    """concept_id -> {mean_reward, n} from our posts. The age-matched lift, discounted by age (a
+    6h-old post counts about 30% of a 72h one) so early posts nudge the picker without dominating
+    it; posts under MIN_AGE_H_FOR_OWN are skipped as noise. Without a reference curve (nothing
+    scraped yet) it falls back to the lift over the account's usual views."""
     agg: dict[int, list[float]] = {}
     for p in own_posts(store):
-        if p["concept_id"] is None:
+        if p["concept_id"] is None or p["age_h"] < MIN_AGE_H_FOR_OWN:
             continue
-        if p["lift_72h"] is not None:
+        weight = min(1.0, (p["age_h"] / 72) ** 0.5)
+        if p["lift_matched"] is not None:
+            r = p["lift_matched"] * weight
+        elif p["lift_72h"] is not None:
             r = p["lift_72h"]
         elif p["lift_now"] is not None:
-            r = p["lift_now"] * min(1.0, (p["age_h"] / 72) ** 0.5)
+            r = p["lift_now"] * weight
         else:
             continue
         agg.setdefault(p["concept_id"], []).append(r)

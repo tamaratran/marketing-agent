@@ -11,14 +11,14 @@ export const dynamic = "force-dynamic";
 export default async function Page() {
   const [o, concepts] = await Promise.all([get<Ours>("/ours"), get<Concept[]>("/concepts")]);
   const conceptName = new Map(concepts.map((c) => [String(c.id), formatName(c.name)]));
-  const beat = o.posts.filter((p) => (p.lift_72h ?? p.lift_now ?? 0) > 0).length;
+  const beat = o.posts.filter((p) => (p.lift_matched ?? p.lift_72h ?? p.lift_now ?? 0) > 0).length;
   return (
     <>
       <H1 sub="How our own TikTok posts are doing. This is the only page that uses our account's results; everything else is research on other accounts.">Our posts</H1>
       <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-4">
         <Stat label="accounts we post from" value={o.accounts.length} />
         <Stat label="posts since registering" value={o.posts.length} hint="Older posts only set the account's usual views." />
-        <Stat label="beating our usual views" value={o.posts.length ? `${beat}/${o.posts.length}` : "none yet"} />
+        <Stat label="ahead of videos like them" value={o.posts.length ? `${beat}/${o.posts.length}` : "none yet"} hint="Same age, same account size, this niche." />
         <Stat label="concepts with results" value={Object.keys(o.rewards).length} hint="Concepts at least one matched post has tested." />
       </div>
       {o.accounts.length === 0 ? (
@@ -37,15 +37,15 @@ export default async function Page() {
         </form>
       </Card>
       <Card title="Posts">
-        <Note className="mb-3">Each post is matched to the script it came from by caption. &quot;vs our usual&quot; compares its views with the account&apos;s typical post: 2x usual means twice the normal views. The 3-day number is the one that counts; the current one is provisional.</Note>
+        <Note className="mb-3">Each post is matched to the script it came from by caption. &quot;vs videos like it&quot; compares its views with what a video of the same age from an account of the same size typically has in this niche right now; that is the number the picker learns from, once the post is 6 hours old. &quot;vs our usual&quot; compares with the account&apos;s own posts, whatever their age, which flatters or punishes a fresh post, so it is shown for reference only.</Note>
         {o.posts.length === 0 ? <p className="text-sm text-neutral-500">No posts since the account was registered. Post a clip from the Clips page, then add its link above.</p> : (
-          <Table head={["", "posted", "post", "script / concept", "views now", "views at 3 days", "vs our usual now", "vs our usual at 3 days", ""]} rows={o.posts.map((p) => [
+          <Table head={["", "posted", "post", "script / concept", "views now", "views at 3 days", "vs videos like it", "vs our usual at 3 days", ""]} rows={o.posts.map((p) => [
             <Thumb key={`t${p.id}`} id={p.id} href={`/videos/${p.id}`} />,
             dateOf(p.create_time),
             <Link key={p.id} href={`/videos/${p.id}`} className="text-sky-300 hover:underline">{(p.desc || p.id).slice(0, 60)}</Link>,
             p.script_id ? `#${p.script_id} · ${p.concept ? formatName(p.concept) : "?"}` : <Pill key="u" tone="warn">no script matched</Pill>,
             p.views_now?.toLocaleString() ?? "", p.views_72h ? Math.round(p.views_72h).toLocaleString() : "not yet",
-            reward(p.lift_now, p.baseline_log == null ? "no baseline" : "not yet"), reward(p.lift_72h, p.baseline_log == null ? "no baseline" : "not yet"),
+            reward(p.lift_matched, p.views_now ? "no reference videos yet" : "no views yet"), reward(p.lift_72h, p.baseline_log == null ? "no baseline" : "not yet"),
             <span key="n" className="text-neutral-500">{p.n_obs} polls</span>,
           ])} />
         )}
