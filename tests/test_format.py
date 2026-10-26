@@ -298,3 +298,19 @@ def test_own_results_on_an_older_row_reach_the_latest_concept(tmp_path: Path, mo
     monkeypatch.setattr(own, "own_rewards", lambda s: {ids[0]: {"mean_reward": -0.5, "n": 2}})
     (c,) = concept_scores(store, "fitness")
     assert c["id"] == ids[1] and c["n"] == 2 and c["mean_reward"] == -0.5
+
+
+def test_hook_split_over_lines_is_not_replayed():
+    caps = captions_from_script(
+        "POV: I made cardio Subway Surfers", ["POV: I made cardio", "Subway Surfers"], 12
+    )
+    assert [c.text for c in caps] == ["POV: I made cardio\nSubway Surfers"]
+    assert (caps[0].start, caps[0].end) == (0, 6)
+
+
+def test_app_label_follows_hook():
+    caps = captions_from_script(
+        "After 402 calories", ["After 402 calories", "Immersive Workout"], 12
+    )
+    assert [c.text for c in caps] == ["After 402 calories", "Immersive Workout"]
+    assert caps[0].end == 2.5 and caps[1].end == 12
