@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { CLIPS, dateOf, get, usd, type Render, type Script, frameUrl } from "@/lib/api";
 import type { Ours } from "@/lib/ours";
+import { Download } from "../download";
 import { Card, H1, Note, Pill } from "../ui";
 
 export const dynamic = "force-dynamic";
@@ -27,7 +28,7 @@ export default async function Page() {
               <video poster={frameUrl(`s${r.script_id}`)} controls preload="metadata" className="aspect-[9/16] w-full rounded bg-black" src={src} />
               <div className="mt-2 flex items-center gap-2">
                 {p ? <a href={p.url} target="_blank"><Pill tone="good">posted</Pill></a> : <Pill tone="warn">ready to post</Pill>}
-                <a href={src} download className="text-xs text-sky-300 hover:underline">download</a>
+                <Download src={src} className="text-xs text-sky-300 hover:underline">download</Download>
               </div>
               <p className="mt-2 text-sm font-medium">{r.hook}</p>
               {s?.concept && <p className="text-xs text-neutral-400">concept: {s.concept}</p>}
