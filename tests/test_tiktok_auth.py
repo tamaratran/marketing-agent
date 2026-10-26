@@ -33,6 +33,7 @@ def test_handle_validation_and_profile_links():
     assert auth.profile_handle("/@TestAccount?lang=en") == "testaccount"
     assert auth.profile_handle("https://www.tiktok.com/@testaccount") == "testaccount"
     assert auth.profile_handle("/login") is None
+    assert auth.profile_handle("/@") is None  # logged-out nav link
     for bad in ("", "test@gmail.com", "https://example.com/", "../user", "user/pass"):
         with pytest.raises(auth.LoginRequired):
             auth.normalize_handle(bad)

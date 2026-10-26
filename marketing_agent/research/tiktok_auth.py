@@ -25,7 +25,7 @@ def normalize_handle(handle: str) -> str:
 
 def profile_handle(href: str | None) -> str | None:
     path = urlsplit(href or "").path
-    return path[2:].lower() if path.startswith("/@") else None
+    return (path[2:].lower() or None) if path.startswith("/@") else None  # logged out: "/@"
 
 
 async def _identity(page) -> str | None:
@@ -90,7 +90,10 @@ async def ensure_login(cdp_url: str, handle: str | None = None) -> str:
             leave_open = True
             try:
                 await page.wait_for_url(
-                    lambda url: url.hostname == "www.tiktok.com" and "/login" not in url.path,
+                    lambda url: (
+                        urlsplit(url).hostname == "www.tiktok.com"
+                        and "/login" not in urlsplit(url).path
+                    ),
                     timeout=20000,
                 )
             except PlaywrightTimeoutError:
