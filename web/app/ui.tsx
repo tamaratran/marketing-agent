@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export function H1({ children, sub }: { children: React.ReactNode; sub?: string }) {
   return (
     <div className="mb-5">
@@ -81,3 +83,39 @@ export const human = (s: string | null | undefined) => (s ? s.replaceAll("_", " 
 
 export const pt = (ts: number) =>
   new Date(ts * 1000).toLocaleString("en-US", { timeZone: "America/Los_Angeles", weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) + " PT";
+
+/** A collapsed section: one summary line, open for the detail. Plain HTML, so it works without JS. */
+export function Fold({ summary, children, open = false, className = "" }: { summary: React.ReactNode; children: React.ReactNode; open?: boolean; className?: string }) {
+  return (
+    <details open={open} className={`group rounded-lg border border-neutral-800 ${className}`}>
+      <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-3 marker:hidden [&::-webkit-details-marker]:hidden">
+        <span className="min-w-0 flex-1">{summary}</span>
+        <span aria-hidden className="shrink-0 text-xs text-neutral-500 transition-transform group-open:rotate-90">▶</span>
+      </summary>
+      <div className="border-t border-neutral-800 px-4 py-3">{children}</div>
+    </details>
+  );
+}
+
+/** The four steps of the loop, in order; the nav and the Next buttons read this. */
+export const STEPS: { href: string; label: string; what: string }[] = [
+  { href: "/", label: "Formats", what: "what works in the niche" },
+  { href: "/learnings", label: "Learnings", what: "what we learned, what to make next" },
+  { href: "/clips", label: "Clips", what: "what got made, post it" },
+  { href: "/ours", label: "Our posts", what: "how it went, back into step 1" },
+];
+
+/** The button at the foot of each step page pointing at the next one. */
+export function NextStep({ from }: { from: string }) {
+  const i = STEPS.findIndex((s) => s.href === from);
+  const next = STEPS[(i + 1) % STEPS.length];
+  const n = (i + 1) % STEPS.length + 1;
+  return (
+    <div className="mt-8 flex justify-end border-t border-neutral-800 pt-4">
+      <Link href={next.href} className={`${button} flex items-center gap-2`}>
+        <span>{i === STEPS.length - 1 ? "Back to step 1" : `Next: step ${n}`}, {next.label}</span>
+        <span className="text-xs font-normal text-neutral-600">{next.what}</span>
+      </Link>
+    </div>
+  );
+}

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { get, type Concept, type Overview, type Script } from "@/lib/api";
 import { TraitBars, traitValue, type RankRow } from "./charts";
 import { Thumb } from "./thumb";
-import { H1, Pill, formatName, times } from "./ui";
+import { Fold, H1, NextStep, Pill, formatName, times } from "./ui";
 
 const TABLES: [keyof Overview, string, string][] = [
   ["hooks", "hook_type", "Hook type"], ["styles", "visual_style", "Visual style"],
@@ -60,9 +60,26 @@ export async function Formats() {
           {o.tagged < 40 && ` With ${o.tagged} classified so far these are early reads, not verdicts; each cycle classifies more.`}
         </p>
         {tables.length ? (
-          <div className="grid gap-5 sm:grid-cols-2">
-            {tables.map((t) => <TraitBars key={t.k} rows={t.rows} column={t.col} title={t.title} max={5} />)}
-          </div>
+          <>
+            <ul className="grid gap-2 text-sm sm:grid-cols-2">
+              {tables.map((t) => {
+                const top = [...t.rows].sort((a, b) => (b.mean_reward ?? 0) - (a.mean_reward ?? 0))[0];
+                return (
+                  <li key={t.k} className="flex flex-wrap items-baseline gap-x-2">
+                    <span className="text-neutral-500">{t.title}:</span>
+                    <span className="text-neutral-100">{traitValue(top[t.col] as string | boolean | null)}</span>
+                    <span className="text-emerald-300">{times(top.mean_reward ?? 0)}</span>
+                    <span className="text-xs text-neutral-500">on {top.n} video{top.n === 1 ? "" : "s"}</span>
+                  </li>
+                );
+              })}
+            </ul>
+            <Fold summary={<span className="text-xs text-neutral-400">Every trait, with its bar, sample size and error</span>} className="mt-3">
+              <div className="grid gap-5 sm:grid-cols-2">
+                {tables.map((t) => <TraitBars key={t.k} rows={t.rows} column={t.col} title={t.title} max={5} />)}
+              </div>
+            </Fold>
+          </>
         ) : (
           <p className="text-sm text-neutral-500">No scored videos have been classified yet. The next cycle classifies the first batch.</p>
         )}
@@ -70,17 +87,21 @@ export async function Formats() {
       </section>
 
       {sorted.length === 0 && <p className="text-sm text-neutral-500">No formats yet. A run cycle groups research videos into formats.</p>}
-      <ul className="space-y-4">
+      <ul className="space-y-2">
         {sorted.map((c) => {
           const traits = Object.entries(c.traits ?? {}).filter(([k, v]) => v != null && TRAIT[k]);
           return (
-            <li key={c.id} className="rounded-lg border border-neutral-800 p-4">
-              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                <h2 className="text-base font-semibold">{formatName(c.name)}</h2>
-                {c.kind === "format" && <Pill tone="good">our clone</Pill>}
-                {c.pick_share != null && <span className="text-xs text-neutral-500">picked {Math.round(c.pick_share * 100)}% of the time</span>}
-              </div>
-              <p className="mt-1 text-sm leading-relaxed text-neutral-400">{c.description}</p>
+            <li key={c.id}>
+              <Fold open={c.kind === "format"} summary={
+                <span className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+                  <span className="text-base font-semibold">{formatName(c.name)}</span>
+                  {c.kind === "format" && <Pill tone="good">our clone</Pill>}
+                  {c.pick_share != null && <span className="text-xs text-neutral-500">picked {Math.round(c.pick_share * 100)}%</span>}
+                  {c.n && c.mean_reward != null ? <span className={`text-xs ${c.mean_reward > 0 ? "text-emerald-300" : "text-red-300"}`}>{times(c.mean_reward)} videos like it</span> : null}
+                  <span className="flex gap-1">{(c.examples ?? []).slice(0, 3).map((e) => <Thumb key={e.id} id={e.id} size={22} />)}</span>
+                </span>
+              }>
+              <p className="text-sm leading-relaxed text-neutral-400">{c.description}</p>
               {traits.length > 0 && (
                 <div className="mt-3 flex flex-wrap gap-1.5">
                   {traits.map(([k, v]) => <span key={k} className="rounded-full border border-neutral-800 px-2 py-0.5 text-xs text-neutral-400">{TRAIT[k]}: {traitValue(v)}</span>)}
@@ -101,10 +122,12 @@ export async function Formats() {
                 <div className="mb-2 text-xs text-neutral-500">Examples from other accounts</div>
                 <Examples examples={c.examples} />
               </div>
+              </Fold>
             </li>
           );
         })}
       </ul>
+      <NextStep from="/" />
     </>
   );
 }

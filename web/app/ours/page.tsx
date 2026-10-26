@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { dateOf, get, type Concept } from "@/lib/api";
 import type { Ours } from "@/lib/ours";
-import { Card, H1, Note, Pill, Stat, Table, reward, formatName } from "../ui";
+import { Card, H1, NextStep, Note, Pill, Stat, Table, reward, formatName } from "../ui";
 import { Thumb } from "../thumb";
 import { addPost } from "../actions";
 
@@ -62,6 +62,7 @@ export default async function Page() {
           <Table head={["concept", "average vs videos like it, age-weighted", "posts"]} rows={Object.entries(o.rewards).map(([cid, r]) => [conceptName.get(cid) ?? `#${cid}`, reward(r.mean_reward), r.n])} />
         )}
       </Card>
+      <NextStep from="/ours" />
     </>
   );
 }
