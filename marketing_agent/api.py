@@ -341,6 +341,25 @@ def analyze_now(niche: str | None = None):
     return res["status"]
 
 
+class PostIn(BaseModel):
+    """A post a person made from one of our accounts: its TikTok link and, ideally, the caption
+    used, so it links to its script even before TikTok makes it public."""
+
+    url: str
+    caption: str = ""
+
+
+@app.post("/ours/posts", dependencies=[Depends(_auth)])
+def ours_add_post(body: PostIn):
+    """Register a post we made so the re-poll tracks its views and the picker learns from it."""
+    from .own import add_post
+
+    try:
+        return add_post(_store(), body.url, body.caption, niche=DEFAULT_NICHE)
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
+
+
 @app.get("/ours")
 def ours():
     """Our own posts with script, concept, baseline and lift, plus the per-concept reward the
