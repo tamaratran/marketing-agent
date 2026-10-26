@@ -109,7 +109,7 @@ def download(tag, top, max_age_h):
 
 
 @cli.command()
-@click.option("--limit", default=20)
+@click.option("--limit", default=None, type=int, help="Videos this run (default: all of them)")
 @click.option("--model", default=None)
 @click.option(
     "--niche",
@@ -119,13 +119,16 @@ def download(tag, top, max_age_h):
 )
 def classify(limit, model, niche):
     """Tag downloaded, untagged videos with the multimodal classifier. With --niche, work through
-    the scored research panel instead, so trait tables rest on the videos that have a score."""
+    the scored research panel instead, so trait tables rest on the videos that have a score. The
+    default is every video that qualifies: a scored video without tags is a lost lesson, and after
+    the first full pass only the cycle's new videos are left each run."""
     from .classifier.classify import classify as run_classify
     from .research.tiktok_browser import fetch_video_sync
 
     store = _store()
     model = model or settings.openai_model
     rows = store.untagged(limit) if niche is None else panel_untagged(store, _niche(niche), limit)
+    console.print(f"{len(rows)} to classify")
     done = 0
     for v in rows:
         path = Path(v["local_path"] or "")
@@ -151,15 +154,16 @@ def classify(limit, model, niche):
     return f"{done} classified"
 
 
-def panel_untagged(store, niche: str, limit: int) -> list[dict]:
+def panel_untagged(store, niche: str, limit: int | None = None) -> list[dict]:
     """The niche's scored research videos (a day old, so they have a lift) without tags, newest
-    first: the ones whose score a classification would turn into a trait lesson."""
+    first: the ones whose score a classification would turn into a trait lesson. All of them
+    unless `limit` says otherwise."""
     from .scoreboard import build
 
     sb = build(store, tags=store.niche_tags(niche) or None)
     scored = [v for v in sb["videos"] if v.get("reward") is not None and not v.get("hook_type")]
     scored.sort(key=lambda v: -(v.get("create_time") or 0))
-    return scored[:limit]
+    return scored if limit is None else scored[:limit]
 
 
 @cli.command()
@@ -827,8 +831,10 @@ def format_cmd(niche, product_tags, limit):
 @click.option("--top", default=8)
 @click.option(
     "--classify-panel",
-    default=40,
-    help="Scored research videos without tags to download and classify this run",
+    default=None,
+    type=int,
+    help="Cap on scored research videos without tags to download and classify this run"
+    " (default: all of them)",
 )
 @click.option("--renders", default=None, type=int, help="Clips to render (default campaign.toml)")
 @click.option("--resolution", default=None, help="480p, 720p or 1080p (default campaign.toml)")

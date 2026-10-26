@@ -206,7 +206,9 @@ class Store:
             )
         }
 
-    def untagged(self, limit: int = 50) -> list[dict]:
+    def untagged(self, limit: int | None = 50) -> list[dict]:
+        """Downloaded videos without tags; `limit=None` means all of them (SQLite's LIMIT -1)."""
+        limit = -1 if limit is None else limit
         with self.conn() as c:
             return [
                 dict(r)

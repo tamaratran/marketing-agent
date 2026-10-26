@@ -69,6 +69,7 @@ def overview(niche: str = DEFAULT_NICHE):
         "videos": len(sb["videos"]),
         "scored": sb["n_scored"],
         "tagged": sb["n_tagged"],
+        "trait_min_n": sb["trait_min_n"],
         "concepts": len(concept_scores(store, niche)),
         "spent_usd": round(spent, 2),
         "winning": winning_traits(store),
