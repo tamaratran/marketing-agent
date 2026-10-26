@@ -8,6 +8,9 @@ import { addPost } from "../actions";
 export const dynamic = "force-dynamic";
 
 
+// Mirrors scoreboard.MIN_AGE_H_FOR_OWN: younger posts are not judged.
+const MIN_AGE_H_OWN = 6;
+
 export default async function Page() {
   const [o, concepts] = await Promise.all([get<Ours>("/ours"), get<Concept[]>("/concepts")]);
   const conceptName = new Map(concepts.map((c) => [String(c.id), formatName(c.name)]));
@@ -45,7 +48,9 @@ export default async function Page() {
             <Link key={p.id} href={`/videos/${p.id}`} className="text-sky-300 hover:underline">{(p.desc || p.id).slice(0, 60)}</Link>,
             p.script_id ? `#${p.script_id} · ${p.concept ? formatName(p.concept) : "?"}` : <Pill key="u" tone="warn">no script matched</Pill>,
             p.views_now?.toLocaleString() ?? "", p.views_72h ? Math.round(p.views_72h).toLocaleString() : "not yet",
-            reward(p.lift_matched, p.views_now ? "no reference videos yet" : "no views yet"),
+            p.age_h != null && p.age_h < MIN_AGE_H_OWN
+              ? <span key="early" className="text-neutral-600" title={`Posts younger than ${MIN_AGE_H_OWN} hours are noise and do not move the picker`}>too early ({p.age_h.toFixed(1)}h)</span>
+              : reward(p.lift_matched, p.views_now ? "no reference videos yet" : "no views yet", "videos like it"),
             p.engagement_per_1k != null ? <span key="e">{p.engagement_per_1k} <span className="text-neutral-500">({p.engagement_lift != null ? `${p.engagement_lift > 0 ? "+" : ""}${p.engagement_lift.toFixed(2)} vs niche` : "no niche median"})</span></span> : "",
             reward(p.lift_72h, p.baseline_log == null ? "no baseline" : "not yet"),
             <span key="n" className="text-neutral-500">{p.n_obs} polls</span>,
