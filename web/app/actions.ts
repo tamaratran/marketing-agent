@@ -37,3 +37,11 @@ export async function analyzeNow() {
   revalidatePath("/");
   return r;
 }
+
+export async function addPost(formData: FormData) {
+  const url = String(formData.get("url") ?? "").trim();
+  const caption = String(formData.get("caption") ?? "").trim();
+  if (!url) return;
+  await post("/ours/posts", { url, caption });
+  revalidatePath("/ours");
+}

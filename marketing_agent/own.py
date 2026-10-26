@@ -15,6 +15,7 @@ import difflib
 import json
 import math
 import os
+import re
 import time
 
 from .cohort import snapshot_creator, views_at
@@ -54,6 +55,75 @@ def add_account(store: Store, handle: str, campaign_tag: str, product: str = "")
                 int(time.time()),
             ),
         )
+
+
+POST_URL = re.compile(r"tiktok\.com/@([\w.\-]+)/video/(\d+)")
+
+
+def add_post(store: Store, url: str, caption: str = "", niche: str | None = None) -> dict:
+    """Register a post a person made from one of our accounts, by its TikTok link. Public stats
+    come over plain HTTP; a post still under review is stored with the caption given so the script
+    match happens now and the 2-hourly re-poll fills in the views once it is public."""
+    from .research.tiktok_browser import poll_public_stats
+
+    migrate(store)
+    m = POST_URL.search(url)
+    try:
+        row = poll_public_stats(url)
+    except Exception:
+        row = None
+    if not row and not m:
+        raise ValueError(
+            "Need a tiktok.com/@handle/video/<id> link (short links need a public post)"
+        )
+    ours = {a["handle"]: a for a in accounts(store)}
+    author = ((row or {}).get("author") or m.group(1)).lower()
+    if author not in ours:
+        raise ValueError(f"@{author} is not one of our accounts; register it with `mkt own add`")
+    now = int(time.time())
+    public = bool(row)
+    if not row:
+        row = {
+            "id": m.group(2),
+            "url": f"https://www.tiktok.com/@{author}/video/{m.group(2)}",
+            "author": author,
+            "followers": None,
+            "create_time": now,
+            "duration": None,
+            "desc": caption,
+            "music": "",
+            "hashtags": re.findall(r"#(\w+)", caption),
+        }
+    row["source_tag"] = "profile"
+    if caption and not row.get("desc"):
+        row["desc"] = caption
+    store.upsert_video(row)
+    with store.conn() as c:
+        c.execute("DELETE FROM observations WHERE video_id=? AND views IS NULL", (row["id"],))
+    sid, score = match_script(
+        store,
+        caption or row.get("desc", ""),
+        posted_at=row["create_time"],
+        niche=niche,
+        product=ours[author]["product"],
+    )
+    with store.conn() as c:
+        c.execute(
+            """UPDATE videos SET ours=1, script_id=COALESCE(?, script_id), niche=COALESCE(?, niche),
+                      cohort_at=COALESCE(cohort_at, ?) WHERE id=?""",
+            (sid, niche, now, row["id"]),
+        )
+    if not store.rows("SELECT 1 FROM creator_snapshots WHERE author=?", (author,)):
+        snapshot_creator(store, author)
+    return {
+        "id": row["id"],
+        "url": row["url"],
+        "author": author,
+        "script_id": sid,
+        "match": score,
+        "views": row.get("views"),
+        "public": public,
+    }
 
 
 def accounts(store: Store) -> list[dict]:
