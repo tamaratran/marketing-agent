@@ -803,11 +803,6 @@ def daily(
         lambda: ctx.invoke(cohort, niche=niche, tags=tags, scrolls=6, max_classify=100),
     )
     stage("analyze", lambda: ctx.invoke(analyze, niche=()))
-    if dashboard_out:
-        stage(
-            "frames",
-            lambda: ctx.invoke(frames, out=str(Path(dashboard_out).parent / "frames")),
-        )
     store = _store()
     todays = [
         r["id"]
@@ -863,6 +858,11 @@ def daily(
             return note
 
         stage("render", render_best)
+    if dashboard_out:  # after render, so new clips get posters too
+        stage(
+            "frames",
+            lambda: ctx.invoke(frames, out=str(Path(dashboard_out).parent / "frames")),
+        )
 
     stage("own_research", lambda: ctx.invoke(own_research, limit=20, model=None))
     stage("scoreboard", lambda: ctx.invoke(scoreboard, tag=None, top=15, group="both"))
