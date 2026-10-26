@@ -234,8 +234,7 @@ def own_sync(niche, tags, source="profile"):
 @click.option("--limit", default=20, help="Max posts to download and tag this run")
 @click.option("--model", default=None)
 def own_research(limit, model):
-    """Download and classify our posts (our accounts' campaign posts and briefed creators' posts)
-    so we know which hook, style and pacing each one actually used, not only which script it
+    """Download and classify our accounts' campaign posts so we know which hook, style and pacing each one actually used, not only which script it
     came from."""
     from .classifier.classify import classify as run_classify
     from .research.tiktok_browser import fetch_video_sync
@@ -243,7 +242,7 @@ def own_research(limit, model):
     store = _store()
     model = model or settings.openai_model
     todo = store.rows(
-        """SELECT v.* FROM videos v WHERE (v.ours=1 OR v.id IN (SELECT video_id FROM posts))
+        """SELECT v.* FROM videos v WHERE v.ours=1
             AND NOT EXISTS (SELECT 1 FROM tags t WHERE t.video_id=v.id)
             ORDER BY v.create_time DESC LIMIT ?""",
         (limit,),
@@ -445,7 +444,7 @@ def poll(urls):
     "--group",
     type=click.Choice(["reference", "ours", "both"]),
     default="both",
-    help="reference = videos scraped for research, ours = our accounts and briefed creators",
+    help="reference = videos scraped for research, ours = our registered accounts",
 )
 def scoreboard(tag, top, group):
     """Reward per video (log views vs the account's baseline), hooks and concepts ranked by it,

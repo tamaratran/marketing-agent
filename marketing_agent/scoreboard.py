@@ -130,8 +130,8 @@ def build(
     group: str | None = "reference",
 ) -> dict:
     """Scored videos, hook/concept/style tables and stuck accounts for one group of videos:
-    "reference" (scraped for research, the default) or "ours" (our accounts and briefed
-    creators). The two are never pooled: a stranger's viral hit says nothing about our accounts,
+    "reference" (scraped for research, the default) or "ours" (our registered
+    accounts). The two are never pooled: a stranger's viral hit says nothing about our accounts,
     and throttling only matters on accounts we post from. Hashtag `tags` apply to reference only;
     our posts are found by account, not hashtag."""
     rows = store.latest(tag, limit=limit, group=group)

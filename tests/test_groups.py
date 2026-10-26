@@ -3,7 +3,6 @@ import time
 from click.testing import CliRunner
 
 from marketing_agent.cohort import build_features, enroll, features
-from marketing_agent.creators.ops import add_creator, record_post
 from marketing_agent.own import add_account
 from marketing_agent.research.radar import rank
 from marketing_agent.scoreboard import build
@@ -20,10 +19,6 @@ def _setup(tmp_path):
     store.upsert_video(_video(11, "ourring", 2, 3000))  # our campaign post
     with store.conn() as c:
         c.execute("UPDATE videos SET ours=1, cohort_at=? WHERE id='11'", (int(time.time()),))
-    add_creator(store, "amy", "discord", 1.0)
-    record_post(
-        store, "amy", "https://www.tiktok.com/@amy/video/12", stats=_video(12, "amy", 2, 9000)
-    )
     return store
 
 
@@ -32,7 +27,7 @@ def test_reference_and_ours_never_mix(tmp_path):
     ref = {r["id"] for r in store.latest(group="reference")}
     ours = {r["id"] for r in store.latest(group="ours")}
     assert ref == {"1", "2", "3"}
-    assert ours == {"10", "11", "12"}
+    assert ours == {"10", "11"}
     assert {r["id"] for r in store.latest()} == ref | ours
     assert {r["id"] for r in rank(store)} == ref
     assert {r["id"] for r in build(store)["videos"]} == ref
@@ -57,4 +52,4 @@ def test_prompt_and_cli_label_each_group(tmp_path, monkeypatch):
     assert "Our own posts" not in winning_traits(store)  # nothing old enough to score yet
     monkeypatch.setattr(cli_mod, "_store", lambda: store)
     out = CliRunner().invoke(cli_mod.cli, ["scoreboard"]).output
-    assert "Our posts: 3 videos" in out and "Reference videos (research): 3 videos" in out
+    assert "Our posts: 2 videos" in out and "Reference videos (research): 3 videos" in out

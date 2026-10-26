@@ -21,9 +21,8 @@ Every video in the store is in exactly one of two groups, and they are never poo
   radar, concept clustering, the cohort panel and the controlled findings: what the market
   rewards right now.
 - **Ours**: posts from our registered accounts (`mkt own add`, including their older posts, which
-  set the baseline) and posts by creators we briefed (`mkt creators post`). They feed the picker's
-  observed reward, the "our posts" section of the script prompt, payouts and the throttled-account
-  check. `mkt own research` downloads and classifies them so we know which hook and style each
+  set the baseline). They feed the picker's observed reward, the "our posts" section of the
+  script prompt and the throttled-account check. `mkt own research` downloads and classifies them so we know which hook and style each
   one actually used.
 
 `mkt scoreboard` prints both, `--group reference|ours` prints one. The daily report has a section
