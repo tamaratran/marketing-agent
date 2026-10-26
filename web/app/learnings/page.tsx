@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { API, get, type Campaign, type CycleFacts, type Learning, type Overview, type Render, type Run, type Script } from "@/lib/api";
+import { API, get, type Campaign, type CycleFacts, type Learning, type Render, type Run, type Script } from "@/lib/api";
 import { startRenders, startResearch } from "../actions";
 import { Trend, traitValue, type RankRow } from "../charts";
 import { Markdown } from "../md";
@@ -21,8 +21,8 @@ const TABLES: [keyof NonNullable<CycleFacts["traits"]>, string, string][] = [
 ];
 
 export default async function Page() {
-  const [rows, o, scripts, renders, runs, c] = await Promise.all([
-    get<Learning[]>("/learnings?limit=100"), get<Overview>("/overview"),
+  const [rows, scripts, renders, runs, c] = await Promise.all([
+    get<Learning[]>("/learnings?limit=100"),
     get<Script[]>("/scripts?days=14&limit=200"), get<Render[]>("/renders"), get<Run[]>("/runs?limit=5"), get<Campaign>("/campaign"),
   ]);
   const newest = scripts.reduce((m, s) => Math.max(m, s.created_at), 0);
@@ -40,7 +40,6 @@ export default async function Page() {
   const taggedPts = cycles.filter((c) => c.facts.n_tagged != null).map((c) => ({ t: c.created_at, v: c.facts.n_tagged as number }));
   const ownPts = cycles.filter((c) => c.facts.own_mean_lift != null).map((c) => ({ t: c.created_at, v: c.facts.own_mean_lift as number }));
   const clonePts = cycles.flatMap((c) => { const p = c.facts.picks?.find((x) => /clone/i.test(x.name)); return p ? [{ t: c.created_at, v: p.share }] : []; });
-  const nScored = latest?.n_scored ?? o.scored, nTagged = latest?.n_tagged ?? o.tagged, nVideos = latest?.n_videos ?? o.videos;
   return (
     <>
       <H1 sub="What the data says, what the agent wrote about it, and what it proposes to make next.">Learnings</H1>
@@ -49,7 +48,7 @@ export default async function Page() {
         <form action={startResearch} className="flex flex-wrap items-center gap-3">
           <button className={ghost} disabled={!!running}>Research again</button>
           <Note>
-            Re-measures our posts, re-scrapes the market, classifies every scored video that has no tags yet, and rewrites the learnings and the proposed scripts below. About 15 minutes plus 20 seconds per video to classify (the first full pass is about an hour), no clips, so no fal cost.
+            About an hour the first time, then about 15 minutes. No clips, so no fal cost.
             {running && <> A run is already going: <Link href="/runs" className="text-sky-300 hover:underline">see Runs</Link>.</>}
           </Note>
         </form>
@@ -57,7 +56,7 @@ export default async function Page() {
 
       <Card title="What changed since last cycle">
         <Note>
-          {nVideos} {o.niche} videos tracked, {nScored} scored (a day old, views against {o.niche} videos of the same age and account size), {nTagged} classified by the vision model. What wins right now, trait by trait, is on <Link href="/" className="text-sky-300 hover:underline">Formats</Link>; this is what moved between the last two cycles{prev && latest ? <>, {when(cycles[cycles.length - 2].created_at)} to {when(cycles[cycles.length - 1].created_at)}</> : null}.
+          {prev && latest ? <>{when(cycles[cycles.length - 2].created_at)} to {when(cycles[cycles.length - 1].created_at)}. What wins now is on <Link href="/" className="text-sky-300 hover:underline">Formats</Link>.</> : <>What wins now is on <Link href="/" className="text-sky-300 hover:underline">Formats</Link>.</>}
         </Note>
         {!latest ? (
           <Note className="mt-3">No cycle entry yet. Research again writes the first one.</Note>
@@ -74,7 +73,7 @@ export default async function Page() {
             </dl>
             <h3 className="mt-5 text-sm font-medium text-neutral-200">Trait evidence that moved</h3>
             {moves.length === 0 ? (
-              <Note className="mt-1">No trait value changed by 0.1 or more in mean lift, gained or lost a bar, or added videos.</Note>
+              <Note className="mt-1">Nothing moved.</Note>
             ) : (
               <ul className="mt-2 space-y-2 text-sm">
                 {moves.map((m) => (
@@ -111,15 +110,15 @@ export default async function Page() {
 
       {cycles.length > 0 && (
         <Card title="Cycle to cycle" className="mt-4">
-          <Note>One point per cycle entry. These are the numbers the &quot;Changed since last cycle&quot; lines are computed from.</Note>
+
           <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <Trend points={scoredPts} label="Research videos scored" fmt={(v) => String(Math.round(v))} />
             <Trend points={taggedPts} label="Videos classified" fmt={(v) => String(Math.round(v))} />
             <Trend points={ownPts} label="Our posts, mean lift" fmt={(v) => `${times(v)} videos like them`} />
             <Trend points={clonePts} label="Clone format's pick share" fmt={(v) => `${Math.round(v * 100)}%`} />
           </div>
-          {scoredPts.length + taggedPts.length + clonePts.length === 0 && <Note className="mt-2">No cycle has recorded these counts yet; entries written before the counts existed have nothing to plot. The next cycle adds the first point.</Note>}
-          {ownPts.length === 0 && <Note className="mt-2">Our posts have no measured lift yet (a post counts once it is 6 hours old).</Note>}
+          {scoredPts.length + taggedPts.length + clonePts.length === 0 && <Note className="mt-2">Nothing to plot yet; the next cycle adds the first point.</Note>}
+          {ownPts.length === 0 && <Note className="mt-2">No post is 6 hours old yet.</Note>}
         </Card>
       )}
 
@@ -128,7 +127,7 @@ export default async function Page() {
           <>
             <Note>
               {batch.length} scripts across {batchFormats.length} format{batchFormats.length === 1 ? "" : "s"} ({batchFormats.map(formatName).join(", ")}), written {when(newest)}.
-              {batch.some((s) => s.why) ? " Ranked by expected lift: what the picker believes the format earns against videos like it, from our posts and the panel's trait evidence. Open a script for the reasons." : " Best demo score first; the picker's reasons are stored from the next Research again on."}
+
             </Note>
             <ul className="mt-3 space-y-2 text-sm">
               {batch.map((s) => (
@@ -150,7 +149,7 @@ export default async function Page() {
             </ul>
             <form action={startRenders} className="mt-4 flex flex-wrap items-center gap-3">
               <button className={button} disabled={!!running}>Generate clips</button>
-              <Note>Renders the best {c.cycle.clips} not-yet-rendered scripts above at {c.cycle.resolution}, about ${(c.cycle.clips * (c.cycle.resolution === "1080p" ? 9.6 : c.cycle.resolution === "480p" ? 2.65 : 5.68)).toFixed(0)} on fal. Each finished clip is then posted to our account on its own and its link registered on Our posts, so measurement starts right away. Clips the worker holds (wrong game on screen, a second person) are not posted.</Note>
+              <Note>{c.cycle.clips} clips at {c.cycle.resolution}, about ${(c.cycle.clips * (c.cycle.resolution === "1080p" ? 9.6 : c.cycle.resolution === "480p" ? 2.65 : 5.68)).toFixed(0)} on fal. Each finished clip is posted to our account and tracked on Our posts; held clips are not posted.</Note>
             </form>
           </>
         )}

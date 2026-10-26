@@ -53,12 +53,15 @@ export async function Formats() {
       <H1 sub={`What is working in ${o.niche} on TikTok right now, grouped into formats we can copy. Each cycle the picker chooses one and writes scripts in it.`}>Formats</H1>
 
       <section className="mb-8 rounded-lg border border-neutral-800 p-4">
-        <h2 className="text-sm font-semibold">What wins, across the whole panel</h2>
-        <p className="mt-1 mb-4 text-xs leading-relaxed text-neutral-500">
-          {o.videos} recent {o.niche} videos from other accounts tracked, {o.scored} scored against {o.niche} videos of the same age from accounts the same size, {o.tagged} classified by the vision model.
-          Each bar is the mean lift of videos with that trait: 1x means the same views as videos like it, 10x ten times more. The number after the dot is how many scored videos the bar rests on; the white tick is one standard error.
-          {o.tagged < 40 && ` With ${o.tagged} classified so far these are early reads, not verdicts; a trait value needs ${o.trait_min_n ?? 5} videos before it gets a bar, and Research again classifies every scored video that has none.`}
-        </p>
+        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+          <h2 className="text-sm font-semibold">What wins</h2>
+          <Link href="/how" className="text-xs text-neutral-500 hover:text-neutral-300 hover:underline">How these are scored</Link>
+        </div>
+        <div className="mt-3 mb-4 grid grid-cols-3 gap-2">
+          <Stat n={o.videos} label={`${o.niche} videos tracked`} />
+          <Stat n={o.scored} label="scored" />
+          <Stat n={o.tagged} label="classified" />
+        </div>
         {tables.length ? (
           <>
             <ul className="grid gap-2 text-sm sm:grid-cols-2">
@@ -69,21 +72,20 @@ export async function Formats() {
                     <span className="text-neutral-500">{t.title}:</span>
                     <span className="text-neutral-100">{traitValue(top[t.col] as string | boolean | null)}</span>
                     <span className="text-emerald-300">{times(top.mean_reward ?? 0)}</span>
-                    <span className="text-xs text-neutral-500">on {top.n} video{top.n === 1 ? "" : "s"}</span>
+                    <span className="text-xs text-neutral-500">{top.n} video{top.n === 1 ? "" : "s"}</span>
                   </li>
                 );
               })}
             </ul>
-            <Fold summary={<span className="text-xs text-neutral-400">Every trait, with its bar, sample size and error</span>} className="mt-3">
+            <Fold summary={<span className="text-xs text-neutral-400">Every trait</span>} className="mt-3">
               <div className="grid gap-5 sm:grid-cols-2">
                 {tables.map((t) => <TraitBars key={t.k} rows={t.rows} column={t.col} title={t.title} max={5} />)}
               </div>
             </Fold>
           </>
         ) : (
-          <p className="text-sm text-neutral-500">No trait value has {o.trait_min_n ?? 5} scored, classified videos yet. Research again on Learnings classifies every scored video that has no tags.</p>
+          <p className="text-sm text-neutral-500">No trait has {o.trait_min_n ?? 5} classified videos yet. <Link href="/learnings" className="text-sky-300 hover:underline">Research again</Link> classifies the rest.</p>
         )}
-        <p className="mt-4 text-xs text-neutral-500">Cycle by cycle, with our own posts: <Link href="/learnings" className="text-sky-300 hover:underline">Learnings</Link>. How the picker turns this into a choice: <Link href="/how" className="text-sky-300 hover:underline">How it decides</Link>.</p>
       </section>
 
       {sorted.length === 0 && <p className="text-sm text-neutral-500">No formats yet. A run cycle groups research videos into formats.</p>}
@@ -129,5 +131,14 @@ export async function Formats() {
       </ul>
       <NextStep from="/" />
     </>
+  );
+}
+
+function Stat({ n, label }: { n: number; label: string }) {
+  return (
+    <div className="rounded-lg border border-neutral-800 px-3 py-2">
+      <div className="text-xl font-semibold tabular-nums text-neutral-100">{n.toLocaleString("en-US")}</div>
+      <div className="text-xs text-neutral-500">{label}</div>
+    </div>
   );
 }
