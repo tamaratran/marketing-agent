@@ -85,7 +85,7 @@ styles into the prompt. `mkt policy <niche>` shows what the loop has learned.
 # Supply TIKTOK_POST_HANDLE and TIKTOK_POST_PASSWORD through protected secrets, not CLI arguments.
 mkt own login
 mkt own add @youraccount --product "your product"
-mkt own sync wearables
+mkt own sync                      # niche and hashtags from campaign.toml
 mkt own list
 ```
 
@@ -106,7 +106,7 @@ reward. Caption similarity is heuristic, not proof of attribution.
 `mkt daily` syncs own posts before selecting the next concept. No new post means no new reward.
 Historical lifetime-view baselines are not age-matched 72-hour controls; early lift is provisional.
 Hashtag discovery remains an explicit fallback:
-`mkt own add @youraccount --tag yourtag`, then `mkt own sync wearables --source hashtag`.
+`mkt own add @youraccount --tag yourtag`, then `mkt own sync --source hashtag`.
 Without profile access, that fallback can miss posts without those hashtags.
 
 - Watch time and completion are not public for other people's videos. The scoreboard uses views,
