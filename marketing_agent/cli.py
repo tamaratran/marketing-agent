@@ -230,14 +230,59 @@ def own_sync(niche, tags, source="profile"):
         raise click.ClickException(str(exc)) from None
 
 
+@own.command("research")
+@click.option("--limit", default=20, help="Max posts to download and tag this run")
+@click.option("--model", default=None)
+def own_research(limit, model):
+    """Download and classify our posts (our accounts' campaign posts and briefed creators' posts)
+    so we know which hook, style and pacing each one actually used, not only which script it
+    came from."""
+    from .classifier.classify import classify as run_classify
+    from .research.tiktok_browser import fetch_video_sync
+
+    store = _store()
+    model = model or settings.openai_model
+    todo = store.rows(
+        """SELECT v.* FROM videos v WHERE (v.ours=1 OR v.id IN (SELECT video_id FROM posts))
+            AND NOT EXISTS (SELECT 1 FROM tags t WHERE t.video_id=v.id)
+            ORDER BY v.create_time DESC LIMIT ?""",
+        (limit,),
+    )
+    tagged = failed = 0
+    for v in todo:
+        try:
+            if not (v.get("local_path") and Path(v["local_path"]).exists()):
+                out = settings.videos_dir / f"{v['id']}.mp4"
+                fetch_video_sync(v["url"], out, settings.cdp_url)
+                store.set_local_path(v["id"], str(out))
+                v["local_path"] = str(out)
+            v["hashtags"] = json.loads(v["hashtags"] or "[]")
+            res = run_classify(
+                Path(v["local_path"]), v, model=model, transcribe_model=settings.transcribe_model
+            )
+            store.save_tags(v["id"], model, res)
+            tagged += 1
+            console.print(f"{v['id']} @{v['author']}: {res['tags']['hook_type']}")
+        except Exception as e:  # noqa: BLE001 - one bad post must not stop the rest
+            failed += 1
+            console.print(f"[red]{v['id']}: {e!r}")
+    note = f"{tagged}/{len(todo)} of our posts tagged"
+    console.print(note)
+    if failed:
+        raise click.ClickException(f"{note}, {failed} failed")
+    return note
+
+
 @own.command("list")
 def own_list():
     from .own import own_posts
 
-    for p in own_posts(_store()):
+    store = _store()
+    for p in own_posts(store):
+        hook = store.tags_for([p["id"]]).get(p["id"], {}).get("tags", {}).get("hook_type")
         console.print(
             f"{p['id']} @{p['author']} {p['age_h']}h views={p['views_now']} "
-            f"script={p['script_id']} concept={p['concept']} lift_now={p['lift_now']}"
+            f"script={p['script_id']} concept={p['concept']} hook={hook} lift_now={p['lift_now']}"
         )
 
 
@@ -396,15 +441,28 @@ def poll(urls):
 @cli.command()
 @click.option("--tag", default=None)
 @click.option("--top", default=25)
-def scoreboard(tag, top):
+@click.option(
+    "--group",
+    type=click.Choice(["reference", "ours", "both"]),
+    default="both",
+    help="reference = videos scraped for research, ours = our accounts and briefed creators",
+)
+def scoreboard(tag, top, group):
     """Reward per video (log views vs the account's baseline), hooks and concepts ranked by it,
-    and accounts stuck under 1k views."""
+    and accounts stuck under 1k views. Reference videos and our posts are scored separately."""
+    for g in ("ours", "reference") if group == "both" else (group,):
+        _scoreboard_group(tag, top, g)
+
+
+def _scoreboard_group(tag, top, group):
     from .scoreboard import build, growth
 
     store = _store()
-    sb = build(store, tag)
+    sb = build(store, tag, group=group)
+    title = "Our posts" if group == "ours" else "Reference videos (research)"
     console.print(
-        f"{len(sb['videos'])} videos, {sb['n_scored']} old enough to score, {sb['n_tagged']} tagged"
+        f"[bold]{title}[/bold]: {len(sb['videos'])} videos, {sb['n_scored']} old enough to score, "
+        f"{sb['n_tagged']} tagged"
     )
     t = Table("reward", "views", "vph now", "eng/1k", "hook", "concept", "author", "url")
     for r in sb["videos"][:top]:
@@ -714,9 +772,10 @@ def daily(ctx, niche, tags, product, top, renders, resolution, refs, report, das
         return f"{n}/{len(urls)} posts polled"
 
     stage("poll_posts", poll_posts)
+    stage("own_research", lambda: ctx.invoke(own_research, limit=20, model=None))
     stage("payouts", lambda: ctx.invoke(creators_payouts, min_age_days=7))
     stage("creators", lambda: ctx.invoke(creators_report, stall_days=7))
-    stage("scoreboard", lambda: ctx.invoke(scoreboard, tag=None, top=15))
+    stage("scoreboard", lambda: ctx.invoke(scoreboard, tag=None, top=15, group="both"))
     stage("policy", lambda: ctx.invoke(policy, niche=niche))
 
     report = (

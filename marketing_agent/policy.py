@@ -37,18 +37,49 @@ def controlled_traits(store: Store, outcome: str = "lift_72h") -> str:
     if not parts:
         return ""
     return (
+        "Reference videos in the niche (other accounts). "
         "Controlled for account size, niche, length and posting hour "
         f"({f['status']['videos']} cohort videos):\n" + "\n".join(parts)
     )
 
 
-def winning_traits(store: Store, tag: str | None = None, top: int = 3) -> str:
-    """Short text for the script prompt. Prefers the controlled findings; until those exist it
-    falls back to the raw scoreboard tables, labelled as such. Empty when nothing is scored."""
+def our_traits(store: Store, top: int = 3) -> str:
+    """What our own posts have shown so far: concepts and hooks by lift over our accounts'
+    baselines. Empty until a post has a reward."""
+    from .own import own_posts
+
+    by_concept: dict[str, list[float]] = {}
+    for p in own_posts(store):
+        r = p["lift_72h"] if p["lift_72h"] is not None else p["lift_now"]
+        if r is not None and p["concept"]:
+            by_concept.setdefault(p["concept"], []).append(r)
+    parts = []
+    if by_concept:
+        ranked = sorted(by_concept.items(), key=lambda kv: -sum(kv[1]) / len(kv[1]))
+        parts.append(
+            "concepts: "
+            + "; ".join(f"{k} ({sum(v) / len(v):+.2f}, n={len(v)})" for k, v in ranked[:top])
+        )
+    hooks = build(store, group="ours")["hooks"]
+    if hooks:
+        parts.append(
+            "hooks: "
+            + "; ".join(
+                f"{h['hook_type']} ({h['mean_reward']:+.2f}, n={h['n']})" for h in hooks[:top]
+            )
+        )
+    if not parts:
+        return ""
+    return "Our own posts, lift over our accounts' usual views:\n" + "\n".join(parts)
+
+
+def reference_traits(store: Store, tag: str | None = None, top: int = 3) -> str:
+    """What reference videos in the niche show. Prefers the controlled findings; until those
+    exist it falls back to the raw scoreboard tables, labelled as such."""
     controlled = controlled_traits(store)
     if controlled:
         return controlled
-    sb = build(store, tag)
+    sb = build(store, tag, group="reference")
     parts = []
     for name, key in (("hooks", "hook_type"), ("concepts", "concept"), ("styles", "visual_style")):
         rows = sb[name]
@@ -69,8 +100,18 @@ def winning_traits(store: Store, tag: str | None = None, top: int = 3) -> str:
         if lose:
             parts.append(f"{name} that lost: " + "; ".join(lose))
     if parts:
-        parts.insert(0, "Raw scoreboard, not yet controlled for account size or niche, small n:")
+        parts.insert(
+            0,
+            "Reference videos in the niche (other accounts), raw, not yet controlled for account "
+            "size or niche, small n:",
+        )
     return "\n".join(parts)
+
+
+def winning_traits(store: Store, tag: str | None = None, top: int = 3) -> str:
+    """Short text for the script prompt: our own posts first, then the reference videos, each
+    labelled so the writer knows which is which. Empty when nothing is scored."""
+    return "\n\n".join(t for t in (our_traits(store, top), reference_traits(store, tag, top)) if t)
 
 
 def concept_scores(store: Store, niche: str, tag: str | None = None) -> list[dict]:

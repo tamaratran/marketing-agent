@@ -237,10 +237,40 @@ class DailyReport:
         if not pays and not stalled:
             lines.append("no posts tracked")
 
-        sb = build(store)
+        from .own import own_posts
+
+        posts = own_posts(store)
+        ours = build(store, group="ours")
+        lines += ["", "## Our posts", ""]
+        if posts:
+            lines += [
+                "| post | account | age h | views | concept | lift |",
+                "|---|---|---|---|---|---|",
+            ]
+            for p in posts[:15]:
+                lift = p["lift_72h"] if p["lift_72h"] is not None else p["lift_now"]
+                lines.append(
+                    f"| {p['url']} | {p['author']} | {p['age_h']} | {p['views_now'] or ''} | "
+                    f"{p['concept'] or 'unmatched'} | {'' if lift is None else f'{lift:+.2f}'} |"
+                )
+        else:
+            lines.append("No posts from our accounts yet.")
+        if ours["hooks"]:
+            lines += ["", "| hook_type | n | mean reward | win rate |", "|---|---|---|---|"]
+            lines += [
+                f"| {r['hook_type']} | {r['n']} | {r['mean_reward']:+.2f} | {r['win_rate']:.0%} |"
+                for r in ours["hooks"][:6]
+            ]
+        if ours["stuck_accounts"]:
+            lines += [
+                "",
+                "Possibly throttled: " + ", ".join(f["author"] for f in ours["stuck_accounts"]),
+            ]
+
+        sb = build(store, group="reference")
         lines += [
             "",
-            "## Scoreboard",
+            "## Reference videos (research)",
             "",
             f"{len(sb['videos'])} videos, {sb['n_scored']} scored, {sb['n_tagged']} tagged.",
         ]
@@ -251,11 +281,6 @@ class DailyReport:
                     f"| {r[key]} | {r['n']} | {r['mean_reward']:+.2f} | {r['win_rate']:.0%} |"
                     for r in sb[name][:6]
                 ]
-        if sb["stuck_accounts"]:
-            lines += [
-                "",
-                "Possibly throttled: " + ", ".join(f["author"] for f in sb["stuck_accounts"]),
-            ]
 
         lines += ["", "## Policy", ""]
         traits = winning_traits(store)

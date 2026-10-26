@@ -96,7 +96,7 @@ def render(store: Store, niche: str, out: Path, copy_assets: bool = True) -> Pat
     spent = sum(r["cost_usd"] or 0 for r in store.rows("SELECT cost_usd FROM renders"))
 
     kpis = [
-        (len(sb["videos"]), "videos tracked"),
+        (len(sb["videos"]), "reference videos tracked"),
         (sb["n_scored"], "scored"),
         (sb["n_tagged"], "tagged by classifier"),
         (len(cs), "concepts"),
@@ -215,7 +215,9 @@ def render(store: Store, niche: str, out: Path, copy_assets: bool = True) -> Pat
             for p in pays
         ],
     )
-    stuck = ", ".join(_e(f["author"]) for f in sb["stuck_accounts"]) or "none"
+    stuck = (
+        ", ".join(_e(f["author"]) for f in build(store, group="ours")["stuck_accounts"]) or "none"
+    )
 
     page = f"""<!doctype html><html lang=en><head><meta charset=utf-8>
 <meta name=viewport content="width=device-width,initial-scale=1"><title>marketing agent · {_e(niche)}</title>
@@ -223,7 +225,7 @@ def render(store: Store, niche: str, out: Path, copy_assets: bool = True) -> Pat
 <h1>marketing agent · {_e(niche)}</h1>
 <p class=sub>updated {datetime.fromtimestamp(now, UTC):%Y-%m-%d %H:%M} UTC · read-only, rebuilt by the daily run</p>
 <div class=kpis>{kpi_html}</div>
-<h2>What is working</h2>
+<h2>What is working (reference videos)</h2>
 <p class=mut>{_e(traits) or "Nothing scored yet; picks follow the radar's early score."}</p>
 <div class=grid2><div>{rank_table("hook_type", sb["hooks"])}</div><div>{rank_table("visual_style", sb["styles"])}</div></div>
 <h2>Concepts (what tomorrow picks from)</h2>{concept_table}

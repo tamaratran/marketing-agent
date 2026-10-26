@@ -68,7 +68,8 @@ def test_daily_report_writes_markdown_on_empty_store(tmp_path):
     text = out.read_text()
     assert rep.failed == ["render"]
     assert "| render | failed | 0 | RuntimeError: FAL_KEY not set |" in text
-    assert "## Scoreboard" in text and "## Policy" in text
+    assert "## Our posts" in text and "## Reference videos (research)" in text
+    assert "## Policy" in text
 
 
 def test_daily_report_only_counts_this_runs_scripts_and_renders(tmp_path):

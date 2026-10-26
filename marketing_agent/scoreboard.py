@@ -123,12 +123,19 @@ def shadowban_flags(rows: list[dict], now: int | None = None) -> list[dict]:
 
 
 def build(
-    store: Store, tag: str | None = None, limit: int = 500, tags: list[str] | None = None
+    store: Store,
+    tag: str | None = None,
+    limit: int = 500,
+    tags: list[str] | None = None,
+    group: str | None = "reference",
 ) -> dict:
-    """Everything the CLI and the next-batch picker need: scored videos, hook and concept tables,
-    stuck accounts."""
-    rows = store.latest(tag, limit=limit)
-    if tags:
+    """Scored videos, hook/concept/style tables and stuck accounts for one group of videos:
+    "reference" (scraped for research, the default) or "ours" (our accounts and briefed
+    creators). The two are never pooled: a stranger's viral hit says nothing about our accounts,
+    and throttling only matters on accounts we post from. Hashtag `tags` apply to reference only;
+    our posts are found by account, not hashtag."""
+    rows = store.latest(tag, limit=limit, group=group)
+    if tags and group != "ours":
         rows = [r for r in rows if r["source_tag"] in tags]
     tags = store.tags_for([r["id"] for r in rows])
     for r in rows:

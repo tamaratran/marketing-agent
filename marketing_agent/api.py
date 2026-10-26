@@ -69,7 +69,7 @@ def overview(niche: str = DEFAULT_NICHE):
         "hooks": sb["hooks"][:8],
         "styles": sb["styles"][:8],
         "concept_rank": sb["concepts"][:8],
-        "stuck_accounts": sb["stuck_accounts"],
+        "stuck_accounts": build(store, group="ours")["stuck_accounts"],
         "top_videos": [v for v in sb["videos"] if v.get("hook_type")][:20],
     }
 
@@ -308,7 +308,7 @@ def repoll_cohort(max_age_days: float = 8.0, niche: str | None = None):
 
 @app.get("/features")
 def features_list(niche: str = DEFAULT_NICHE):
-    return features(_store(), niche)
+    return features(_store(), niche, group="reference")
 
 
 @app.get("/videos/{video_id}")
