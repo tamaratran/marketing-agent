@@ -63,7 +63,7 @@ POST_URL = re.compile(r"tiktok\.com/@([\w.\-]+)/video/(\d+)")
 def add_post(store: Store, url: str, caption: str = "", niche: str | None = None) -> dict:
     """Register a post a person made from one of our accounts, by its TikTok link. Public stats
     come over plain HTTP; a post still under review is stored with the caption given so the script
-    match happens now and the 2-hourly re-poll fills in the views once it is public."""
+    match happens now and the next cycle's re-poll fills in the views once it is public."""
     from .research.tiktok_browser import poll_public_stats
 
     migrate(store)

@@ -142,8 +142,9 @@ session checks out as a worktree (`MKT_DB` points the CLI at it). Humans still d
 Nothing runs on a schedule. The site's Runs page has one "Run cycle" button: it calls `POST /runs`
 on the API with an empty body, and the API starts the Devin session with the campaign below.
 `mkt daily` and `mkt devin kickoff` take the same defaults, so `mkt daily` alone runs a full cycle.
-The 2-hourly cohort re-poll (`deploy/modal_repoll.py`) is the only scheduled job; it measures, it
-does not create or post anything.
+Nothing is scheduled. Measuring happens live: the first stage of every cycle re-polls our posts
+and the cohort, so the pick that follows uses fresh numbers; the site's "Update view counts now"
+button does the same on demand.
 
 ## Learnings
 

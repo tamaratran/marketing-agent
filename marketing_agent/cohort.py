@@ -1,7 +1,8 @@
 """Measurement layer: watch fresh videos as a cohort so the loop learns from curves, not snapshots.
 
 A video enters the cohort when the radar sees it younger than COHORT_MAX_AGE_H. From then on
-`repoll` records its public stats every couple of hours for REPOLL_DAYS, every cohort video gets
+`repoll` records its public stats at the start of every cycle (and on demand from the site) for
+REPOLL_DAYS, every cohort video gets
 classified (not just the top few), the author's other posts give a baseline, and `build_features`
 turns all of that into one wide row per video at fixed ages (1h, 6h, 24h, 72h, 7d) that the
 analysis reads."""
