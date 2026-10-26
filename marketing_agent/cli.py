@@ -339,8 +339,9 @@ def frames(out):
 @click.option("--max-age-days", default=8.0)
 @click.option("--niche", default=None)
 def repoll(max_age_days, niche):
-    """Re-record public stats for every cohort video still inside the window, then rebuild
-    features. No browser needed; this is what the 2-hourly cron runs."""
+    """Re-record public stats for every tracked video (our posts and the cohort) still inside the
+    window, then rebuild features. No browser needed; the cycle runs this first, and the site's
+    "Update view counts now" button runs it on demand."""
     from .cohort import build_features
     from .cohort import repoll as do_repoll
 
@@ -697,7 +698,8 @@ def format_cmd(niche, product_tags, limit):
 def daily(
     ctx, niche, tags, product, product_tags, top, renders, resolution, refs, report, dashboard_out
 ):
-    """One cycle, every stage in order with a report at the end: our account, run (scrape,
+    """One cycle, every stage in order with a report at the end: our account, measure (re-poll
+    our posts and the cohort so the picker learns from fresh numbers), own sync, run (scrape,
     classify, concepts, pick, scripts), cohort, analyze, render, our posts, scoreboard, compare
     (ours vs market), policy. Anything not given comes from campaign.toml. A failed stage is
     recorded and the rest still runs."""
@@ -732,6 +734,7 @@ def daily(
             "account",
             lambda: add_account(_store(), c.account.handle, c.account.backup_hashtag, product),
         )
+    stage("measure", lambda: ctx.invoke(repoll, max_age_days=8.0, niche=None))
     stage("own", lambda: ctx.invoke(own_sync, niche=niche, tags=tags))
     stage(
         "run",

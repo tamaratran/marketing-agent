@@ -258,8 +258,8 @@ async def db_import(request: Request):
 
 @app.post("/repoll", dependencies=[Depends(_auth)])
 def repoll_cohort(max_age_days: float = 8.0, niche: str | None = None):
-    """Re-poll every cohort video inside the window and rebuild features. The 2-hourly Modal cron
-    calls this so the curves are recorded here, race-free, rather than by replacing the db."""
+    """Re-poll every tracked video inside the window and rebuild features. The site's "Update view
+    counts now" button calls this; the cycle itself re-polls as its first stage."""
     store = _store()
     res = repoll(store, max_age_days, niche)
     res["features"] = build_features(store, niche)
