@@ -35,7 +35,8 @@ export type Campaign = {
   path: string;
 };
 export type Learning = { id: number; created_at: number; niche: string; product: string; kind: string; title: string; body: string };
-export type Run = { id: number; created_at: number; session_id: string; url: string; niche: string; product: string; note: string };
+export type Run = { id: number; created_at: number; session_id: string; url: string; niche: string; product: string; note: string; status?: string | null; stages?: string | null; finished_at?: number | null };
+export type RunStage = { stage: string; status: string; seconds: number; note: string };
 
 export type Level = { level: string; n: number; coef: number; se: number; lo: number; hi: number; raw_mean: number; reference: boolean; verdict: string; travels?: boolean };
 export type Fit = { n: number; k?: number; r2?: number; reference?: string; levels: Level[] };
