@@ -116,6 +116,7 @@ def fal_locked() -> str | None:
             "https://rest.fal.ai/storage/auth/token",
             params={"storage_type": "fal-cdn-v3"},
             headers={"Authorization": f"Key {key}"},
+            json={},
             timeout=30,
         )
     except httpx.HTTPError as e:
