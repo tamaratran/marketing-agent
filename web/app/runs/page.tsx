@@ -1,5 +1,5 @@
 /* eslint-disable @next/next/no-img-element */
-import { dateOf, get, type Campaign, type Run } from "@/lib/api";
+import { dateOf, get, type Campaign, type Run, type RunStage } from "@/lib/api";
 import { startRun } from "../actions";
 import { button, Card, H1, Note, Table } from "../ui";
 import { RefreshButtons } from "../refresh";
@@ -37,9 +37,23 @@ export default async function Page() {
         <RefreshButtons />
       </Card>
       <Card title="Runs started here">
+        <Note className="mb-3">Status comes from the cycle itself when it finishes. &quot;needs a human&quot; means a login, captcha or credit, not a code failure.</Note>
         <Table
-          head={["started", "niche", "product", "session", "note"]}
-          rows={rows.map((r) => [dateOf(r.created_at), r.niche, r.product, <a key="u" href={r.url} target="_blank" className="text-sky-300 hover:underline">{r.session_id}</a>, r.note])}
+          head={["started", "status", "stages", "session", "note"]}
+          rows={rows.map((r) => {
+            const stages: RunStage[] = r.stages ? JSON.parse(r.stages) : [];
+            const bad = stages.filter((s) => s.status === "failed");
+            const human = bad.filter((s) => /top-up|login|captcha|TikTok session|credit/i.test(s.note));
+            const status = !r.finished_at ? "running" : human.length === bad.length && bad.length ? "needs a human" : r.status === "failed" ? "failed" : "done";
+            const summary = stages.length ? `${stages.filter((s) => s.status === "ok").length}/${stages.length} ok` + (bad.length ? `; failed: ${bad.map((s) => s.stage).join(", ")}` : "") : "";
+            return [
+              dateOf(r.created_at),
+              <span key="s" className={status === "done" ? "text-emerald-300" : status === "running" ? "text-neutral-400" : "text-amber-200"}>{status}</span>,
+              <span key="g" title={bad.map((s) => `${s.stage}: ${s.note}`).join("\n")}>{summary}</span>,
+              r.url ? <a key="u" href={r.url} target="_blank" className="text-sky-300 hover:underline">{r.session_id}</a> : "CLI",
+              r.note,
+            ];
+          })}
           empty="None yet. Cycles started from the CLI are listed too; their results show up on the other pages."
         />
       </Card>

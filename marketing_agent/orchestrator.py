@@ -182,9 +182,51 @@ class DailyReport:
     def failed(self) -> list[str]:
         return [s["stage"] for s in self.stages if s["status"] == "failed"]
 
+    def record(self, store: Store) -> int:
+        """Store the outcome on the runs row the site created for this cycle (the newest one
+        still open), or a new row when the cycle was started from the CLI, so the Runs page can
+        show each stage and whether the cycle finished or failed."""
+        import json
+
+        with store.conn() as c:
+            cols = {r[1] for r in c.execute("PRAGMA table_info(runs)")}
+            for col, typ in (("status", "TEXT"), ("stages", "TEXT"), ("finished_at", "INTEGER")):
+                if col not in cols:
+                    c.execute(f"ALTER TABLE runs ADD COLUMN {col} {typ}")
+        status = "failed" if self.failed else "ok"
+        stages = json.dumps(self.stages)
+        now = int(time.time())
+        open_runs = store.rows(
+            "SELECT id FROM runs WHERE finished_at IS NULL AND niche=? ORDER BY id DESC LIMIT 1",
+            (self.niche,),
+        )
+        if open_runs:
+            with store.conn() as c:
+                c.execute(
+                    "UPDATE runs SET status=?, stages=?, finished_at=? WHERE id=?",
+                    (status, stages, now, open_runs[0]["id"]),
+                )
+            return open_runs[0]["id"]
+        return store.insert(
+            "runs",
+            {
+                "created_at": int(self.started),
+                "session_id": "",
+                "url": "",
+                "niche": self.niche,
+                "product": self.product,
+                "note": "started from the CLI",
+                "status": status,
+                "stages": stages,
+                "finished_at": now,
+            },
+        )
+
     def write(self, path: Path, store: Store) -> Path:
         from .policy import concept_scores, winning_traits
         from .scoreboard import build
+
+        self.record(store)
 
         run_start = int(self.started)
         lines = [
