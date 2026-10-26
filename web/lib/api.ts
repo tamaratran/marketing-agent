@@ -36,7 +36,8 @@ export type Concept = {
   traits?: Record<string, string | boolean | null>; trait_bonus?: number; trait_detail?: TraitDetail[]; learned?: number; pick_share?: number;
   examples?: { id: string; author: string; url: string; views: number | null; reward?: number | null }[];
 };
-export type Script = { id: number; concept: string; product: string; created_at: number; hook: string; demo_score: number; captions: string[]; body: string; spoken?: string; hook_on_screen?: boolean; sound?: string; sound_url?: string };
+export type Script = { id: number; concept: string; product: string; created_at: number; hook: string; demo_score: number; captions: string[]; body: string; spoken?: string; hook_on_screen?: boolean; sound?: string; sound_url?: string; why?: ScriptWhy | null };
+export type ScriptWhy = { pick_share?: number; head_start?: number; expected_lift?: number; own_mean_reward?: number | null; own_n?: number; kind?: string; traits?: { trait: string; value: string | boolean | null; ours: number; ours_n: number; market: number; market_n: number }[] };
 export type Render = { id: number; script_id: number; created_at: number; model: string; cost_usd: number; hook: string; post_path: string | null; post_text: string[]; hold_reason: string | null; post_session_url: string | null; post_requested_at: number | null };
 export type Campaign = {
   account: { handle: string; backup_hashtag: string };

@@ -406,3 +406,53 @@ def pick_concept(store: Store, niche: str, rng: random.Random | None = None) -> 
         sd = EXPLORE_SD / math.sqrt(1 + c["n"])
         c["sampled"] = round(rng.gauss(mean, sd), 3)
     return max(cands, key=lambda c: c["sampled"])
+
+
+def propose_batch(store: Store, niche: str, formats: int = 3) -> list[dict]:
+    """The formats the next batch of scripts should span: the `formats` concepts the picker
+    chooses most often, each with the reasons a reader can check. One format per cycle made every
+    batch look alike (five scripts, one format, all "demo 5/5"); spreading the batch over the
+    picker's top choices tests more than one idea per cycle while still favouring what the
+    evidence favours. `expected_lift` is what the picker believes the format earns beyond its
+    head start: trait evidence from our posts and the niche, taken over by its own posts as they
+    come in (log10; +1 is 10x)."""
+    cands = concept_scores(store, niche)
+    if not cands:
+        return []
+    for c, share in zip(cands, pick_shares(cands), strict=False):
+        c["pick_share"] = round(share, 3)
+    cands.sort(key=lambda c: (-c["pick_share"], -(c["prior"] + c["learned"])))
+    out = []
+    for c in cands[:formats]:
+        out.append(
+            {
+                **c,
+                "why": {
+                    "pick_share": c["pick_share"],
+                    "head_start": c["prior"],
+                    "expected_lift": c["learned"],
+                    "own_mean_reward": c["mean_reward"],
+                    "own_n": c["n"],
+                    "traits": c["trait_detail"],
+                    "kind": c["kind"],
+                },
+            }
+        )
+    return out
+
+
+def rank_scripts(rows: list[dict]) -> list[dict]:
+    """Scripts best first: by the expected lift of their format, then the writer's demo score,
+    then id. The demo score is the writer grading its own script on whether the product shows
+    within 5s; it gates a script, it does not predict views."""
+
+    def lift(r: dict) -> float:
+        why = r.get("why")
+        if why is None:
+            try:
+                why = json.loads(r.get("payload") or "{}").get("why") or {}
+            except ValueError:
+                why = {}
+        return float(why.get("expected_lift") or 0.0)
+
+    return sorted(rows, key=lambda r: (-lift(r), -(r.get("demo_score") or 0), r.get("id") or 0))

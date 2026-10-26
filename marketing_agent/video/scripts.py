@@ -118,7 +118,13 @@ def write_scripts(
     min_score: int = 3,
     model: str = "gpt-5.4",
     context: str = "",
+    keep: int | None = None,
+    why: dict | None = None,
 ) -> list[dict]:
+    """Write `n` scripts in the concept and store them. With `keep`, only the `keep` best (demo
+    score first, those under `min_score` last) are stored, so a batch can span formats without
+    twelve scripts each. `why` is the picker's reasoning for this format, stored with each script
+    so the site can show why it was proposed."""
     client = OpenAI()
     if concept.get("beat_sheet"):
         prompt = format_prompt(concept, product, n)
@@ -146,8 +152,14 @@ def write_scripts(
         text_format=ScriptBatch,
     )
     kept = []
-    for s in resp.output_parsed.scripts:
+    scripts_out = list(resp.output_parsed.scripts)
+    if keep is not None:
+        scripts_out.sort(key=lambda s: (s.demo_score_1_5 < min_score, -s.demo_score_1_5))
+        scripts_out = scripts_out[:keep]
+    for s in scripts_out:
         row = s.model_dump()
+        if why is not None:
+            row["why"] = why
         if concept.get("beat_sheet"):
             sheet = concept["beat_sheet"]
             row["captions"] = [

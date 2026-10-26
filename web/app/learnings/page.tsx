@@ -27,7 +27,9 @@ export default async function Page() {
     get<Script[]>("/scripts?days=14&limit=200"), get<Render[]>("/renders"), get<Run[]>("/runs?limit=5"), get<Campaign>("/campaign"),
   ]);
   const newest = scripts.reduce((m, s) => Math.max(m, s.created_at), 0);
-  const batch = scripts.filter((s) => s.created_at >= newest - 20 * 60).sort((a, b) => b.demo_score - a.demo_score || a.id - b.id);
+  const lift = (s: Script) => s.why?.expected_lift ?? 0;
+  const batch = scripts.filter((s) => s.created_at >= newest - 20 * 60).sort((a, b) => lift(b) - lift(a) || b.demo_score - a.demo_score || a.id - b.id);
+  const batchFormats = [...new Set(batch.map((s) => s.concept))];
   const rendered = new Set(renders.map((r) => r.script_id));
   const now = nowSec();
   const running = runs.find((r) => !r.finished_at && now - r.created_at < 3 * 3600);
@@ -84,14 +86,25 @@ export default async function Page() {
       <Card title="Proposed next scripts" className="mt-4">
         {batch.length === 0 ? <Note>No scripts yet. Research again writes the first batch.</Note> : (
           <>
-            <Note>The latest batch, best demo score first, all in the format {formatName(batch[0].concept)}. Written {when(newest)}.</Note>
-            <ul className="mt-3 divide-y divide-neutral-800 text-sm">
+            <Note>
+              {batch.length} scripts across {batchFormats.length} format{batchFormats.length === 1 ? "" : "s"} ({batchFormats.map(formatName).join(", ")}), written {when(newest)}.
+              {batch.some((s) => s.why) ? " Ranked by expected lift: what the picker believes the format earns against videos like it, from our posts and the panel's trait evidence. Open a script for the reasons." : " Best demo score first; the picker's reasons are stored from the next Research again on."}
+            </Note>
+            <ul className="mt-3 space-y-2 text-sm">
               {batch.map((s) => (
-                <li key={s.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-2">
-                  <span className="w-12 shrink-0 text-xs text-neutral-500">s{s.id}</span>
-                  <Link href={`/scripts#s${s.id}`} className="font-medium text-neutral-100 hover:underline">{s.hook}</Link>
-                  <span className="text-xs text-neutral-500">demo {s.demo_score}/5</span>
-                  {rendered.has(s.id) && <Link href="/clips" className="text-xs text-emerald-300 hover:underline">clip ready</Link>}
+                <li key={s.id}>
+                  <Fold summary={
+                    <span className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                      <span className="w-12 shrink-0 text-xs text-neutral-500">s{s.id}</span>
+                      <span className="font-medium text-neutral-100">{s.hook}</span>
+                      <span className="text-xs text-neutral-400">{formatName(s.concept)}</span>
+                      {s.why?.expected_lift != null && <span className={`text-xs ${s.why.expected_lift >= 0 ? "text-emerald-300" : "text-red-300"}`}>{times(s.why.expected_lift)} expected</span>}
+                      <span className="text-xs text-neutral-500">demo {s.demo_score}/5</span>
+                      {rendered.has(s.id) && <Link href="/clips" className="text-xs text-emerald-300 hover:underline">clip ready</Link>}
+                    </span>
+                  }>
+                    <Why s={s} />
+                  </Fold>
                 </li>
               ))}
             </ul>
@@ -125,5 +138,37 @@ export default async function Page() {
       </div>
       <NextStep from="/learnings" />
     </>
+  );
+}
+
+const TRAIT_LABEL: Record<string, string> = { hook_type: "hook", visual_style: "style", product_on_screen_by_5s: "product by 5s", pacing_bucket: "pace" };
+
+/** Why the picker proposed this script's format, in the words of its stored evidence. */
+function Why({ s }: { s: Script }) {
+  const w = s.why;
+  return (
+    <div className="space-y-2 text-sm text-neutral-300">
+      {w ? (
+        <ul className="space-y-1">
+          {w.pick_share != null && <li>The picker chooses {formatName(s.concept)} {Math.round(w.pick_share * 100)}% of the time{w.kind === "format" ? " (our clone of the product's own best videos, which gets a head start)" : ""}.</li>}
+          {w.head_start != null && <li>Head start {w.head_start.toFixed(2)} from early traction{w.expected_lift != null && <>, plus {w.expected_lift >= 0 ? "+" : ""}{w.expected_lift.toFixed(2)} learned ({times(w.expected_lift)} expected against videos like it)</>}.</li>}
+          <li>{w.own_n ? <>Our posts in it: {w.own_n}, mean {times(w.own_mean_reward ?? 0)} videos like them.</> : "We have not posted in this format yet, so the learned part comes from its traits."}</li>
+          {w.traits?.length ? (
+            <li>
+              Trait evidence:{" "}
+              {w.traits.map((t, i) => (
+                <span key={t.trait}>
+                  {i > 0 && ", "}
+                  {TRAIT_LABEL[t.trait] ?? t.trait} {String(t.value)} ({t.ours_n ? `${times(t.ours)} on ${t.ours_n} of ours` : "none of ours"}{t.market_n ? `, ${times(t.market / 0.25)} on ${t.market_n} panel videos` : ""})
+                </span>
+              ))}
+            </li>
+          ) : null}
+        </ul>
+      ) : (
+        <p className="text-neutral-500">Written before the picker stored its reasons; the next batch carries them.</p>
+      )}
+      <p className="text-xs text-neutral-500">Demo {s.demo_score}/5 is the writer grading whether the product shows within 5 seconds; it gates a script, it does not predict views. <Link href={`/scripts#s${s.id}`} className="hover:underline">Full script</Link></p>
+    </div>
   );
 }

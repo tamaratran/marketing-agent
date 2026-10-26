@@ -392,7 +392,11 @@ class DailyReport:
         )
         lines += ["", "## Today's scripts", ""]
         if scripts:
-            lines.append(f"Concept: {scripts[0]['concept']}. {len(scripts)} kept.")
+            names = list(dict.fromkeys(s["concept"] or "?" for s in scripts))
+            lines.append(
+                f"{len(scripts)} script{'s' if len(scripts) != 1 else ''} across {len(names)} "
+                f"format{'s' if len(names) != 1 else ''}: {', '.join(names)}."
+            )
             lines += [f"- s{s['id']} (demo {s['demo_score']}): {s['hook']}" for s in scripts[:8]]
         else:
             lines.append("none")

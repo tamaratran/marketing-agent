@@ -165,6 +165,7 @@ def scripts(
                 "hook_on_screen": payload.get("hook_on_screen", True),
                 "sound": payload.get("sound", ""),
                 "sound_url": _sound_url(payload.get("sound", ""), sound_id),
+                "why": payload.get("why"),
             }
         )
     return out
