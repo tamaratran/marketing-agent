@@ -95,3 +95,52 @@ def test_poster_frames_skips_missing_and_existing(tmp_path):
     out = tmp_path / "frames"
     assert poster_frames(store, out) == 1 and (out / "1.jpg").exists()
     assert poster_frames(store, out) == 0
+
+
+def test_repoll_marks_a_video_tiktok_removed_and_clears_it_when_it_returns(tmp_path, monkeypatch):
+    from marketing_agent import cohort
+    from marketing_agent.research import tiktok_browser
+
+    store = Store(tmp_path / "db.sqlite")
+    live, gone = _video(1, "a", 5, 100), _video(2, "b", 5, 200)
+    store.upsert_video(live)
+    store.upsert_video(gone)
+    enroll(store, "fitness", [live, gone])
+    monkeypatch.setattr(
+        tiktok_browser,
+        "public_video",
+        lambda url: (None, "unknown") if "/1" in url else (None, tiktok_browser.GONE),
+    )
+    out = cohort.repoll(store)
+    assert out == {"polled": 0, "failed": 2, "gone": 1}
+    rows = {r["id"]: r["gone_at"] for r in store.rows("SELECT id, gone_at FROM videos")}
+    assert rows["1"] is None and rows["2"] is not None
+
+    monkeypatch.setattr(tiktok_browser, "public_video", lambda url: ({**gone, "views": 300}, "ok"))
+    cohort.repoll(store)
+    assert store.rows("SELECT gone_at FROM videos WHERE id='2'")[0]["gone_at"] is None
+
+
+def test_public_video_reads_tiktok_status(monkeypatch):
+    import json
+
+    from marketing_agent.research import tiktok_browser
+
+    def page(scope):
+        body = json.dumps({"__DEFAULT_SCOPE__": {"webapp.video-detail": scope}})
+        return f'<script id="__UNIVERSAL_DATA_FOR_REHYDRATION__" type="application/json">{body}</script>'
+
+    class R:
+        def __init__(self, text):
+            self.text = text
+
+    import httpx
+
+    monkeypatch.setattr(
+        httpx,
+        "get",
+        lambda *a, **k: R(page({"statusCode": "10204", "statusMsg": "item doesn't exist"})),
+    )
+    assert tiktok_browser.public_video("https://www.tiktok.com/@x/video/1") == (None, "gone")
+    monkeypatch.setattr(httpx, "get", lambda *a, **k: R("<html>captcha</html>"))
+    assert tiktok_browser.public_video("https://www.tiktok.com/@x/video/1") == (None, "unknown")

@@ -49,7 +49,7 @@ export type Findings = {
 export type Observation = { video_id: string; observed_at: number; views: number | null; likes: number | null; comments: number | null; shares: number | null; saves: number | null };
 export type Features = Record<string, number | string | boolean | string[] | null>;
 export type VideoDetail = {
-  video: { id: string; url: string; author: string; followers: number | null; create_time: number; duration: number | null; desc: string; music: string; hashtags: string[]; source_tag: string; niche: string | null; cohort_at: number | null };
+  video: { id: string; url: string; author: string; followers: number | null; create_time: number; duration: number | null; desc: string; music: string; hashtags: string[]; source_tag: string; niche: string | null; cohort_at: number | null; gone_at: number | null };
   observations: Observation[];
   tags: { tags: Record<string, unknown>; run: { model: string; prompt_version: string; latency_s: number; transcript: string; frame_times: number[] } } | null;
   tagged_at: number | null;

@@ -152,8 +152,13 @@ def fetch_video_sync(url: str, out: Path, cdp_url: str) -> dict:
     return asyncio.run(fetch_video(url, out, cdp_url))
 
 
-def poll_public_stats(url: str) -> dict | None:
-    """Stats for any public video via plain HTTP (no browser). Used by the scoreboard."""
+GONE = "gone"
+
+
+def public_video(url: str) -> tuple[dict | None, str]:
+    """(stats row, status) for a video page over plain HTTP. Status is "ok", "gone" when TikTok
+    says the item no longer exists (deleted or made private), or "unknown" when the page could
+    not be read (blocked, timeout), which must not be mistaken for a removal."""
     import httpx
 
     r = httpx.get(
@@ -169,16 +174,25 @@ def poll_public_stats(url: str) -> dict | None:
         r.text,
     )
     if not m:
-        return None
+        return None, "unknown"
     try:
-        item = json.loads(m.group(1))["__DEFAULT_SCOPE__"]["webapp.video-detail"]["itemInfo"][
-            "itemStruct"
-        ]
+        detail = json.loads(m.group(1))["__DEFAULT_SCOPE__"]["webapp.video-detail"]
+    except (KeyError, ValueError):
+        return None, "unknown"
+    if "itemInfo" not in detail:
+        return None, GONE if str(detail.get("statusCode")) == "10204" else "unknown"
+    try:
+        item = detail["itemInfo"]["itemStruct"]
     except KeyError:
-        return None
+        return None, "unknown"
     row = _row(item, source_tag="poll")
     row["observed_at"] = int(time.time())
-    return row
+    return row, "ok"
+
+
+def poll_public_stats(url: str) -> dict | None:
+    """Stats for any public video via plain HTTP (no browser). Used by the scoreboard."""
+    return public_video(url)[0]
 
 
 def profile_stats(author: str) -> dict | None:
