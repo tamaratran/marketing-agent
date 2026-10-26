@@ -62,8 +62,11 @@ def test_script_prompt_uses_controlled_findings_only_when_ready(tmp_path):
     assert controlled_traits(store) == ""
     res = analyze(store)
     res["status"]["reached"]["72h"] = 50
+    res["status"]["reached"]["scored"] = 50
     res["status"]["videos"] = 60
-    res["fits"]["lift_72h"]["pooled"]["hook_type"] = {
+    res["fits"]["lift_now"]["pooled"]["hook_type"] = res["fits"]["lift_72h"]["pooled"][
+        "hook_type"
+    ] = {
         "reference": "text_on_screen",
         "levels": [
             {
@@ -91,3 +94,34 @@ def test_script_prompt_uses_controlled_findings_only_when_ready(tmp_path):
         and "pov +0.41 vs text_on_screen (n=25, travels" in text
     )
     assert "question" not in text
+
+
+def test_analyze_scores_the_panel_at_cycle_time(tmp_path):
+    """The default outcome exists as soon as a panel video is a day old with a view count: its
+    lift against niche videos of the same age and account size. Other niches' rows stay out."""
+    import time
+
+    from marketing_agent.cohort import build_features
+    from tests.test_cohort import _video
+
+    store = Store(tmp_path / "t.sqlite")
+    now = int(time.time())
+    for i in range(40):
+        v = _video(i, f"c{i}", 30 + i, 1000 + 40 * i, 5000)
+        v["source_tag"] = "immersiveworkout"
+        store.upsert_video(v)
+    stale = _video(900, "old", 60, 5000, 5000)
+    store.upsert_video(stale)
+    with store.conn() as c:
+        c.execute("UPDATE videos SET cohort_at=?, niche='fitness' WHERE id!='900'", (now,))
+        c.execute("UPDATE videos SET cohort_at=?, niche='wearables' WHERE id='900'", (now,))
+    store.set_niche_tags("fitness", ["immersiveworkout"])
+    build_features(store)
+    res = analyze(store, ["fitness"])
+    st = res["status"]
+    assert st["videos"] == 40 and st["niches"] == {"fitness": 40}
+    assert st["reached"]["scored"] == 40
+    assert "lift_now" in res["fits"] and res["outcomes"]["lift_now"].startswith(
+        "lift over niche videos"
+    )
+    assert st["reached"]["scored"] >= res["min_n"]  # enough to stop "collecting" at cycle time

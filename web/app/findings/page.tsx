@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { fmt, get, type Findings, type Level } from "@/lib/api";
-import { Card, H1, Note, Pill, Stat, Table, human, pt } from "../ui";
+import { Card, H1, Note, Pill, Stat, Table, human } from "../ui";
 import { RefreshButtons } from "../refresh";
 
 export const dynamic = "force-dynamic";
@@ -8,6 +8,7 @@ export const dynamic = "force-dynamic";
 const tone = (v: string) => (v === "better" ? "good" : v === "worse" ? "bad" : v === "thin" ? "warn" : "neutral");
 const verdictText: Record<string, string> = { thin: "too few videos", "no evidence": "no clear difference", reference: "baseline" };
 const outcomeText: Record<string, string> = {
+  lift_now: "Beat videos like it (same age, same account size), latest check",
   lift_72h: "Beat the creator's usual at 3 days",
   growth_6_24: "Kept growing from 6h to 24h",
   log_vph_6h: "Fast start (views per hour at 6h)",
@@ -32,7 +33,7 @@ function Levels({ levels, minN }: { levels: Level[]; minN: number }) {
 export default async function Page({ searchParams }: { searchParams: Promise<{ outcome?: string; niche?: string }> }) {
   const sp = await searchParams;
   const f = await get<Findings>("/findings");
-  const outcome = sp.outcome && f.fits[sp.outcome] ? sp.outcome : "lift_72h";
+  const outcome = sp.outcome && f.fits[sp.outcome] ? sp.outcome : f.fits.lift_now ? "lift_now" : "lift_72h";
   const niche = sp.niche;
   const fits = f.fits[outcome] ? (niche ? f.fits[outcome].per_niche[niche] ?? {} : f.fits[outcome].pooled) : {};
   const st = f.status;
@@ -47,14 +48,13 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ o
         <Stat label="videos being followed" value={st.videos} hint="Enrolled when under 6 hours old." />
         <Stat label="tagged by the classifier" value={st.tagged ?? 0} />
         <Stat label="with the creator's usual views" value={st.with_baseline ?? 0} hint="Needed to judge a video against its own account." />
-        <Stat label="1 day old" value={st.reached["24h"] ?? 0} />
-        <Stat label="3 days old" value={st.reached["72h"] ?? 0} hint={`Findings need ${minN} per group at 3 days.`} />
+        <Stat label="scored" value={st.reached["scored"] ?? 0} hint={`A day old with a view count, judged against videos like them. Findings need ${minN}.`} />
+        <Stat label="3 days old" value={st.reached["72h"] ?? 0} hint="For the slower 3-day measures." />
       </div>
       {f.collecting && (
         <Card className="mb-4">
           <p className="text-sm text-amber-200">
-            Still collecting, so nothing below is a result yet. {st.reached["72h"] ?? 0} of {st.videos} videos are 3 days old; each group needs {minN} before a trait is called better or worse.
-            {st.eta_72h ? ` The first videos turn 3 days old ${pt(st.eta_72h)}.` : ""}
+            Still collecting, so nothing below is a result yet. {st.reached["scored"] ?? 0} of {st.videos} videos are scored (a day old, with a view count); {minN} are needed before a trait is called better or worse. Views are checked when a cycle runs, so this fills in with cycles.
           </p>
         </Card>
       )}

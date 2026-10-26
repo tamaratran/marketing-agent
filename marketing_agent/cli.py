@@ -209,7 +209,9 @@ def analyze(niche):
     console.print(
         f"panel {st['videos']} videos, {st['tagged']} tagged, reached 72h: {st['reached']['72h']}"
     )
-    for trait, fit in res["fits"]["lift_72h"]["pooled"].items():
+    from .analysis import DEFAULT_OUTCOME
+
+    for trait, fit in res["fits"][DEFAULT_OUTCOME]["pooled"].items():
         for lvl in fit.get("levels", []):
             if not lvl["reference"]:
                 console.print(

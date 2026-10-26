@@ -4,7 +4,7 @@ import type { Ours } from "@/lib/ours";
 import { startRun } from "./actions";
 import { Download } from "./download";
 import { Thumb } from "./thumb";
-import { button, formatName, Pill, human, pt, reward, times } from "./ui";
+import { button, formatName, Pill, human, reward, times } from "./ui";
 
 export const dynamic = "force-dynamic";
 
@@ -140,7 +140,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<Q> 
           )}
           <p className="mt-4 text-sm text-neutral-400">
             {fs.collecting
-              ? `Wider patterns across the niche need more 3-day-old videos${fs.status.eta_72h ? `; the first are ready ${pt(fs.status.eta_72h)}` : ""}.`
+              ? `Wider patterns across the niche need more scored videos (${fs.status.reached["scored"] ?? 0} of ${fs.min_n ?? 20}); they fill in as cycles run.`
               : <>Patterns across the niche are ready on <Link href="/findings" className="text-sky-300 hover:underline">Findings</Link>.</>}
           </p>
           <div className="mt-6 rounded-lg border border-neutral-800 p-4">

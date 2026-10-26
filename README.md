@@ -202,3 +202,11 @@ hook shot and delivery, shot order with timings, pacing, on-screen text budget, 
 picker takes it ahead of the fresh niche concepts until our own posts say otherwise, and the scripts
 written from it follow it beat for beat and carry the sound the poster should pick in TikTok.
 Without `--product-tag` (or before the db has product videos) the niche concepts are used as before.
+
+## Findings
+
+The default measure is `lift_now`: each panel video's score against niche videos of the same age and
+account size at its latest check (the step-2 score on How it decides), which exists as soon as a
+video is a day old. The 72h measures stay behind it and fill in as the panel ages. The panel is the
+campaign niche only; `analyze` and `/analyze` default to it. "Collecting" means fewer than
+`MIN_N` scored videos; since views are only checked when a cycle runs, it fills in with cycles.

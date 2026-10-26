@@ -35,10 +35,14 @@ TRAITS = [
 ]
 CONTROLS = ["niche", "follower_bucket", "duration_bucket", "posted_hour_bucket"]
 OUTCOMES = {
+    "lift_now": "lift over niche videos of the same age and account size, at the latest check (log10)",
     "lift_72h": "lift over the creator's baseline at 72h (log10)",
     "growth_6_24": "6h to 24h growth (log10 ratio)",
     "log_vph_6h": "views per hour at 6h (log10)",
 }
+
+
+DEFAULT_OUTCOME = "lift_now"
 
 
 def _outcome(row: dict, name: str) -> float | None:
@@ -161,10 +165,24 @@ def analyze(store: Store, niches: list[str] | None = None) -> dict:
     """Pooled and per-niche fits for every trait and outcome, plus a status block that says how
     much of the panel has reached each age, so the UI can say 'collecting' instead of showing
     thin numbers. Reference videos only; our posts are judged in own.own_posts."""
-    rows = features(store, group="reference")
-    niches = niches or sorted({r["niche"] for r in rows})
+    from . import campaign as campaign_cfg
+    from .scoreboard import build
+
+    niches = niches or [campaign_cfg.load().niche.name]
+    rows = [r for r in features(store, group="reference") if r["niche"] in niches]
+    # The outcome that exists at cycle time: how each video sits against niche videos of the same
+    # age from accounts of the same size (scoreboard.rewards), once it is a day old. The 72h
+    # outcomes keep filling in behind it as the panel ages.
+    reward: dict[str, float] = {}
+    for n in niches:
+        for v in build(store, tags=store.niche_tags(n) or None, group="reference")["videos"]:
+            if v.get("reward") is not None:
+                reward[v["id"]] = v["reward"]
+    for r in rows:
+        r["lift_now"] = reward.get(r["video_id"])
     now = int(time.time())
     reached = {f"{a}h": sum(1 for r in rows if r.get(f"views_{a}h")) for a in (1, 6, 24, 72, 168)}
+    reached["scored"] = sum(1 for r in rows if r.get("lift_now") is not None)
     first_72h = min((r for r in rows), key=lambda r: -r["age_h"], default=None)
     eta_72h = None
     if rows and reached["72h"] == 0:
@@ -239,7 +257,7 @@ def latest_findings(store: Store) -> dict | None:
     return json.loads(row[0]) if row else None
 
 
-def controlled_lift(store: Store, trait: str, outcome: str = "lift_72h") -> dict[str, dict]:
+def controlled_lift(store: Store, trait: str, outcome: str = DEFAULT_OUTCOME) -> dict[str, dict]:
     """For the picker: level -> {coef, se, n, verdict} from the latest pooled fit, empty when
     nothing has been analysed or the panel is still collecting."""
     f = latest_findings(store)

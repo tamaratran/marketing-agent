@@ -20,14 +20,15 @@ MARKET_TRAIT_WEIGHT = 0.25  # and what it says counts a quarter of what our own 
 TRAITS = ("hook_type", "visual_style", "product_on_screen_by_5s", "pacing_bucket")
 
 
-def controlled_traits(store: Store, outcome: str = "lift_72h") -> str:
+def controlled_traits(store: Store, outcome: str | None = None) -> str:
     """Text from the latest controlled findings: trait levels called better or worse once account
     size, niche, length and posting hour are held fixed. Empty while the panel is still
-    collecting (fewer than MIN_N videos per cell at 72h), so the raw tables are used instead."""
-    from .analysis import TRAITS, latest_findings
+    collecting (fewer than MIN_N scored videos), so the raw tables are used instead."""
+    from .analysis import DEFAULT_OUTCOME, TRAITS, latest_findings
 
+    outcome = outcome or DEFAULT_OUTCOME
     f = latest_findings(store)
-    if not f or f["status"]["reached"].get("72h", 0) < f["min_n"]:
+    if not f or f["status"]["reached"].get("scored", 0) < f["min_n"]:
         return ""
     parts = []
     for trait in TRAITS:

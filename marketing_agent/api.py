@@ -380,19 +380,23 @@ def creator_detail(handle: str):
 
 @app.get("/findings")
 def findings_latest():
-    """Latest controlled-effect tables, or a `collecting` status with the 72h ETA when no video
-    in the panel has reached 72h yet."""
+    """Latest controlled-effect tables, or a `collecting` status while fewer than MIN_N panel
+    videos are scored (a day old with a view count); the 72h ETA is kept for the slower outcomes."""
     f = latest_findings(_store())
     if not f:
-        return {"status": {"videos": 0, "reached": {"72h": 0}}, "fits": {}, "collecting": True}
-    f["collecting"] = f["status"]["reached"]["72h"] < f["min_n"]
+        return {
+            "status": {"videos": 0, "reached": {"72h": 0, "scored": 0}},
+            "fits": {},
+            "collecting": True,
+        }
+    f["collecting"] = f["status"]["reached"].get("scored", 0) < f["min_n"]
     return f
 
 
 @app.post("/analyze", dependencies=[Depends(_auth)])
 def analyze_now(niche: str | None = None):
     store = _store()
-    res = analyze(store, [niche] if niche else None)
+    res = analyze(store, [niche or DEFAULT_NICHE])
     save_findings(store, res)
     return res["status"]
 

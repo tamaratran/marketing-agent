@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { get, type Concept, type TraitDetail, type Findings, type Logic, type Overview, type Render, type Script } from "@/lib/api";
 import type { Ours } from "@/lib/ours";
-import { H1, Note, formatName, pt, times } from "../ui";
+import { H1, Note, formatName, times } from "../ui";
 
 export const dynamic = "force-dynamic";
 
@@ -152,13 +152,13 @@ export default async function How() {
       <Section n={6} title="Check: is a pattern real or luck?">
         <p className="text-sm text-neutral-300">
           The summary above is raw averages, which mix up the trait with account size, video length and posting time.
-          A separate analysis tracks fresh videos and compares like with like, but only once at least {fs.min_n ?? 20} of
-          them are 3 days old.
+          A separate analysis follows fresh videos in this niche and compares like with like, using the same &quot;videos like it&quot; score as step 2,
+          once at least {fs.min_n ?? 20} of them are a day old and scored. Views are only checked when a cycle runs, so this fills in with cycles, not with time.
         </p>
-        <Progress done={fs.status.reached["72h"] ?? 0} need={fs.min_n ?? 20} tracked={fs.status.videos} />
+        <Progress done={fs.status.reached["scored"] ?? 0} need={fs.min_n ?? 20} tracked={fs.status.videos} />
         <Note className="mt-2">
           {fs.collecting
-            ? `Still collecting${fs.status.eta_72h ? `; the first videos turn 3 days old ${pt(fs.status.eta_72h)}` : ""}. Until then the writer gets the raw version.`
+            ? "Still collecting. Until then the writer gets the raw version."
             : <>Ready. See <Link href="/findings" className="text-sky-300 hover:underline">Findings</Link>.</>}
         </Note>
       </Section>
