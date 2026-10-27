@@ -265,6 +265,24 @@ def own_login():
     console.print(f"TikTok session verified ({status}). Nothing posted.")
 
 
+@own.command("postmortem")
+@click.option("--niche", default=None)
+@click.option("--again", is_flag=True, help="Re-judge posts that already have a post-mortem")
+@click.option("--limit", default=3, show_default=True)
+def own_postmortem(niche, again, limit):
+    """Why did our underperforming posts (24h+, below half of what videos like them get) fall
+    short? Compare each with the reference videos it cloned and write the causes as learnings
+    and the fixes as rules for the next scripts and renders."""
+    from .postmortem import run
+
+    c = _campaign()
+    res = run(_store(), niche or c.niche.name, c.product.description, again=again, limit=limit)
+    if not res:
+        console.print("no underperforming post to examine (or all examined)")
+    for r in res:
+        console.print(f"s{r['script_id']}: {r['causes']} cause(s), learning #{r['learning']}")
+
+
 @own.command("add")
 @click.argument("handle")
 @click.option("--tag", default="", help="Optional campaign hashtag for fallback discovery")
@@ -934,6 +952,7 @@ def daily(
         )
     stage("measure", lambda: ctx.invoke(repoll, max_age_days=8.0, niche=None))
     stage("own", own_stage)
+    stage("postmortem", lambda: ctx.invoke(own_postmortem, niche=niche, again=False, limit=3))
     stage(
         "run",
         lambda: ctx.invoke(
