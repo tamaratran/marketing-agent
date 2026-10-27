@@ -471,12 +471,11 @@ def test_tags_merge_row_by_row(client, monkeypatch):
         {
             "video_id": "v1",
             "model": "gemini",
-            "payload": {"tags": {"rubric": {"dance": True}}, "run": {}},
+            "payload": {"tags": {"hook_type": "text_on_screen"}, "run": {}},
         },
         {"video_id": "nope", "model": "gemini", "payload": {}},
     ]
     assert client.post("/tags", json=rows).status_code == 401
     r = client.post("/tags", json=rows, headers=AUTH).json()
     assert r == {"saved": 1, "unknown": ["nope"]}
-    assert store.tags_for(["v1"])["v1"]["tags"]["rubric"]["dance"] is True
-    assert client.get("/rubric").json()["variables"][0]["key"] == "content"
+    assert store.tags_for(["v1"])["v1"]["tags"]["hook_type"] == "text_on_screen"

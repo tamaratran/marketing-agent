@@ -34,7 +34,7 @@ SCHEMA = """CREATE TABLE IF NOT EXISTS rubric (
   payload TEXT
 )"""
 
-RUBRIC_VERSION = "r1"
+RUBRIC_VERSION = "r2"
 WINNER = "winner"
 OURS = "ours"
 CLIPS_URL = os.environ.get("MKT_CLIPS_URL", "https://mkt-dashboard-eta.vercel.app/renders").rstrip(
@@ -45,7 +45,7 @@ SYSTEM = """You grade short vertical TikTok videos for a marketing team. Some ar
 videos in a format; some are the team's own clips in that format. Grade every video the same way,
 from what you see and hear, never from the caption alone. Be literal: name the game or app on any
 screen and say whether it is visibly working; quote on-screen text exactly; describe clothing in
-a few words. Text fields with nothing to say are an empty string, never the word None.
+a few words. Describe people only as they look on screen. Text fields with nothing to say are an empty string, never the word None.
 `helped` and `hurt` are the two or three concrete things in this video most likely to have
 helped or hurt its views, each a short phrase about something visible or audible (not the
 algorithm, posting time or luck). Return JSON matching the schema."""
@@ -53,6 +53,9 @@ algorithm, posting time or luck). Return JSON matching the schema."""
 
 class Grade(BaseModel):
     content: str = Field(description="What happens in the video, one line")
+    first_frame: str = Field(description="What the very first frame shows, a few words")
+    payoff: str = Field(description="The moment the video builds to, a few words, or empty")
+    humor: bool = Field(description="Is the video trying to be funny")
     product_on_screen: Literal["no", "yes_working", "yes_wrong", "yes_unclear"] = Field(
         description="Is a game or app on a screen, and is it visibly the right one and working"
     )
@@ -61,20 +64,45 @@ class Grade(BaseModel):
         description="On-screen captions: none, readable, with typos or broken glyphs, or covering the subject"
     )
     caption_text: str = Field(description="The on-screen caption text, quoted exactly")
+    caption_amount: Literal["none", "a_few_words", "a_sentence", "a_lot"]
+    caption_placement: Literal["none", "top", "middle", "bottom", "several"]
     people: Literal["none", "one", "two_or_more"]
-    gender: Literal["none", "woman", "man", "mixed"]
+    gender: Literal["none", "woman", "man", "mixed"] = Field(
+        description="How the people present on screen"
+    )
+    age: Literal["none", "teen", "20s", "30s", "40s_plus", "mixed"] = Field(
+        description="Rough age as the people look on screen"
+    )
     build: Literal["none", "slim", "average", "athletic", "heavy"]
+    size_in_frame: Literal["none", "full_body", "waist_up", "face_close", "small_in_room"] = Field(
+        description="How much of the main person the frame shows"
+    )
+    face_visible: bool
     clothing: str = Field(description="What the person wears, a few words")
+    clothing_type: Literal["none", "gym_wear", "casual", "dressy", "costume", "pajamas"]
     sweat: Literal["none", "some", "a_lot"] = Field(description="How sweaty the person looks")
     speech: Literal["none", "a_few_words", "talks"]
     speech_text: str = Field(description="What is said out loud, quoted, or empty")
+    talks_to_camera: bool
     movement: Literal["still", "slow", "moderate", "fast"] = Field(
         description="How fast the person moves"
     )
     activity: str = Field(description="The exercise, dance or activity, a few words")
+    dance: bool = Field(description="Is the person dancing")
+    dance_name: str = Field(description="The dance or trend, named, or empty")
+    energy: Literal["low", "medium", "high"]
+    setting: Literal["living_room", "bedroom", "gym", "outdoors", "studio", "other"]
+    camera: Literal["tripod", "handheld", "selfie", "screen_recording", "mixed"]
+    lighting: Literal["dim", "natural", "bright", "colored"]
+    body_controls_game: Literal["no_game", "yes", "no", "unclear"] = Field(
+        description="Does the game on screen visibly respond to the person's body"
+    )
     sound: Literal["none", "music", "trend_sound", "voice_only", "music_and_voice"]
     sound_fits: bool = Field(description="Does the sound fit what is on screen")
+    sound_name: str = Field(description="The song or sound, named if you know it, or empty")
+    sound_synced: bool = Field(description="Do the moves or cuts land on the beat")
     pacing: Literal["one_shot", "few_cuts", "many_cuts"]
+    looks_ai_made: bool = Field(description="Does the video as a whole look AI-generated")
     looks_fake: list[str] = Field(description="Anything that looks AI-made or wrong, each a phrase")
     helped: list[str]
     hurt: list[str]
@@ -83,16 +111,32 @@ class Grade(BaseModel):
 # The variables compared between the winners and our clips, in the order the page shows them.
 VARIABLES = [
     ("product_on_screen", "Game on screen"),
+    ("body_controls_game", "Body controls the game"),
     ("captions", "Captions"),
+    ("caption_amount", "Caption length"),
+    ("caption_placement", "Caption placement"),
     ("people", "People"),
     ("gender", "Gender"),
+    ("age", "Age"),
     ("build", "Build"),
+    ("size_in_frame", "Size in frame"),
+    ("face_visible", "Face visible"),
+    ("clothing_type", "Clothing"),
     ("sweat", "Sweat"),
     ("speech", "Speech"),
+    ("talks_to_camera", "Talks to camera"),
     ("movement", "Movement"),
+    ("dance", "Dance"),
+    ("energy", "Energy"),
+    ("humor", "Humor"),
+    ("setting", "Setting"),
+    ("camera", "Camera"),
+    ("lighting", "Lighting"),
     ("sound", "Sound"),
     ("sound_fits", "Sound fits"),
+    ("sound_synced", "On the beat"),
     ("pacing", "Pacing"),
+    ("looks_ai_made", "Looks AI made"),
 ]
 TEXT_FIELDS = {k for k, f in Grade.model_fields.items() if f.annotation is str}
 WORDS = {
@@ -109,6 +153,11 @@ WORDS = {
     "one_shot": "one shot",
     "few_cuts": "a few cuts",
     "many_cuts": "many cuts",
+    "40s_plus": "40s or older",
+    "face_close": "face close-up",
+    "small_in_room": "small in the room",
+    "no_game": "no game",
+    "screen_recording": "screen recording",
     "True": "yes",
     "False": "no",
 }
@@ -306,7 +355,11 @@ def run(
         if concept_id
         else winning_concept(store)
     )
-    done = {r["key"] for r in grades(store)} if not again else set()
+    done = (
+        {r["key"] for r in grades(store) if r["run"].get("rubric_version") == RUBRIC_VERSION}
+        if not again
+        else set()
+    )
     graded = {"winners": 0, "ours": 0, "failed": []}
     todo = 0
     for v in winners(store, concept):
