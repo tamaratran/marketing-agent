@@ -162,6 +162,19 @@ Nothing is scheduled. Measuring happens live: the first stage of every cycle re-
 and the cohort, so the pick that follows uses fresh numbers; the site's "Check post performance"
 button does the same on demand.
 
+## Status in one read
+
+`mkt status` pulls the live API into one page: the account and campaign, our posts with views and
+lift, every clip with its post state (posted, posting, ready, on hold, rendered) and the clean file
+to post, the proposed next scripts, what the data says (best bets and the trait tables), the rules
+every script follows, the agent's notes, and any run going. `mkt status --json` is the same as
+JSON with the API's field names, so a chat agent reads it once and curls an endpoint for detail.
+
+```bash
+mkt status          # markdown
+mkt status --json   # for agents
+```
+
 ## Learnings
 
 After every cycle `mkt daily` writes an entry to the `learnings` table (`mkt learn write` does it

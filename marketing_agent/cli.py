@@ -1378,6 +1378,30 @@ def campaign_show():
     )
 
 
+@cli.command("status")
+@click.option("--json", "as_json", is_flag=True, help="The same as JSON (field names are the API's).")
+def status(as_json):
+    """Everything in one read, from the live API: campaign, our posts and how they do, clips and
+    their post state, the proposed scripts, what the data says, rules, notes, any run going."""
+    import httpx
+
+    from . import status as status_mod
+
+    url, _ = _api()
+
+    def get(path):
+        r = httpx.get(f"{url}{path}", timeout=60, follow_redirects=True)
+        r.raise_for_status()
+        return r.json()
+
+    st = status_mod.build(get)
+    st["api"] = url
+    if as_json:
+        click.echo(json.dumps(st, indent=2, default=str))
+    else:
+        click.echo(status_mod.render(st), nl=False)
+
+
 @devin.command("status")
 @click.argument("session_id")
 def devin_status(session_id):
