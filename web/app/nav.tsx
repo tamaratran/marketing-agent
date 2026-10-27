@@ -1,7 +1,6 @@
 "use client";
 import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
-import { useRef } from "react";
+import { usePathname } from "next/navigation";
 import { STEPS } from "./ui";
 
 const pages: [string, string][] = [
@@ -11,8 +10,6 @@ const pages: [string, string][] = [
 
 export function Nav() {
   const path = usePathname();
-  const key = path + useSearchParams().toString();
-  const menu = useRef<HTMLDetailsElement>(null);
   const current = path === "/concepts" ? "/" : path;
   return (
     <nav className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 text-sm">
@@ -33,12 +30,16 @@ export function Nav() {
           })}
         </ol>
       </div>
-      <details key={key} ref={menu} className="relative shrink-0">
-        <summary className="cursor-pointer list-none text-xs text-neutral-500 hover:text-neutral-300">All details</summary>
-        <div className="absolute right-0 z-10 mt-2 w-40 rounded-lg border border-neutral-800 bg-neutral-900 py-1 shadow-lg">
-          {pages.map(([href, label]) => <Link key={href} href={href} onClick={() => menu.current?.removeAttribute("open")} className="block px-3 py-1.5 text-neutral-300 hover:bg-neutral-800">{label}</Link>)}
-        </div>
-      </details>
+      <ul className="flex shrink-0 items-center gap-3 text-xs sm:gap-4">
+        {pages.map(([href, label]) => {
+          const on = current === href;
+          return (
+            <li key={href}>
+              <Link href={href} aria-current={on ? "page" : undefined} className={on ? "text-neutral-100" : "text-neutral-400 hover:text-neutral-100"}>{label}</Link>
+            </li>
+          );
+        })}
+      </ul>
     </nav>
   );
 }
