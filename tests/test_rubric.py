@@ -202,3 +202,13 @@ def test_run_grades_the_winners_and_ours_then_reports(tmp_path, monkeypatch):
 def test_must_have_on_nothing():
     assert rubric.must_have([]) == []
     assert rubric.differences(GRADE, []) == []
+
+
+def test_must_have_counts_only_winners_with_a_person():
+    person = {**GRADE, "people": "one", "movement": "fast"}
+    screen = {**GRADE, "people": "none", "gender": "none", "movement": "still"}
+    must = {m["variable"]: m for m in rubric.must_have([person, person, screen, screen, screen])}
+    assert must["people"]["value"] == "one" and must["people"]["n"] == 2
+    assert must["movement"]["value"] == "fast" and must["movement"]["share"] == 1.0
+    # one person video is too few to lean on: everyone counts
+    assert rubric.comparable([person, screen, screen]) == [person, screen, screen]

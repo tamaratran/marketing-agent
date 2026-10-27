@@ -404,9 +404,19 @@ def run(
     return graded
 
 
+def comparable(winner_grades: list[dict]) -> list[dict]:
+    """The winners our clips can be measured against: the ones with a person on camera. The
+    format's example list can carry screen-only videos (another app's prompt cards with no one in
+    frame); counting those would tell us the winners share "no people". When fewer than two
+    winners have a person, every winner counts."""
+    with_person = [g for g in winner_grades if g.get("people") not in (None, "none")]
+    return with_person if len(with_person) >= 2 else list(winner_grades)
+
+
 def must_have(winner_grades: list[dict]) -> list[dict]:
-    """For each variable, the value most of the winners share, with how many share it."""
+    """For each variable, the value most of the comparable winners share, with how many share it."""
     out = []
+    winner_grades = comparable(winner_grades)
     n = len(winner_grades)
     if not n:
         return out
@@ -477,6 +487,9 @@ def report(store: Store) -> dict:
     win = [r for r in rows if r["kind"] == WINNER]
     ours = [r for r in rows if r["kind"] == OURS]
     must = must_have([r["grade"] for r in win])
+    used = {id(g) for g in comparable([r["grade"] for r in win])}
+    for r in win:
+        r["comparable"] = id(r["grade"]) in used
     for r in ours:
         r["differences"] = differences(r["grade"], must)
     hooks = {
@@ -492,6 +505,7 @@ def report(store: Store) -> dict:
         "rubric_version": RUBRIC_VERSION,
         "variables": [{"variable": k, "label": v} for k, v in VARIABLES],
         "winners": win,
+        "n_comparable": sum(1 for r in win if r.get("comparable")),
         "ours": ours,
         "must_have": must,
         "candidates": {
