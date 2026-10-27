@@ -71,7 +71,7 @@ export type Features = Record<string, number | string | boolean | string[] | nul
 export type VideoDetail = {
   video: { id: string; url: string; author: string; followers: number | null; create_time: number; duration: number | null; desc: string; music: string; hashtags: string[]; source_tag: string; niche: string | null; cohort_at: number | null; gone_at: number | null };
   observations: Observation[];
-  tags: { tags: Record<string, unknown>; run: { model: string; prompt_version: string; latency_s: number; transcript: string | null; frame_times: number[] | null } } | null;
+  tags: { tags: Record<string, unknown>; run: { model: string; prompt_version: string; latency_s?: number | null; transcript: string | null; frame_times: number[] | null } } | null;
   tagged_at: number | null;
   features: Features | null;
   creator: { followers: number | null; n_posts: number; median_views: number | null; video_count: number | null; heart_count: number | null; taken_at: number } | null;

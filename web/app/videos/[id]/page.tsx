@@ -63,7 +63,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
         </Card>
       </div>
       <div className="mt-4 grid gap-4 md:grid-cols-2">
-        <Card title={t ? `${isDetailed(t) ? "Video labeller" : "Classifier"} (${run?.model}, ${run?.latency_s}s)` : "Classifier"}>
+        <Card title={t ? `${isDetailed(t) ? "Video labeller" : "Classifier"} (${run?.model}${run?.latency_s != null ? `, ${run.latency_s}s` : ""})` : "Classifier"}>
           {t ? (
             <>
               <p className="mb-3 text-sm text-neutral-200">{String(t.summary ?? "")}</p>
