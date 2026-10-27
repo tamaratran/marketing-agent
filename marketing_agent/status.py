@@ -130,7 +130,9 @@ def _and(items: list[str]) -> str:
     return ", ".join(items[:-1]) + (" and " if len(items) > 1 else "") + items[-1] if items else ""
 
 
-def _story(facts: dict, min_n: int, concepts: list, batch: list, posts: list) -> dict:
+def _story(
+    facts: dict, min_n: int, concepts: list, batch: list, posts: list, rubric: dict | None = None
+) -> dict:
     """Three plain sentences a person reads first: what was scanned, what it says, what we make.
     Every number is read from the data; nothing here is written by a model.
 
@@ -215,7 +217,50 @@ def _story(facts: dict, min_n: int, concepts: list, batch: list, posts: list) ->
             else "; none old enough to read yet."
         )
 
-    return {"scanned": scanned, "learned": learned, "making": making, "format": fmt}
+    return {
+        "scanned": scanned,
+        "learned": learned,
+        "making": making,
+        "format": fmt,
+        **_rubric_story(rubric or {}, posts),
+    }
+
+
+def _rubric_story(rubric: dict, posts: list) -> dict:
+    """What the winners share (`must_have`), each posted clip's differences from them (worst
+    post first, then the unposted clips), and the candidate variables, from GET /rubric."""
+    must = [m for m in rubric.get("must_have") or [] if m.get("agreed")]
+    by_script = {p.get("script_id"): p for p in posts if p.get("script_id") is not None}
+    diffs = []
+    for r in rubric.get("ours") or []:
+        p = by_script.get(r.get("script_id")) or {}
+        diffs.append(
+            {
+                "script_id": r.get("script_id"),
+                "hook": r.get("hook") or p.get("hook"),
+                "posted": bool(p),
+                "lift": p.get("lift_now"),
+                "lift_text": pct(p.get("lift_now")) if p else "not posted",
+                "views": p.get("views_now"),
+                "differences": r.get("differences") or [],
+                "hurt": (r.get("grade") or {}).get("hurt") or [],
+                "looks_fake": (r.get("grade") or {}).get("looks_fake") or [],
+            }
+        )
+    diffs.sort(
+        key=lambda d: (
+            not d["posted"],
+            d["lift"] if d["lift"] is not None else 9,
+            -len(d["differences"]),
+        )
+    )
+    n_win = len(rubric.get("winners") or [])
+    return {
+        "must_have": must,
+        "n_winners_graded": n_win,
+        "differences": diffs,
+        "candidates": rubric.get("candidates") or {"hurt": [], "helped": []},
+    }
 
 
 def build(get: Get, now: float | None = None) -> dict:
@@ -229,6 +274,7 @@ def build(get: Get, now: float | None = None) -> dict:
     learnings = get("/learnings?limit=100") or []
     findings = get("/findings") or {}
     concepts = get("/concepts") or []
+    rubric = get("/rubric") or {}
 
     posts = sorted(ours.get("posts") or [], key=lambda p: -(p.get("create_time") or 0))
     for p in posts:
@@ -306,7 +352,7 @@ def build(get: Get, now: float | None = None) -> dict:
             "rules": [e for e in notes if e.get("kind") == "rule"],
             "notes": [e for e in notes if e.get("kind") != "rule"][:10],
         },
-        "story": _story(facts, min_n, concepts, batch, posts),
+        "story": _story(facts, min_n, concepts, batch, posts, rubric),
         "running": running,
         "posting": posting,
         "runs": runs[:5],
@@ -344,6 +390,24 @@ def render(st: dict) -> str:
     if st.get("story"):
         y = st["story"]
         out.append(f"\n{y['scanned']} {y['learned']} {y['making']}")
+        if y.get("must_have"):
+            out.append(
+                f"\nWhat the {y.get('n_winners_graded')} top videos share: "
+                + "; ".join(
+                    f"{m['label'].lower()} {m['text']} ({round(m['share'] * 100)}%)"
+                    for m in y["must_have"]
+                )
+                + "."
+            )
+        for d in y.get("differences") or []:
+            gap = (
+                ", ".join(
+                    f"{x['label'].lower()} {x['ours']} (they: {x['winners']})"
+                    for x in d["differences"]
+                )
+                or "matches the winners on every variable"
+            )
+            out.append(f"- s{d['script_id']} ({d['lift_text']}): {gap}")
 
     out.append("\n## Our posts")
     if not st["posts"]:
