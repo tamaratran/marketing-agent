@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from marketing_agent.classifier import gemini, tagger
+from marketing_agent.classifier import gemini, rubric, tagger
 
 FULL = {
     "hook_type": "pov",
@@ -34,6 +34,12 @@ FULL = {
     "shots": [{"t_s": 0, "seconds": 3, "camera": "static medium", "what": "jumping"}],
     "text_overlays": [{"t_s": 0, "text": "POV: cardio", "position": "top"}],
     "product_timeline": [{"t_s": 0, "what": "Flappy game on the TV"}],
+    "rubric": {
+        v["key"]: v["options"][0]
+        if v["kind"] == "choice"
+        else {"text": "x", "bool": False, "number": 1}[v["kind"]]
+        for v in rubric.variables()
+    },
 }
 
 
@@ -126,3 +132,39 @@ def test_tagger_uses_gemini_when_key_set_else_frames(tmp_path: Path, monkeypatch
         ("frames", "gpt-5.4"),
         ("frames", tagger.settings.openai_model),
     ]
+
+
+def test_rubric_rides_in_the_schema_and_the_tags(tmp_path: Path):
+    clip = tmp_path / "c.mp4"
+    clip.write_bytes(b"x")
+    doc = json.loads(json.dumps(FULL))
+    doc["rubric"]["speech"] = "None"
+    calls = []
+
+    def post(url, body, timeout):
+        calls.append(body)
+        return {"candidates": [{"content": {"parts": [{"text": json.dumps(doc)}]}}]}
+
+    out = gemini.label_video(clip, {}, model="m", api_key="k", post=post)
+    schema = json.dumps(calls[0]["generationConfig"]["responseJsonSchema"])
+    assert "person_gender" in schema and "movement_speed" in schema and "dance" in schema
+    assert out["tags"]["rubric"]["speech"] == ""
+    assert out["run"]["rubric_version"] == rubric.version()
+
+
+def test_rubric_file_is_sound():
+    keys = [v["key"] for v in rubric.variables()]
+    for k in (
+        "content",
+        "caption_text",
+        "sound_kind",
+        "person_gender",
+        "person_build",
+        "person_size_in_frame",
+        "clothing",
+        "speech",
+        "movement_speed",
+        "dance",
+    ):
+        assert k in keys
+    assert all(v["question"] for v in rubric.variables())

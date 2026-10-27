@@ -456,3 +456,27 @@ def test_concepts_carry_pick_share_and_example_lift(client):
     ours = [c for c in rows if c["name"] in ("A", "B")]
     assert len(ours) == 2
     assert all("reward" in e for c in ours for e in c["examples"])
+
+
+def test_tags_merge_row_by_row(client, monkeypatch):
+    from pathlib import Path
+
+    from marketing_agent import api
+    from marketing_agent.store import Store
+
+    store = Store(Path(os.environ["MKT_DB"]))
+    monkeypatch.setattr(api, "_store", lambda: store)
+    store.insert("videos", {"id": "v1", "url": "u", "author": "a"})
+    rows = [
+        {
+            "video_id": "v1",
+            "model": "gemini",
+            "payload": {"tags": {"rubric": {"dance": True}}, "run": {}},
+        },
+        {"video_id": "nope", "model": "gemini", "payload": {}},
+    ]
+    assert client.post("/tags", json=rows).status_code == 401
+    r = client.post("/tags", json=rows, headers=AUTH).json()
+    assert r == {"saved": 1, "unknown": ["nope"]}
+    assert store.tags_for(["v1"])["v1"]["tags"]["rubric"]["dance"] is True
+    assert client.get("/rubric").json()["variables"][0]["key"] == "content"
