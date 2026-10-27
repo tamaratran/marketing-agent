@@ -12,7 +12,7 @@ export function Nav() {
   const path = usePathname();
   const current = path === "/concepts" ? "/" : path;
   return (
-    <nav className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 text-sm">
+    <nav className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-3 gap-y-2 px-4 py-3 text-sm">
       <div className="flex min-w-0 items-center gap-3 sm:gap-4">
         <Link href="/" className="font-semibold tracking-tight">mkt</Link>
         <ol className="flex min-w-0 items-center gap-2 sm:gap-3">
@@ -30,7 +30,7 @@ export function Nav() {
           })}
         </ol>
       </div>
-      <ul className="flex shrink-0 items-center gap-3 text-xs sm:gap-4">
+      <ul className="flex w-full items-center gap-4 text-xs sm:w-auto sm:shrink-0">
         {pages.map(([href, label]) => {
           const on = current === href;
           return (
