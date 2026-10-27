@@ -315,11 +315,13 @@ straight to the upload.
 
 Setup (in the repo): uv venv && . .venv/bin/activate && uv pip install -e ".[dev]"
 The uploader runs in the Chrome already open in your VM at http://localhost:29229 (Playwright over
-CDP). It must be signed in as @{handle}: `mkt own login` reuses a verified login or submits
+CDP). It must be signed in as @{handle}. First run `mkt browser restore`: it loads our saved
+signed-in session into Chrome, so TikTok sees the same browser as last time and no login happens.
+Only if that fails (no saved session, or it expired) run `mkt own login`, which submits
 TIKTOK_POST_HANDLE and TIKTOK_POST_PASSWORD from protected environment secrets. Never print them,
-put them in prompts, export cookies or copy them anywhere. If TikTok asks for a verification code
-or a CAPTCHA you cannot solve, or the browser is signed into a different account, stop and report;
-do not post from another account.
+put them in prompts or copy them anywhere; the only place the session goes is `mkt browser save`.
+If TikTok asks for a verification code or a CAPTCHA you cannot solve, or the browser is signed into
+a different account, stop and report; do not post from another account.
 
 Uploader notes: https://www.tiktok.com/tiktokstudio/upload has one hidden input[type=file]; set the
 file on it. Click Cancel on the "automatic content checks" dialog and let the tour finish (never
@@ -331,7 +333,9 @@ Then:
 2. Register it so views start counting toward the script:
    curl -sS -X POST {api_url}/ours/posts -H "Authorization: Bearer $MKT_API_TOKEN" \\
      -H "content-type: application/json" -d '{{"url": "<post url>", "caption": "<description>"}}'
-3. Reply with: the post URL, the text lines as added, the sound used, and anything TikTok changed
+3. Run `mkt browser save` so the next poster session gets the refreshed signed-in session
+   (TikTok rotates it).
+4. Reply with: the post URL, the text lines as added, the sound used, and anything TikTok changed
    or refused. Attach a screenshot of the posted video page.
 
 Rules: one post per message, this clip only, then wait for the next. If you already posted script

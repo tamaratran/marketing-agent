@@ -508,6 +508,52 @@ async def db_import(request: Request):
     return {"ok": True, "bytes": len(body)}
 
 
+class BrowserSession(BaseModel):
+    cookies: list[dict]
+
+
+def _session_cipher():
+    from cryptography.fernet import Fernet
+
+    key = os.environ.get("MKT_SESSION_KEY")
+    if not key:
+        raise HTTPException(503, "MKT_SESSION_KEY not configured; the browser session is off")
+    return Fernet(key)
+
+
+def _session_path() -> Path:
+    return settings.db_path.parent / "browser_session.enc"
+
+
+@app.put("/browser/session", dependencies=[Depends(_auth)])
+def browser_session_save(body: BrowserSession):
+    """`mkt browser save`: the signed-in TikTok cookies, kept encrypted so every poster session is
+    the same browser to TikTok instead of a new login."""
+    if not body.cookies:
+        raise HTTPException(400, "no cookies")
+    path = _session_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    blob = _session_cipher().encrypt(json.dumps({"cookies": body.cookies}).encode())
+    path.write_bytes(blob)
+    return {"ok": True, "cookies": len(body.cookies), "saved_at": int(time.time())}
+
+
+@app.get("/browser/session", dependencies=[Depends(_auth)])
+def browser_session_load():
+    """`mkt browser restore`: the saved session, decrypted for the token holder."""
+    path = _session_path()
+    if not path.exists():
+        raise HTTPException(404, "no saved session")
+    from cryptography.fernet import InvalidToken
+
+    try:
+        data = json.loads(_session_cipher().decrypt(path.read_bytes()))
+    except InvalidToken:
+        raise HTTPException(500, "saved session does not decrypt with this key") from None
+    data["saved_at"] = int(path.stat().st_mtime)
+    return data
+
+
 @app.post("/repoll", dependencies=[Depends(_auth)])
 def repoll_cohort(max_age_days: float = 8.0, niche: str | None = None):
     """Re-poll every tracked video inside the window and rebuild features. The site's

@@ -1093,6 +1093,64 @@ def sync_push():
 
 
 @cli.group()
+def browser():
+    """Keep one signed-in TikTok browser across sessions: save the cookies from a Chrome that is
+    signed in as our account, restore them into a fresh Chrome. Stored on the API, encrypted."""
+
+
+@browser.command("save")
+def browser_save():
+    """Save this Chrome's signed-in TikTok session to the API (needs MKT_API_TOKEN)."""
+    import httpx
+
+    from .research.tiktok_auth import LoginRequired, export_session_sync
+
+    url, token = _api()
+    if not token:
+        raise click.ClickException("MKT_API_TOKEN not set")
+    try:
+        cookies = export_session_sync(settings.cdp_url)
+    except LoginRequired as exc:
+        raise click.ClickException(str(exc)) from None
+    r = httpx.put(
+        f"{url}/browser/session",
+        json={"cookies": cookies},
+        headers={"Authorization": f"Bearer {token}"},
+        timeout=60,
+    )
+    r.raise_for_status()
+    console.print(f"saved the signed-in session ({len(cookies)} cookies) -> {url}")
+
+
+@browser.command("restore")
+def browser_restore():
+    """Load the saved TikTok session into this Chrome, so no login is needed."""
+    import httpx
+
+    from .research.tiktok_auth import LoginRequired, import_session_sync
+
+    url, token = _api()
+    if not token:
+        raise click.ClickException("MKT_API_TOKEN not set")
+    r = httpx.get(
+        f"{url}/browser/session", headers={"Authorization": f"Bearer {token}"}, timeout=60
+    )
+    if r.status_code == 404:
+        raise click.ClickException("no saved session on the API; run `mkt browser save` first")
+    r.raise_for_status()
+    try:
+        ok = import_session_sync(settings.cdp_url, r.json()["cookies"])
+    except LoginRequired as exc:
+        raise click.ClickException(str(exc)) from None
+    if not ok:
+        raise click.ClickException(
+            "the saved session no longer signs in (expired or revoked); "
+            "sign in by hand once and run `mkt browser save` again"
+        )
+    console.print("signed-in TikTok session restored. Nothing posted.")
+
+
+@cli.group()
 def devin():
     """Have Devin run the loop: start a session through the Devin API that runs `mkt daily`,
     fixes what broke, pushes the state branch and reports."""
