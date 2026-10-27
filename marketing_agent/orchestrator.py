@@ -348,6 +348,12 @@ Then:
 4. Reply with: the post URL, the text lines as added, the sound used, and anything TikTok changed
    or refused. Attach a screenshot of the posted video page.
 
+If TikTok Studio shows the post as "Failed to publish" ("Something went wrong"), the post is not
+live and its URL must not be registered. Delete that failed item from Studio (its Actions menu),
+then upload the same clip once more with no added sound (the clip's own audio only); an added sound
+is what made this happen before, and the same file published first time without it. If that also
+fails, stop and report; do not retry a third time or register anything.
+
 Rules: one post per message, this clip only, then wait for the next. If you already posted script
 #{script_id} earlier (check https://www.tiktok.com/@{handle} before uploading), do not post it again:
 register the existing URL and reply with it. Never message anyone, no bot accounts, no purchases, no account,
