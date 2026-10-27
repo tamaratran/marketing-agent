@@ -1,7 +1,6 @@
 "use client";
 import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
-import { useRef } from "react";
+import { usePathname } from "next/navigation";
 import { STEPS } from "./ui";
 
 const pages: [string, string][] = [
@@ -11,11 +10,9 @@ const pages: [string, string][] = [
 
 export function Nav() {
   const path = usePathname();
-  const key = path + useSearchParams().toString();
-  const menu = useRef<HTMLDetailsElement>(null);
   const current = path === "/concepts" ? "/" : path;
   return (
-    <nav className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 text-sm">
+    <nav className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-3 gap-y-2 px-4 py-3 text-sm">
       <div className="flex min-w-0 items-center gap-3 sm:gap-4">
         <Link href="/" className="font-semibold tracking-tight">mkt</Link>
         <ol className="flex min-w-0 items-center gap-2 sm:gap-3">
@@ -33,12 +30,16 @@ export function Nav() {
           })}
         </ol>
       </div>
-      <details key={key} ref={menu} className="relative shrink-0">
-        <summary className="cursor-pointer list-none text-xs text-neutral-500 hover:text-neutral-300">All details</summary>
-        <div className="absolute right-0 z-10 mt-2 w-40 rounded-lg border border-neutral-800 bg-neutral-900 py-1 shadow-lg">
-          {pages.map(([href, label]) => <Link key={href} href={href} onClick={() => menu.current?.removeAttribute("open")} className="block px-3 py-1.5 text-neutral-300 hover:bg-neutral-800">{label}</Link>)}
-        </div>
-      </details>
+      <ul className="flex w-full items-center gap-4 text-xs sm:w-auto sm:shrink-0">
+        {pages.map(([href, label]) => {
+          const on = current === href;
+          return (
+            <li key={href}>
+              <Link href={href} aria-current={on ? "page" : undefined} className={on ? "text-neutral-100" : "text-neutral-400 hover:text-neutral-100"}>{label}</Link>
+            </li>
+          );
+        })}
+      </ul>
     </nav>
   );
 }
