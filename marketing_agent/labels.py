@@ -50,7 +50,14 @@ def label_render(
         "tags": out["tags"],
         "run": {
             k: run.get(k)
-            for k in ("model", "prompt_version", "transcript", "frame_times", "watched")
+            for k in (
+                "model",
+                "prompt_version",
+                "latency_s",
+                "transcript",
+                "frame_times",
+                "watched",
+            )
         },
         "labelled_at": int(time.time()),
     }
