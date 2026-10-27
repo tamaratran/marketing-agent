@@ -333,7 +333,7 @@ Then:
 1. Open https://www.tiktok.com/@{handle} and copy the new post's URL (it can take a minute).
 2. Register it so views start counting toward the script:
    curl -sS -X POST {api_url}/ours/posts -H "Authorization: Bearer $MKT_API_TOKEN" \\
-     -H "content-type: application/json" -d '{{"url": "<post url>", "caption": "<description>"}}'
+     -H "content-type: application/json" -d '{{"url": "<post url>", "caption": "<description>", "script_id": {script_id}}}'
 3. Run `mkt browser save` so the next poster session gets the refreshed signed-in session
    (TikTok rotates it).
 4. Reply with: the post URL, the text lines as added, the sound used, and anything TikTok changed

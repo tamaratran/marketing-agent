@@ -651,6 +651,7 @@ class PostIn(BaseModel):
 
     url: str
     caption: str = ""
+    script_id: int | None = None  # the poster session passes the clip it uploaded
 
 
 @app.post("/ours/posts", dependencies=[Depends(_auth)])
@@ -660,7 +661,7 @@ def ours_add_post(body: PostIn):
 
     store = _store()
     try:
-        res = add_post(store, body.url, body.caption, niche=DEFAULT_NICHE)
+        res = add_post(store, body.url, body.caption, niche=DEFAULT_NICHE, script_id=body.script_id)
     except ValueError as e:
         raise HTTPException(400, str(e)) from e
     if res.get("script_id"):
