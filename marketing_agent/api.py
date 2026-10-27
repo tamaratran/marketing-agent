@@ -20,6 +20,7 @@ from . import policy, scoreboard
 from .analysis import analyze, latest_findings, save_findings
 from .cohort import build_features, features, latest_snapshot, repoll
 from .config import settings
+from .labels import copy_to_tags, labels_of
 from .learnings import document as learnings_doc
 from .learnings import entries as learnings_entries
 from .learnings import hold as learnings_hold
@@ -234,7 +235,7 @@ def renders(limit: int = 50, niche: str = DEFAULT_NICHE):
     rows = store.rows(
         """SELECT r.id, r.script_id, r.created_at, r.model, r.cost_usd, r.final_path, r.post_path,
                   r.post_session_url, r.post_requested_at, COALESCE(r.post_attempts, 0) post_attempts,
-                  r.hold_reason, s.hook, s.payload
+                  r.hold_reason, s.hook, s.payload, r.payload rpayload
            FROM renders r JOIN scripts s ON s.id=r.script_id JOIN concepts c ON c.id=s.concept_id
            WHERE r.final_path IS NOT NULL AND r.model!='stub' AND c.niche=?
            ORDER BY r.created_at DESC LIMIT ?""",
@@ -246,6 +247,10 @@ def renders(limit: int = 50, niche: str = DEFAULT_NICHE):
         # fun"); the poster types the hook once, so those fragments are not repeated.
         r["post_text"] = _post_text(r["hook"], payload)
         r["hook"] = strip_label(r["hook"] or "")
+        lab = labels_of(json.loads(r.pop("rpayload") or "{}"))
+        r["labels"] = (
+            {"tags": lab["tags"], "beats": lab["tags"].get("beats") or []} if lab else None
+        )
     return rows
 
 
@@ -666,6 +671,7 @@ def ours_add_post(body: PostIn):
         raise HTTPException(400, str(e)) from e
     if res.get("script_id"):
         _finish_post_runs(store, res["script_id"])
+        copy_to_tags(store, res["id"], res["script_id"])
     return res
 
 

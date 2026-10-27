@@ -7,6 +7,7 @@ import { Card, Pill, Stat, formatName, ghost, times } from "../../ui";
 import { postClip, releaseClip } from "../../actions";
 import { PostButton } from "../../post-button";
 import { MIN_AGE_H_OWN, WhyBlock, explain } from "../why";
+import { LabelsBlock } from "../labels";
 import { MAX_POST_ATTEMPTS, age, gaveUp, hoursSince, statusOf, tone, views } from "../status";
 
 export const dynamic = "force-dynamic";
@@ -98,6 +99,8 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
               {r.post_text.map((ln, i) => <p key={i} className="font-medium text-neutral-100">{ln}</p>)}
             </Card>
           )}
+
+          <LabelsBlock labels={r.labels} />
 
           <Card title="Script and sound">
             <p className="text-sm text-neutral-400">
