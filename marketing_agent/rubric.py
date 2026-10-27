@@ -316,6 +316,7 @@ def run(
         path = Path(v["local_path"] or "")
         if not v.get("local_path") or not path.exists():
             path = videos_dir / f"{v['id']}.mp4"
+            path.parent.mkdir(parents=True, exist_ok=True)
             try:
                 fetch_video_sync(v["url"], path, cdp_url)
             except Exception as e:  # noqa: BLE001 - one unfetchable video must not stop the rest
