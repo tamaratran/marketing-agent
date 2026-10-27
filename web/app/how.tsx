@@ -1,10 +1,8 @@
 import Link from "next/link";
-import { fmt, get, type Concept, type TraitDetail, type Findings, type Level, type Logic, type Overview, type Render, type Script } from "@/lib/api";
+import { fmt, get, type Concept, type TraitDetail, type Findings, type Level, type Logic, type Overview } from "@/lib/api";
 import type { Ours } from "@/lib/ours";
-import { Card, H1, Note, Pill, Stat, Table, formatName, human, times } from "../ui";
-import { RefreshButtons } from "../refresh";
-
-export const dynamic = "force-dynamic";
+import { Card, Note, Pill, Stat, Table, formatName, human, times } from "./ui";
+import { RefreshButtons } from "./refresh";
 
 /** Normal CDF via the Abramowitz-Stegun erf approximation (error < 1.5e-7). */
 function cdf(x: number) {
@@ -33,16 +31,18 @@ function pickChances(rows: { mean: number; sd: number }[]) {
 
 const pct = (p: number) => (p >= 0.995 ? ">99%" : p < 0.005 ? "<1%" : `${Math.round(p * 100)}%`);
 
-export default async function How({ searchParams }: { searchParams: Promise<{ outcome?: string; niche?: string }> }) {
-  const sp = await searchParams;
-  const [lg, concepts, ours, fs, o, scripts, renders] = await Promise.all([
+export type HowParams = { outcome?: string; niche?: string };
+
+/** The rules the agent follows, drawn from live data. "formats" = score, pick, learn (on Formats);
+ *  "learnings" = what the writer is told and whether a pattern is real (on Learnings). */
+export async function HowItDecides({ part, sp = {} }: { part: "formats" | "learnings"; sp?: HowParams }) {
+  const [lg, concepts, ours, fs, o] = await Promise.all([
     get<Logic>("/logic"), get<Concept[]>("/concepts"), get<Ours>("/ours"), get<Findings>("/findings"),
-    get<Overview>("/overview"), get<Script[]>("/scripts?days=60&limit=500"), get<Render[]>("/renders"),
+    get<Overview>("/overview"),
   ]);
   const account = ours.accounts[0]?.handle;
   const linked = ours.posts.filter((p) => p.script_id);
   const scored = lg.videos.filter((v) => v.reward != null);
-  const beat = scored.filter((v) => (v.reward as number) > 0).length;
 
   const formats = concepts.map((c) => ({
     c, mean: c.prior + (c.learned ?? c.mean_reward ?? 0), sd: lg.explore_sd / Math.sqrt(1 + c.n),
@@ -67,21 +67,8 @@ export default async function How({ searchParams }: { searchParams: Promise<{ ou
   const scenarios = [whatIf(leader, 1), whatIf(leader, -1), whatIf(research, 1)].filter((x) => x != null);
 
   return (
-    <div className="mx-auto max-w-3xl space-y-12">
-      <H1 sub="The actual rules the agent follows to decide what the next video looks like, drawn from live data, and what the niche's numbers say so far.">How it decides</H1>
-
-      <Section n={1} title="The loop">
-        <Loop steps={[
-          ["Research", `${lg.videos.length} videos from other accounts`],
-          ["Score", `${beat} of ${scored.length} ahead of videos like them`],
-          ["Formats", `${concepts.length} found`],
-          ["Pick", leader ? formatName(leader.c.name) : "none yet"],
-          ["Script + clip", `${scripts.length} scripts, ${new Set(renders.map((r) => r.script_id)).size} clips`],
-          ["You post", `${linked.length} post${linked.length === 1 ? "" : "s"} linked so far`],
-        ]} />
-        <Note className="mt-3">How our posts do feeds back into the pick. Views on research videos are rechecked every 2 hours.</Note>
-      </Section>
-
+    <div className="space-y-10">
+      {part === "formats" && (<>
       <Section n={2} title="Score: did a video beat videos like it?">
         <p className="text-sm text-neutral-300">
           Raw views mislead twice over: 50k is huge for a new account and a flop for a big one, and a video that is 3 hours old has
@@ -148,6 +135,8 @@ export default async function How({ searchParams }: { searchParams: Promise<{ ou
         </Note>
       </Section>
 
+      </>)}
+      {part === "learnings" && (<>
       <Section n={5} title="Write: what the script writer is told">
         <p className="text-sm text-neutral-300">
           Along with the format, GPT gets this summary of what has worked, word for word. Our own posts come first,
@@ -166,6 +155,7 @@ export default async function How({ searchParams }: { searchParams: Promise<{ ou
         <div className="mt-4"><RefreshButtons /></div>
         <FindingsTables f={fs} sp={sp} />
       </Section>
+      </>)}
     </div>
   );
 }
@@ -182,19 +172,6 @@ function Section({ n, title, id, children }: { n: number; title: string; id?: st
   );
 }
 
-function Loop({ steps }: { steps: [string, string][] }) {
-  return (
-    <ol className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-      {steps.map(([t, d], i) => (
-        <li key={t} className="rounded-lg border border-neutral-800 bg-neutral-900/60 p-3">
-          <div className="text-[11px] text-neutral-500">{i + 1}{i === steps.length - 1 ? " → back to 4" : " →"}</div>
-          <div className="text-sm font-medium">{t}</div>
-          <div className="mt-0.5 text-xs text-neutral-400">{d}</div>
-        </li>
-      ))}
-    </ol>
-  );
-}
 
 function Histogram({ videos }: { videos: Logic["videos"] }) {
   const step = 0.25, lo = -3, hi = 3;
@@ -336,7 +313,7 @@ function FindingsTables({ f, sp }: { f: Findings; sp: { outcome?: string; niche?
   const minN = f.min_n ?? 20;
   const fitted = Object.entries(fits).filter(([, fit]) => fit.levels?.length);
   const empty = Object.entries(fits).filter(([, fit]) => !fit.levels?.length).map(([t]) => t);
-  const link = (q: string) => `/how?${q}#check`;
+  const link = (q: string) => `/learnings?${q}#check`;
   return (
     <div className="mt-5">
       <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-5">
