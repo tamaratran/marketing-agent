@@ -41,43 +41,55 @@ export default async function Page() {
         <Stat label="on hold" value={held} />
         <Stat label="ahead of videos like them" value={measured.length ? `${beat} of ${measured.length}` : "none measured yet"} />
       </div>
-      <ul className="space-y-2">
+      <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {rows.map((r) => {
           const s = byId.get(r.script_id), p = posts.get(r.script_id);
           const src = `${CLIPS}/s${r.script_id}.mp4`, clean = r.post_path ? `${CLIPS}/s${r.script_id}_clean.mp4` : null;
           return (
-            <li key={r.id} id={`s${r.script_id}`} className="scroll-mt-4">
-              <Fold summary={<Summary r={r} p={p} />}>
-                <div className="grid gap-4 sm:grid-cols-[12rem_1fr]">
-                  <video poster={frameUrl(`s${r.script_id}`)} controls preload="metadata" className="aspect-[9/16] w-full rounded bg-black" src={src} />
-                  <div className="min-w-0 text-sm">
-                    {p && <PostStats p={p} />}
-                    {p && <WhyFold why={explain(p, details.get(p.id) ?? null, overview)} />}
-                    {!p && !r.hold_reason && clean && (!r.post_session_url || gaveUp(r)) && <PostButton action={postClip} scriptId={r.script_id} account={account} />}
-                    {!p && r.post_session_url && !stale(r) && <p className="text-xs text-neutral-400">Devin is posting this from @{account}{r.post_attempts > 1 ? `, try ${r.post_attempts} of ${MAX_POST_ATTEMPTS}` : ""}: <a href={r.post_session_url} target="_blank" className="text-sky-300 hover:underline">watch</a></p>}
-                    {!p && r.post_session_url && stale(r) && !gaveUp(r) && <p className="text-xs text-neutral-400">No post after try {r.post_attempts} of {MAX_POST_ATTEMPTS} (TikTok login, most likely); handed back within 30 min: <a href={r.post_session_url} target="_blank" className="text-sky-300 hover:underline">see why</a></p>}
-                    {!p && gaveUp(r) && <p className="text-xs text-neutral-400">Gave up after {MAX_POST_ATTEMPTS} tries over {hoursSince(r.post_requested_at)}h: <a href={r.post_session_url ?? "#"} target="_blank" className="text-sky-300 hover:underline">see why</a></p>}
-                    {r.hold_reason && <p className="text-xs text-red-200">{r.hold_reason}</p>}
-                    {!p && r.hold_reason && (
-                      <form action={releaseClip} className="mt-2"><input type="hidden" name="script_id" value={r.script_id} /><button className="text-xs text-neutral-400 hover:text-neutral-100">Release</button></form>
-                    )}
-                    {clean && r.post_text.length > 0 && (
-                      <div className="mt-3 rounded border border-neutral-800 p-2">
-                        <p className="text-[11px] uppercase tracking-wide text-neutral-500">text to add in TikTok</p>
-                        {r.post_text.map((ln, i) => <p key={i} className="font-medium">{ln}</p>)}
-                      </div>
-                    )}
-                    <p className="mt-3 text-xs text-neutral-400">
-                      {s?.concept && <>format: {formatName(s.concept)} · </>}
-                      sound: {s?.sound ? (s.sound_url ? <a className="underline" href={s.sound_url} target="_blank">{s.sound}</a> : s.sound) : <span className="text-neutral-600">none picked</span>}
-                    </p>
-                    <p className="mt-1 text-xs text-neutral-500">
-                      <Link href="/scripts" className="hover:underline">script #{r.script_id}</Link> · {dateOf(r.created_at)} · {usd(r.cost_usd)} ·{" "}
-                      {clean ? <Download src={clean} className="text-sky-300 hover:underline">clean clip</Download> : <Download src={src} className="text-sky-300 hover:underline">download</Download>}
-                    </p>
-                  </div>
+            <li key={r.id} id={`s${r.script_id}`} className="flex scroll-mt-4 flex-col overflow-hidden rounded-xl border border-neutral-800 bg-neutral-950">
+              <video poster={frameUrl(`s${r.script_id}`)} controls preload="none" className="aspect-[9/16] w-full bg-black" src={src} />
+              <div className="flex flex-1 flex-col p-3 text-sm">
+                <p className="font-medium leading-snug text-neutral-100">{r.hook}</p>
+                <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                  {p ? <Pill tone="good">posted</Pill> : r.hold_reason ? <Pill tone="bad">on hold</Pill> : r.post_session_url && !stale(r) ? <Pill tone="neutral">posting</Pill> : r.post_session_url && !gaveUp(r) ? <Pill tone="neutral">waiting</Pill> : r.post_path ? <Pill tone="neutral">ready</Pill> : null}
+                  {p && (
+                    <>
+                      <span className="tabular-nums text-neutral-100">{views(p.views_now)} <span className="text-neutral-500">views</span></span>
+                      <span>{lift(p)}</span>
+                      <span className="text-neutral-500">{p.age_h < 48 ? `${Math.round(p.age_h)}h` : `${Math.round(p.age_h / 24)}d`} up</span>
+                    </>
+                  )}
                 </div>
-              </Fold>
+                <p className="mt-1.5 text-xs text-neutral-500">s{r.script_id}{s?.concept && <> · {formatName(s.concept)}</>} · {dateOf(r.created_at)}</p>
+                {r.hold_reason && <p className="mt-2 text-xs text-red-200">{r.hold_reason}</p>}
+                {!p && !r.hold_reason && clean && (!r.post_session_url || gaveUp(r)) && <div className="mt-3"><PostButton action={postClip} scriptId={r.script_id} account={account} /></div>}
+                <Fold summary={<span className="text-xs text-neutral-400">{p ? "numbers, text and sound" : "text, sound and download"}</span>} className="mt-3">
+                  <div className="min-w-0 text-sm">
+              {p && <PostStats p={p} />}
+              {p && <WhyFold why={explain(p, details.get(p.id) ?? null, overview)} />}
+              {!p && r.post_session_url && !stale(r) && <p className="text-xs text-neutral-400">Devin is posting this from @{account}{r.post_attempts > 1 ? `, try ${r.post_attempts} of ${MAX_POST_ATTEMPTS}` : ""}: <a href={r.post_session_url} target="_blank" className="text-sky-300 hover:underline">watch</a></p>}
+              {!p && r.post_session_url && stale(r) && !gaveUp(r) && <p className="text-xs text-neutral-400">No post after try {r.post_attempts} of {MAX_POST_ATTEMPTS} (TikTok login, most likely); handed back within 30 min: <a href={r.post_session_url} target="_blank" className="text-sky-300 hover:underline">see why</a></p>}
+              {!p && gaveUp(r) && <p className="text-xs text-neutral-400">Gave up after {MAX_POST_ATTEMPTS} tries over {hoursSince(r.post_requested_at)}h: <a href={r.post_session_url ?? "#"} target="_blank" className="text-sky-300 hover:underline">see why</a></p>}
+              {!p && r.hold_reason && (
+                <form action={releaseClip} className="mt-2"><input type="hidden" name="script_id" value={r.script_id} /><button className="text-xs text-neutral-400 hover:text-neutral-100">Release</button></form>
+              )}
+              {clean && r.post_text.length > 0 && (
+                <div className="mt-3 rounded border border-neutral-800 p-2">
+                  <p className="text-[11px] uppercase tracking-wide text-neutral-500">text to add in TikTok</p>
+                  {r.post_text.map((ln, i) => <p key={i} className="font-medium">{ln}</p>)}
+                </div>
+              )}
+              <p className="mt-3 text-xs text-neutral-400">
+                {s?.concept && <>format: {formatName(s.concept)} · </>}
+                sound: {s?.sound ? (s.sound_url ? <a className="underline" href={s.sound_url} target="_blank">{s.sound}</a> : s.sound) : <span className="text-neutral-600">none picked</span>}
+              </p>
+              <p className="mt-1 text-xs text-neutral-500">
+                <Link href="/scripts" className="hover:underline">script #{r.script_id}</Link> · {dateOf(r.created_at)} · {usd(r.cost_usd)} ·{" "}
+                {clean ? <Download src={clean} className="text-sky-300 hover:underline">clean clip</Download> : <Download src={src} className="text-sky-300 hover:underline">download</Download>}
+              </p>
+                  </div>
+                </Fold>
+              </div>
             </li>
           );
         })}
@@ -107,22 +119,6 @@ const lift = (p: OursPost) =>
     ? <span key="early" className="text-neutral-500" title={`Posts under ${MIN_AGE_H_OWN} hours are noise and do not move the picker`}>too early, {p.age_h.toFixed(1)}h</span>
     : reward(p.lift_matched, p.views_now ? "no reference videos yet" : "no views yet", "videos like it");
 
-function Summary({ r, p }: { r: Render; p?: OursPost }) {
-  return (
-    <span className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1 text-sm">
-      <span className="text-xs text-neutral-500">s{r.script_id}</span>
-      <span className="font-medium text-neutral-100">{r.hook}</span>
-      {p ? <Pill tone="good">posted</Pill> : r.hold_reason ? <Pill tone="bad">on hold</Pill> : r.post_session_url && !stale(r) ? <Pill tone="neutral">posting</Pill> : r.post_session_url && !gaveUp(r) ? <Pill tone="neutral">waiting</Pill> : r.post_path ? <Pill tone="neutral">ready</Pill> : null}
-      {p && (
-        <>
-          <span className="tabular-nums text-neutral-100">{views(p.views_now)} <span className="text-xs text-neutral-500">views</span></span>
-          <span className="text-xs">{lift(p)}</span>
-          <span className="text-xs text-neutral-500">{p.age_h < 48 ? `${Math.round(p.age_h)}h` : `${Math.round(p.age_h / 24)}d`} up</span>
-        </>
-      )}
-    </span>
-  );
-}
 
 function PostStats({ p }: { p: OursPost }) {
   return (
@@ -130,7 +126,7 @@ function PostStats({ p }: { p: OursPost }) {
       <p className="text-xs text-neutral-500">
         <a href={p.url} target="_blank" className="text-sky-300 hover:underline">on TikTok</a> · posted {dateOf(p.create_time)} · <Link href={`/videos/${p.id}`} className="hover:underline">history, {p.n_obs} polls</Link>
       </p>
-      <dl className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <dl className="mt-2 grid grid-cols-2 gap-2">
         <Figure label="views now" value={views(p.views_now) || "none yet"} />
         <Figure label="vs videos like it" value={lift(p)} />
         <Figure label="shares+saves per 1k" value={p.engagement_per_1k != null ? <>{p.engagement_per_1k}{p.engagement_lift != null && <span className="ml-1 text-xs text-neutral-500">{p.engagement_lift > 0 ? "+" : ""}{p.engagement_lift.toFixed(2)} vs niche</span>}</> : "none yet"} />
