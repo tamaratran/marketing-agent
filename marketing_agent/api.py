@@ -235,7 +235,8 @@ def renders(limit: int = 50, niche: str = DEFAULT_NICHE):
     rows = store.rows(
         """SELECT r.id, r.script_id, r.created_at, r.model, r.cost_usd, r.final_path, r.post_path,
                   r.post_session_url, r.post_requested_at, COALESCE(r.post_attempts, 0) post_attempts,
-                  r.hold_reason, s.hook, s.payload, r.payload rpayload
+                  r.hold_reason, r.prompt, s.hook, s.body, s.payload, r.payload rpayload,
+                  c.name concept
            FROM renders r JOIN scripts s ON s.id=r.script_id JOIN concepts c ON c.id=s.concept_id
            WHERE r.final_path IS NOT NULL AND r.model!='stub' AND c.niche=?
            ORDER BY r.created_at DESC LIMIT ?""",
@@ -247,7 +248,31 @@ def renders(limit: int = 50, niche: str = DEFAULT_NICHE):
         # fun"); the poster types the hook once, so those fragments are not repeated.
         r["post_text"] = _post_text(r["hook"], payload)
         r["hook"] = strip_label(r["hook"] or "")
-        lab = labels_of(json.loads(r.pop("rpayload") or "{}"))
+        rp = json.loads(r.pop("rpayload") or "{}")
+        lab = labels_of(rp)
+        inp = rp.get("input") or {}
+        res = rp.get("result") or {}
+        # Everything about how the clip was made, for the Clips tab's detail view.
+        r["meta"] = {
+            "concept": r.pop("concept"),
+            "script": r.pop("body") or "",
+            "captions": [str(c) for c in payload.get("captions") or [] if str(c).strip()],
+            "spoken": payload.get("spoken") or "",
+            "sound": payload.get("sound") or "",
+            "prompt": r.pop("prompt") or "",
+            "generation": {
+                "model": r["model"],
+                "duration_s": inp.get("duration"),
+                "resolution": inp.get("resolution"),
+                "aspect_ratio": inp.get("aspect_ratio"),
+                "audio": inp.get("generate_audio"),
+                "seed": res.get("seed"),
+                "size_bytes": (res.get("video") or {}).get("file_size"),
+                "cost_usd": r.get("cost_usd"),
+            },
+            "file": rp.get("file"),
+            "summary": lab["tags"].get("summary") if lab else None,
+        }
         r["labels"] = (
             {
                 "tags": lab["tags"],
@@ -402,6 +427,20 @@ def _hand_off(store: Store, script_id: int, by_hand: bool) -> dict:
         "reused": reused,
         "attempt": r["post_attempts"] + 1,
     }
+
+
+@app.post("/renders/{render_id}/facts", dependencies=[Depends(_auth)])
+def render_facts(render_id: int, facts: dict):
+    """Save what the clip's file really is (`mkt probe-clips`, ffprobe on the posted copy)."""
+    store = _store()
+    rows = store.rows("SELECT payload FROM renders WHERE id=?", (render_id,))
+    if not rows:
+        raise HTTPException(404, "no render")
+    payload = json.loads(rows[0]["payload"] or "{}")
+    payload["file"] = facts
+    with store.conn() as c:
+        c.execute("UPDATE renders SET payload=? WHERE id=?", (json.dumps(payload), render_id))
+    return {"saved": render_id}
 
 
 @app.get("/renders/{render_id}/file")

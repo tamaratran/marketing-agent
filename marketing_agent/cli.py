@@ -607,7 +607,7 @@ def render(script_ids, provider, duration, resolution, sound, ref):
     hook typed into TikTok's own text tool so TikTok reads it as text, not pixels."""
     from . import campaign as campaign_cfg
     from .learnings import rules as review_rules
-    from .video.edit import assemble, captions_from_script, probe_duration
+    from .video.edit import assemble, captions_from_script, probe, probe_duration
     from .video.generate import GenRequest, get_provider
 
     store = _store()
@@ -636,6 +636,10 @@ def render(script_ids, provider, duration, resolution, sound, ref):
         caps = captions_from_script(s["hook"], s.get("captions") or [], probe_duration(raw))
         assemble([raw], final, captions=caps, sound=Path(sound) if sound else None)
         assemble([raw], clean, sound=Path(sound) if sound else None)
+        try:
+            facts = probe(clean)
+        except Exception:  # no ffprobe on this machine: the clip still counts
+            facts = None
         store.insert(
             "renders",
             {
@@ -647,7 +651,7 @@ def render(script_ids, provider, duration, resolution, sound, ref):
                 "final_path": str(final),
                 "post_path": str(clean),
                 "cost_usd": res.cost_usd,
-                "payload": json.dumps(res.raw, default=str),
+                "payload": json.dumps({**res.raw, "file": facts}, default=str),
             },
         )
         console.print(
@@ -1132,6 +1136,51 @@ def dashboard(niche, out, no_assets):
 
     out = Path(out) if out else settings.data_dir / "site" / "index.html"
     console.print(f"dashboard: {render_dashboard(_store(), niche, out, copy_assets=not no_assets)}")
+
+
+@cli.command("probe-clips")
+@click.option("--again", is_flag=True, help="Probe clips that already have file facts")
+def probe_clips(again):
+    """Read each clip's real file (pixels, frame rate, length, sound) and save the facts on its
+    render row in the API, for clips made before `mkt render` recorded them itself."""
+    import tempfile
+    import urllib.request
+
+    from .status import CLIPS_URL
+    from .video.edit import probe
+
+    url, token = _api()
+    if not token:
+        raise click.ClickException("MKT_API_TOKEN not set")
+    with urllib.request.urlopen(f"{url}/renders?limit=500", timeout=60) as r:
+        rows = json.load(r)
+    done = 0
+    for r in rows:
+        if (r.get("meta") or {}).get("file") and not again:
+            continue
+        name = f"s{r['script_id']}_clean.mp4" if r.get("post_path") else f"s{r['script_id']}.mp4"
+        try:
+            with tempfile.TemporaryDirectory() as d:
+                path = Path(d) / name
+                with urllib.request.urlopen(f"{CLIPS_URL}/{name}", timeout=120) as got:
+                    path.write_bytes(got.read())
+                facts = probe(path)
+            req = urllib.request.Request(
+                f"{url}/renders/{r['id']}/facts",
+                data=json.dumps(facts).encode(),
+                headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+                method="POST",
+            )
+            urllib.request.urlopen(req, timeout=60).close()
+        except Exception as e:  # one missing file should not stop the rest
+            console.print(f"[yellow]s{r['script_id']}: {e!r}")
+            continue
+        done += 1
+        console.print(
+            f"s{r['script_id']}: {facts['width']}x{facts['height']}, {facts['fps']} fps, "
+            f"{facts['duration_s']}s, sound {'on' if facts['audio'] else 'off'}"
+        )
+    console.print(f"{done} clips probed")
 
 
 @cli.group()
