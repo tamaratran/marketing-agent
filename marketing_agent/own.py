@@ -70,7 +70,13 @@ def add_account(store: Store, handle: str, campaign_tag: str, product: str = "")
 POST_URL = re.compile(r"tiktok\.com/@([\w.\-]+)/video/(\d+)")
 
 
-def add_post(store: Store, url: str, caption: str = "", niche: str | None = None) -> dict:
+def add_post(
+    store: Store,
+    url: str,
+    caption: str = "",
+    niche: str | None = None,
+    script_id: int | None = None,
+) -> dict:
     """Register a post a person made from one of our accounts, by its TikTok link. Public stats
     come over plain HTTP; a post still under review is stored with the caption given so the script
     match happens now and the next cycle's re-poll fills in the views once it is public."""
@@ -110,13 +116,16 @@ def add_post(store: Store, url: str, caption: str = "", niche: str | None = None
     store.upsert_video(row)
     with store.conn() as c:
         c.execute("DELETE FROM observations WHERE video_id=? AND views IS NULL", (row["id"],))
-    sid, score = match_script(
-        store,
-        caption or row.get("desc", ""),
-        posted_at=row["create_time"],
-        niche=niche,
-        product=ours[author]["product"],
-    )
+    if script_id is not None:
+        sid, score = script_id, 1.0  # the poster knows which clip it uploaded; no caption guess
+    else:
+        sid, score = match_script(
+            store,
+            caption or row.get("desc", ""),
+            posted_at=row["create_time"],
+            niche=niche,
+            product=ours[author]["product"],
+        )
     with store.conn() as c:
         c.execute(
             """UPDATE videos SET ours=1, script_id=COALESCE(?, script_id), niche=COALESCE(?, niche),
