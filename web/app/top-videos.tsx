@@ -14,7 +14,7 @@ export function TopVideos({ o }: { o: Overview }) {
           head={["", "video", "creator", "views", "vs creator's usual", "hook", "style"]}
           rows={o.top_videos.map((v) => [
             <Thumb key={`t${v.id}`} id={v.id} href={`/videos/${v.id}`} />,
-            <Link key={v.id} href={`/videos/${v.id}`} className="text-accent hover:underline">{[...(v.desc || v.id)].slice(0, 60).join("")}</Link>,
+            <Link key={v.id} href={`/videos/${v.id}`} className="text-gold hover:underline">{[...(v.desc || v.id)].slice(0, 60).join("")}</Link>,
             <Link key={`a${v.id}`} href={`/creators/${v.author}`} className="hover:underline">@{v.author}</Link>, v.views.toLocaleString(), reward(v.reward, "too new"), human(v.hook_type), human(v.visual_style),
           ])}
         />

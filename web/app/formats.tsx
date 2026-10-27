@@ -67,7 +67,7 @@ export async function Formats() {
             {tables.map((t) => <TraitBars key={t.k} rows={t.rows} column={t.col} title={t.title} max={4} />)}
           </div>
         ) : (
-          <p className="text-sm text-neutral-500">No trait has {o.trait_min_n ?? 5} classified videos yet. <Link href="/learnings" className="text-accent hover:underline">Research again</Link> classifies the rest.</p>
+          <p className="text-sm text-neutral-500">No trait has {o.trait_min_n ?? 5} classified videos yet. <Link href="/learnings" className="text-gold hover:underline">Research again</Link> classifies the rest.</p>
         )}
       </section>
 
@@ -86,7 +86,7 @@ export async function Formats() {
               <Fold open={i < 5} summary={
                 <span className="grid min-w-0 grid-cols-[1.5rem_minmax(0,1fr)_5.5rem] items-center gap-x-3 sm:grid-cols-[2rem_1fr_9rem_6rem_6rem] sm:gap-x-4">
                   <span className="text-xs tabular-nums text-neutral-600">{i + 1}</span>
-                  <span className="min-w-0 truncate font-medium text-neutral-100">{formatName(c.name)}{c.kind === "format" && <span className="ml-2 text-xs font-normal text-accent">ours</span>}</span>
+                  <span className="min-w-0 truncate font-medium text-neutral-100">{formatName(c.name)}{c.kind === "format" && <span className="ml-2 text-xs font-normal text-gold">ours</span>}</span>
                   <span className="flex items-center gap-2"><span className="h-1 w-10 bg-neutral-800 sm:w-24"><span className="block h-1 bg-neutral-200" style={{ width: `${Math.round(share * 100)}%` }} /></span><span className="text-xs tabular-nums text-neutral-400">{Math.round(share * 100)}%</span></span>
                   <span className="hidden text-xs tabular-nums sm:block">{c.n && c.mean_reward != null ? <span className={c.mean_reward > 0 ? "text-neutral-50" : "text-neutral-400"}>{times(c.mean_reward)}</span> : <span className="text-neutral-600">–</span>}</span>
                   <span className="hidden justify-end gap-1 sm:flex">{(c.examples ?? []).slice(0, 3).map((e) => <Thumb key={e.id} id={e.id} size={22} />)}</span>

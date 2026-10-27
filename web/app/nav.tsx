@@ -14,7 +14,7 @@ export function Nav() {
           const on = current === s.href;
           return (
             <li key={s.href}>
-              <Link href={s.href} aria-current={on ? "page" : undefined} title={s.what} className={`text-base sm:text-lg ${on ? "font-semibold text-neutral-50 underline decoration-accent decoration-2 underline-offset-8" : "text-neutral-500 hover:text-neutral-200"}`}>
+              <Link href={s.href} aria-current={on ? "page" : undefined} title={s.what} className={`text-base sm:text-lg ${on ? "font-semibold text-neutral-50 underline decoration-gold decoration-2 underline-offset-8" : "text-neutral-500 hover:text-neutral-200"}`}>
                 <span className="mr-1.5 text-xs tabular-nums text-neutral-600">{i + 1}</span>{s.label}
               </Link>
             </li>

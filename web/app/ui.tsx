@@ -55,7 +55,7 @@ export function Table({ head, rows, empty = "Nothing yet." }: { head: string[]; 
 }
 
 export function Pill({ children, tone = "neutral" }: { children: React.ReactNode; tone?: "neutral" | "good" | "warn" | "bad" }) {
-  const dot = { neutral: "bg-neutral-500", good: "bg-neutral-100", warn: "bg-accent", bad: "bg-neutral-600" }[tone];
+  const dot = { neutral: "bg-neutral-500", good: "bg-neutral-100", warn: "bg-gold", bad: "bg-neutral-600" }[tone];
   return (
     <span className="inline-flex items-center gap-1.5 text-xs text-neutral-400">
       <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${dot}`} />
@@ -65,7 +65,7 @@ export function Pill({ children, tone = "neutral" }: { children: React.ReactNode
 }
 
 export const input = "border-b border-neutral-700 bg-transparent px-1 py-1 text-sm text-neutral-100 placeholder:text-neutral-600 focus:border-neutral-300 focus:outline-none";
-export const button = "rounded-sm bg-accent px-3 py-1.5 text-sm font-medium text-neutral-950 hover:brightness-110 disabled:opacity-50";
+export const button = "rounded-sm bg-gold px-3 py-1.5 text-sm font-medium text-neutral-950 hover:brightness-110 disabled:opacity-50";
 export const ghost = "text-sm text-neutral-400 underline decoration-neutral-700 underline-offset-4 hover:text-neutral-100";
 
 /** A log10 lift as a plain multiple: +1 means 10x the creator's usual views, -0.3 about half. */

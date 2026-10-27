@@ -108,7 +108,7 @@ export async function HowItDecides({ part, sp = {} }: { part: "formats" | "learn
         </p>
         <PickChart rows={ranked} />
         {leader && leader.p > 0.95 && (
-          <div className="mt-3 rounded-lg border border-amber-900/60 bg-amber-950/30 p-3 text-sm text-accent">
+          <div className="mt-3 rounded-lg border border-amber-900/60 bg-amber-950/30 p-3 text-sm text-gold">
             Right now {formatName(leader.c.name)} wins {pct(leader.p)} of picks. Its head start of {lg.format_prior} is far
             ahead of the rest, so the other formats effectively never get tested.
           </div>
@@ -293,7 +293,7 @@ function Levels({ levels, minN }: { levels: Level[]; minN: number }) {
       head={["value", "videos", "raw average", "after controls", "likely range", "verdict"]}
       rows={levels.map((l) => [
         human(l.level),
-        l.n < minN ? <span key="n" className="text-accent" title={`under the ${minN} needed`}>{l.n}</span> : l.n,
+        l.n < minN ? <span key="n" className="text-gold" title={`under the ${minN} needed`}>{l.n}</span> : l.n,
         fmt(l.raw_mean),
         l.reference ? "baseline" : (l.coef > 0 ? "+" : "") + fmt(l.coef),
         l.reference ? "" : `${fmt(l.lo)} to ${fmt(l.hi)}`,
@@ -325,7 +325,7 @@ function FindingsTables({ f, sp }: { f: Findings; sp: { outcome?: string; niche?
       </div>
       {f.collecting && (
         <Card className="mb-4">
-          <p className="text-sm text-accent">
+          <p className="text-sm text-gold">
             Still collecting, so nothing below is a result yet. {st.reached["scored"] ?? 0} of {st.videos} videos are scored (a day old, with a view count); {minN} are needed before a trait is called better or worse. Until then the writer gets the raw version from step 5.
           </p>
         </Card>

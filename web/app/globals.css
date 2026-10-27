@@ -2,8 +2,8 @@
 
 @theme {
   --font-sans: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
-  --color-accent: #e8b84a;
-  --color-accent-dim: #8a6a1f;
+  --color-gold: #e8b84a;
+  --color-gold-dim: #8a6a1f;
   --color-rule: #262626;
 }
 
