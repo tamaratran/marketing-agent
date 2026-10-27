@@ -424,6 +424,16 @@ def learnings(niche: str | None = None, limit: int = 50):
     return learnings_entries(_store(), niche, limit)
 
 
+@app.get("/rubric")
+def rubric():
+    """The rubric grades (marketing_agent/rubric.py): the winning format's top videos and our
+    clips graded on the same variables, what the winners share, each clip's differences, and the
+    candidate variables from the open fields. Written by `mkt rubric`."""
+    from .rubric import report
+
+    return report(_store())
+
+
 @app.get("/learnings.md", response_class=PlainTextResponse)
 def learnings_md(niche: str | None = None):
     """The same as one markdown file."""

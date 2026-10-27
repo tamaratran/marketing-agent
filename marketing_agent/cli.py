@@ -167,6 +167,47 @@ def panel_untagged(store, niche: str, limit: int | None = None) -> list[dict]:
 
 
 @cli.command()
+@click.option(
+    "--concept", default=None, type=int, help="Format to grade (default: the one we chase)"
+)
+@click.option("--model", default=None)
+@click.option("--again", is_flag=True, help="Grade videos that already have a grade")
+@click.option("--limit", default=None, type=int, help="Videos this run")
+def rubric(concept, model, again, limit):
+    """Grade the winning format's top videos and every clip of ours on the rubric (content, game
+    on screen, captions, person, speech, movement, sound, pacing, what looks fake) with the video
+    model, so the differences between ours and the winners are named. Reads the API's db first
+    (`mkt sync pull`), push after (`mkt sync push`)."""
+    from .rubric import report, run
+
+    store = _store()
+    res = run(
+        store,
+        settings.cdp_url,
+        settings.videos_dir,
+        settings.renders_dir,
+        concept_id=concept,
+        model=model,
+        again=again,
+        limit=limit,
+        log=console.print,
+    )
+    console.print(
+        f"graded {res['winners']} winners and {res['ours']} of ours"
+        + (f" for {res['concept']['name']}" if res.get("concept") else "")
+        + (f"; {len(res['failed'])} failed" if res["failed"] else "")
+    )
+    rep = report(store)
+    for m in rep["must_have"]:
+        console.print(f"  {m['label']:>14}: {m['text']} ({round(m['share'] * 100)}% of winners)")
+    for r in rep["ours"]:
+        d = ", ".join(
+            f"{x['label']} {x['ours']} (winners {x['winners']})" for x in r["differences"]
+        )
+        console.print(f"  s{r['script_id']}: {d or 'matches the winners'}")
+
+
+@cli.command()
 @click.argument("niche", required=False)
 @click.argument("tags", nargs=-1)
 @click.option("--scrolls", default=6)
@@ -1379,7 +1420,9 @@ def campaign_show():
 
 
 @cli.command("status")
-@click.option("--json", "as_json", is_flag=True, help="The same as JSON (field names are the API's).")
+@click.option(
+    "--json", "as_json", is_flag=True, help="The same as JSON (field names are the API's)."
+)
 def status(as_json):
     """Everything in one read, from the live API: campaign, our posts and how they do, clips and
     their post state, the proposed scripts, what the data says, rules, notes, any run going."""
