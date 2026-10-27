@@ -1,17 +1,14 @@
 /* eslint-disable @next/next/no-img-element */
-import { dateOf, get, type Campaign, type Run, type RunStage } from "@/lib/api";
-import { startRun } from "../actions";
-import { button, Card, H1, Note, Table } from "../ui";
-import { RefreshButtons } from "../refresh";
+import { dateOf, type Campaign, type Run, type RunStage } from "@/lib/api";
+import { startRun } from "./actions";
+import { button, Card, Note, Table } from "./ui";
+import { RefreshButtons } from "./refresh";
 
-export const dynamic = "force-dynamic";
-
-export default async function Page() {
-  const [rows, c] = await Promise.all([get<Run[]>("/runs"), get<Campaign>("/campaign")]);
+/** The full cycle button, what a cycle works on, and every run started here. Lives in a fold on Learnings. */
+export function RunsPanel({ rows, c }: { rows: Run[]; c: Campaign }) {
   const perClip = { "480p": 2.65, "720p": 5.7, "1080p": 9.6 }[c.cycle.resolution] ?? 5.7;
   return (
     <>
-      <H1 sub="A cycle is one pass of the loop, done by a Devin session on demand: re-read the product's best TikToks and how our own posts did, write better scripts, render the clips and put them on Clips with caption and sound, ready for a human to post. Nothing runs on a schedule and nothing is posted automatically.">Runs</H1>
       <Card title="Run a cycle" className="mb-5">
         <form action={startRun} className="flex flex-wrap items-center gap-3">
           <button className={button}>Run cycle</button>

@@ -7,6 +7,11 @@ const nextConfig: NextConfig = {
     return [
       { source: "/", destination: "/marketing-agent", basePath: false, permanent: false },
       { source: "/:path((?!marketing-agent(?:/|$)).*)", destination: "/marketing-agent/:path", basePath: false, permanent: false },
+      // Folded into the three tabs.
+      { source: "/how", destination: "/", permanent: false },
+      { source: "/overview", destination: "/", permanent: false },
+      { source: "/scripts", destination: "/learnings", permanent: false },
+      { source: "/runs", destination: "/learnings", permanent: false },
     ];
   },
   turbopack: {

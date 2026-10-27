@@ -3,6 +3,9 @@ import { get, type Campaign, type CycleFacts, type Findings, type Learning, type
 import { startRenders, startResearch } from "../actions";
 import { traitValue, type RankRow } from "../charts";
 import { Markdown } from "../md";
+import { HowItDecides, type HowParams } from "../how";
+import { RunsPanel } from "../runs-panel";
+import { ScriptCards } from "../script-cards";
 import { Card, Fold, H1, NextStep, Note, button, formatName, ghost, times } from "../ui";
 
 export const dynamic = "force-dynamic";
@@ -20,10 +23,11 @@ const TABLES: [keyof NonNullable<CycleFacts["traits"]>, string, string][] = [
   ["product_early", "product_on_screen_by_5s", "Product on screen by 5s"],
 ];
 
-export default async function Page() {
+export default async function Page({ searchParams }: { searchParams: Promise<HowParams> }) {
+  const sp = await searchParams;
   const [rows, scripts, renders, runs, c, fs] = await Promise.all([
     get<Learning[]>("/learnings?limit=100"),
-    get<Script[]>("/scripts?days=14&limit=200"), get<Render[]>("/renders"), get<Run[]>("/runs?limit=5"), get<Campaign>("/campaign"),
+    get<Script[]>("/scripts?days=14&limit=200"), get<Render[]>("/renders"), get<Run[]>("/runs"), get<Campaign>("/campaign"),
     get<Findings>("/findings"),
   ]);
   const minN = fs.min_n ?? 20;
@@ -47,10 +51,16 @@ export default async function Page() {
           <button className={ghost} disabled={!!running}>Research again</button>
           <Note>
             About an hour the first time, then about 15 minutes. No clips, so no fal cost.
-            {running && <> A run is already going: <Link href="/runs" className="text-sky-300 hover:underline">see Runs</Link>.</>}
+            {running && <> A run is already going: <Link href="#runs" className="text-sky-300 hover:underline">see the runs below</Link>.</>}
           </Note>
         </form>
       </Card>
+
+      <div id="runs" className="mb-4 scroll-mt-4">
+        <Fold summary={<span className="text-sm font-medium text-neutral-200">Runs, the full cycle and what it works on</span>}>
+          <div className="pt-2"><RunsPanel rows={runs} c={c} /></div>
+        </Fold>
+      </div>
 
       <Card title="What the data says">
         <Note>
@@ -99,6 +109,13 @@ export default async function Page() {
           </>
         )}
       </Card>
+
+      <Fold className="mt-4" summary={<span className="text-sm font-medium text-neutral-200">All scripts, last 14 days</span>}>
+        <div className="pt-2"><ScriptCards rows={scripts} rendered={rendered} /></div>
+      </Fold>
+      <Fold className="mt-4" summary={<span className="text-sm font-medium text-neutral-200">How the writer is briefed, and whether a pattern is real</span>}>
+        <div className="pt-2"><HowItDecides part="learnings" sp={sp} /></div>
+      </Fold>
 
       {rows.length === 0 && <Card><Note>Nothing yet. The first run writes the first entry.</Note></Card>}
       {notes.length > 0 && (

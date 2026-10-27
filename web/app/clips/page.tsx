@@ -84,7 +84,7 @@ export default async function Page() {
                 sound: {s?.sound ? (s.sound_url ? <a className="underline" href={s.sound_url} target="_blank">{s.sound}</a> : s.sound) : <span className="text-neutral-600">none picked</span>}
               </p>
               <p className="mt-1 text-xs text-neutral-500">
-                <Link href="/scripts" className="hover:underline">script #{r.script_id}</Link> · {dateOf(r.created_at)} · {usd(r.cost_usd)} ·{" "}
+                <Link href={`/learnings#s${r.script_id}`} className="hover:underline">script #{r.script_id}</Link> · {dateOf(r.created_at)} · {usd(r.cost_usd)} ·{" "}
                 {clean ? <Download src={clean} className="text-sky-300 hover:underline">clean clip</Download> : <Download src={src} className="text-sky-300 hover:underline">download</Download>}
               </p>
                   </div>

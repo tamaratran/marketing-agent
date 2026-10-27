@@ -2,6 +2,8 @@ import Link from "next/link";
 import { get, type Concept, type Overview, type Script } from "@/lib/api";
 import { TraitBars, traitValue, type RankRow } from "./charts";
 import { Thumb } from "./thumb";
+import { HowItDecides } from "./how";
+import { TopVideos } from "./top-videos";
 import { Fold, H1, NextStep, Pill, formatName, times } from "./ui";
 
 const TABLES: [keyof Overview, string, string][] = [
@@ -53,10 +55,7 @@ export async function Formats() {
       <H1 sub={`What is working in ${o.niche} on TikTok, grouped into formats we can copy.`}>Formats</H1>
 
       <section className="mb-8 rounded-lg border border-neutral-800 p-4">
-        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-          <h2 className="text-sm font-semibold">What wins</h2>
-          <Link href="/how" className="text-xs text-neutral-500 hover:text-neutral-300 hover:underline">How these are scored</Link>
-        </div>
+        <h2 className="text-sm font-semibold">What wins</h2>
         <div className="mt-3 mb-4 grid grid-cols-3 gap-2">
           <Stat n={o.videos} label={`${o.niche} videos tracked`} />
           <Stat n={o.scored} label="scored" />
@@ -129,6 +128,14 @@ export async function Formats() {
           );
         })}
       </ul>
+      <div className="mt-8 space-y-3">
+        <Fold summary={<span className="text-sm font-medium text-neutral-200">How formats are scored and picked</span>}>
+          <div className="pt-2"><HowItDecides part="formats" /></div>
+        </Fold>
+        <Fold summary={<span className="text-sm font-medium text-neutral-200">Best research videos</span>}>
+          <div className="pt-2"><TopVideos o={o} /></div>
+        </Fold>
+      </div>
       <NextStep from="/" />
     </>
   );

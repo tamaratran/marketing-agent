@@ -1,15 +1,11 @@
 import Link from "next/link";
-import { dateOf, get, type Render, type Script } from "@/lib/api";
-import { Card, H1, Note, Pill, formatName } from "../ui";
+import { dateOf, type Script } from "@/lib/api";
+import { Card, Note, Pill, formatName } from "./ui";
 
-export const dynamic = "force-dynamic";
-
-export default async function Page() {
-  const [rows, renders] = await Promise.all([get<Script[]>("/scripts?days=14&limit=60"), get<Render[]>("/renders")]);
-  const rendered = new Set(renders.map((r) => r.script_id));
+/** Every script of the last 14 days, hook first, shot list folded. Lives in a fold on Learnings. */
+export function ScriptCards({ rows, rendered }: { rows: Script[]; rendered: Set<number> }) {
   return (
     <>
-      <H1 sub="Scripts written for the product from the day's picked concept, last 14 days. The best ones are rendered as preview clips.">Scripts</H1>
       <Note className="mb-4">
         <b className="text-neutral-400">Hook</b> is the first 1 to 3 seconds. <b className="text-neutral-400">Demo score</b> is how clearly the product is shown in the first 5 seconds (5 is best; under 3 is thrown away). Open the shot list for the second-by-second plan.
       </Note>

@@ -3,11 +3,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { STEPS } from "./ui";
 
-const pages: [string, string][] = [
-  ["/how", "How it decides"],
-  ["/overview", "Overview"], ["/scripts", "Scripts"], ["/runs", "Runs"],
-];
-
 export function Nav() {
   const path = usePathname();
   const current = path === "/concepts" ? "/" : path;
@@ -30,16 +25,6 @@ export function Nav() {
           })}
         </ol>
       </div>
-      <ul className="flex w-full items-center gap-4 text-xs sm:w-auto sm:shrink-0">
-        {pages.map(([href, label]) => {
-          const on = current === href;
-          return (
-            <li key={href}>
-              <Link href={href} aria-current={on ? "page" : undefined} className={on ? "text-neutral-100" : "text-neutral-400 hover:text-neutral-100"}>{label}</Link>
-            </li>
-          );
-        })}
-      </ul>
     </nav>
   );
 }
