@@ -1,6 +1,7 @@
 """ffmpeg editing: trim/concat clips, burn TikTok-style captions, mix a sound, export 1080x1920 H.264.
 A TikTok-library sound cannot be attached via API, so audio is baked in here."""
 
+import json
 import re
 import shlex
 import subprocess
@@ -124,6 +125,36 @@ def assemble(
     cmd.append(str(out))
     subprocess.run(cmd, check=True)
     return out
+
+
+def probe_video(path: Path) -> dict:
+    """Width, height, length in seconds and size in bytes of a video file, from ffprobe."""
+    r = subprocess.run(
+        [
+            "ffprobe",
+            "-v",
+            "error",
+            "-select_streams",
+            "v:0",
+            "-show_entries",
+            "stream=width,height:format=duration,size",
+            "-of",
+            "json",
+            str(path),
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    info = json.loads(r.stdout or "{}")
+    stream = (info.get("streams") or [{}])[0]
+    fmt = info.get("format") or {}
+    return {
+        "width": int(stream.get("width") or 0),
+        "height": int(stream.get("height") or 0),
+        "duration_s": round(float(fmt.get("duration") or 0), 2),
+        "size_bytes": int(fmt.get("size") or 0),
+    }
 
 
 def probe_duration(path: Path) -> float:

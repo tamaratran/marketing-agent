@@ -7,6 +7,7 @@ the latest batch of proposed scripts, clips with their post state, what the data
 plus the trait tables), the agent's notes and rules, and any run in flight."""
 
 import os
+import re
 import time
 from collections.abc import Callable
 
@@ -111,6 +112,12 @@ TRAIT_WORDS = {
 }
 
 
+def _video_id(url) -> str | None:
+    """The TikTok video id at the end of a /video/<id> URL, for the embedded player."""
+    m = re.search(r"/video/(\d+)", url or "")
+    return m.group(1) if m else None
+
+
 def _views(n) -> str:
     n = n or 0
     if n >= 1_000_000:
@@ -172,7 +179,12 @@ def _story(
             "name": top.get("name"),
             "description": top.get("description"),
             "examples": [
-                {"author": e.get("author"), "url": e.get("url"), "views": e.get("views")}
+                {
+                    "id": _video_id(e.get("url")),
+                    "author": e.get("author"),
+                    "url": e.get("url"),
+                    "views": e.get("views"),
+                }
                 for e in ex
             ],
             "n_scripts": sum(1 for s in batch if s.get("concept_id") == top.get("id")),
@@ -289,6 +301,22 @@ def build(get: Get, now: float | None = None) -> dict:
         r["status"] = clip_status(r, bool(p), now)
         r["post_url"] = p["url"] if p else None
         r["views_now"] = p.get("views_now") if p else None
+        r["post"] = (
+            {
+                "url": p.get("url"),
+                "create_time": p.get("create_time"),
+                "age_h": p.get("age_h"),
+                "views_now": p.get("views_now"),
+                "views_72h": p.get("views_72h"),
+                "lift_now": p.get("lift_now"),
+                "lift_now_text": p.get("lift_now_text"),
+                "lift_72h": p.get("lift_72h"),
+                "lift_72h_text": p.get("lift_72h_text"),
+                "status": p.get("status"),
+            }
+            if p
+            else None
+        )
         r["clip_url"] = f"{CLIPS_URL}/s{r['script_id']}.mp4"
         r["clean_url"] = f"{CLIPS_URL}/s{r['script_id']}_clean.mp4" if r.get("post_path") else None
         r["poster_url"] = f"{FRAMES_URL}/s{r['script_id']}.jpg"

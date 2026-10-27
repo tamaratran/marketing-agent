@@ -479,3 +479,142 @@ def test_tags_merge_row_by_row(client, monkeypatch):
     r = client.post("/tags", json=rows, headers=AUTH).json()
     assert r == {"saved": 1, "unknown": ["nope"]}
     assert store.tags_for(["v1"])["v1"]["tags"]["hook_type"] == "text_on_screen"
+
+
+def test_renders_carry_script_generation_and_file_facts(tmp_path, monkeypatch):
+    """The Clips page shows everything about a clip: its script, how it was generated (model,
+    resolution, length, seed, reference images) and the file's own width, height and length,
+    which is measured once and kept on the render's payload."""
+    import json
+    import time
+
+    from marketing_agent import api
+    from marketing_agent.store import Store
+    from marketing_agent.video import edit
+
+    store = Store(tmp_path / "t.sqlite")
+    store.migrate()
+    api._store = lambda: store  # noqa: SLF001
+    client = TestClient(api.app)
+    now = int(time.time())
+    cid = store.insert(
+        "concepts", {"name": "TV demo", "niche": "fitness", "created_at": now, "payload": "{}"}
+    )
+    sid = store.insert(
+        "scripts",
+        {
+            "concept_id": cid,
+            "product": "p",
+            "created_at": now,
+            "hook": "POV: cardio finally got fun",
+            "body": "0-2s: person faces the TV.\n2-4s: the game starts.",
+            "demo_score": 5,
+            "payload": json.dumps(
+                {
+                    "captions": ["POV: cardio", "finally got fun"],
+                    "why": "Closest to the winner.",
+                    "sound": "SUBWAY SURFERS (Main Theme)",
+                    "product_reveal_s": 0.0,
+                    "hook_on_screen": True,
+                }
+            ),
+        },
+    )
+    clip = tmp_path / "s1.mp4"
+    clip.write_bytes(b"not really a video")
+    store.insert(
+        "renders",
+        {
+            "script_id": sid,
+            "created_at": now,
+            "model": "bytedance/seedance-2.5/us/reference-to-video",
+            "prompt": "Vertical 9:16 UGC phone video...",
+            "cost_usd": 5.676,
+            "final_path": str(clip),
+            "payload": json.dumps(
+                {
+                    "input": {
+                        "prompt": "Vertical 9:16 UGC phone video...",
+                        "duration": "12",
+                        "aspect_ratio": "9:16",
+                        "resolution": "720p",
+                        "generate_audio": "True",
+                    },
+                    "result": {"video": {"url": "https://fal/x.mp4"}, "seed": 2038801476},
+                }
+            ),
+        },
+    )
+    probes = []
+
+    def fake_probe(path):
+        probes.append(path)
+        return {"width": 720, "height": 1280, "duration_s": 12.04, "size_bytes": 2680508}
+
+    monkeypatch.setattr(edit, "probe_video", fake_probe)
+    r = client.get("/renders?niche=fitness").json()[0]
+    assert r["prompt"] == "Vertical 9:16 UGC phone video..." and r["concept"] == "TV demo"
+    assert r["script"]["body"].startswith("0-2s") and r["script"]["captions"] == [
+        "POV: cardio",
+        "finally got fun",
+    ]
+    assert r["script"]["sound"] == "SUBWAY SURFERS (Main Theme)" and r["script"]["demo_score"] == 5
+    assert r["made_with"] == {
+        "provider": "fal",
+        "model": "bytedance/seedance-2.5/us/reference-to-video",
+        "resolution": "720p",
+        "duration_s": 12,
+        "aspect_ratio": "9:16",
+        "audio_generated": True,
+        "reference_images": 0,
+        "seed": 2038801476,
+    }
+    assert r["video"] == {"width": 720, "height": 1280, "duration_s": 12.04, "size_bytes": 2680508}
+    # measured once: the second read comes from the stored payload
+    r2 = client.get("/renders?niche=fitness").json()[0]
+    assert r2["video"]["width"] == 720 and len(probes) == 1
+    assert (
+        json.loads(store.rows("SELECT payload FROM renders")[0]["payload"])["probe"]["height"]
+        == 1280
+    )
+
+
+def test_renders_without_a_local_file_have_no_video_facts(tmp_path):
+    import time
+
+    from marketing_agent import api
+    from marketing_agent.store import Store
+
+    store = Store(tmp_path / "t.sqlite")
+    store.migrate()
+    api._store = lambda: store  # noqa: SLF001
+    client = TestClient(api.app)
+    now = int(time.time())
+    cid = store.insert(
+        "concepts", {"name": "c", "niche": "fitness", "created_at": now, "payload": "{}"}
+    )
+    sid = store.insert(
+        "scripts",
+        {
+            "concept_id": cid,
+            "product": "p",
+            "created_at": now,
+            "hook": "h",
+            "body": "",
+            "demo_score": 3,
+            "payload": "{}",
+        },
+    )
+    store.insert(
+        "renders",
+        {
+            "script_id": sid,
+            "created_at": now,
+            "model": "seedance",
+            "cost_usd": 1,
+            "final_path": str(tmp_path / "missing.mp4"),
+        },
+    )
+    r = client.get("/renders?niche=fitness").json()[0]
+    assert r["video"] is None and r["made_with"]["model"] == "seedance"
+    assert r["made_with"]["resolution"] is None and r["script"]["body"] == ""

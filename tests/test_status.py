@@ -199,6 +199,10 @@ def test_build_joins_posts_clips_scripts_and_learnings():
     by_script = {c["script_id"]: c for c in st["clips"]}
     assert by_script[95]["status"] == "posted" and by_script[95]["post_url"] == "https://t/1"
     assert by_script[95]["views_now"] == 302
+    assert (
+        by_script[95]["post"]["views_now"] == 302 and by_script[95]["post"]["status"] == "too early"
+    )
+    assert by_script[95]["post"]["url"] == "https://t/1" and by_script[138]["post"] is None
     assert by_script[139]["status"] == "posting"
     assert by_script[141]["status"] == "ready"  # stale hand-off, attempts used up: back to ready
     assert by_script[138]["status"] == "on hold"
@@ -308,7 +312,11 @@ def test_story_reads_as_three_plain_sentences():
             "description": "One locked room shot of a person copying the TV while music plays",
             "early_score": 33400.0,
             "examples": [
-                {"author": "a", "url": "https://t/a", "views": 33400000},
+                {
+                    "author": "a",
+                    "url": "https://www.tiktok.com/@a/video/7573363021439946006",
+                    "views": 33400000,
+                },
                 {"author": "b", "url": "https://t/b", "views": 19100000},
             ],
         },
@@ -331,6 +339,7 @@ def test_story_reads_as_three_plain_sentences():
     )
     assert y["format"]["id"] == 81 and y["format"]["n_scripts"] == 1
     assert [e["views"] for e in y["format"]["examples"]] == [33400000, 19100000]
+    assert [e["id"] for e in y["format"]["examples"]] == ["7573363021439946006", None]
     md = status.render(status.build(_get(data), now=NOW))
     assert "Scanned 220 videos" in md
 

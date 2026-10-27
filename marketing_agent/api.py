@@ -235,7 +235,8 @@ def renders(limit: int = 50, niche: str = DEFAULT_NICHE):
     rows = store.rows(
         """SELECT r.id, r.script_id, r.created_at, r.model, r.cost_usd, r.final_path, r.post_path,
                   r.post_session_url, r.post_requested_at, COALESCE(r.post_attempts, 0) post_attempts,
-                  r.hold_reason, s.hook, s.payload, r.payload rpayload
+                  r.hold_reason, r.prompt, s.hook, s.body, s.demo_score, s.payload, r.payload rpayload,
+                  c.name concept
            FROM renders r JOIN scripts s ON s.id=r.script_id JOIN concepts c ON c.id=s.concept_id
            WHERE r.final_path IS NOT NULL AND r.model!='stub' AND c.niche=?
            ORDER BY r.created_at DESC LIMIT ?""",
@@ -247,7 +248,21 @@ def renders(limit: int = 50, niche: str = DEFAULT_NICHE):
         # fun"); the poster types the hook once, so those fragments are not repeated.
         r["post_text"] = _post_text(r["hook"], payload)
         r["hook"] = strip_label(r["hook"] or "")
-        lab = labels_of(json.loads(r.pop("rpayload") or "{}"))
+        r["script"] = {
+            "body": r.pop("body") or payload.get("body") or "",
+            "captions": payload.get("captions") or [],
+            "spoken": payload.get("spoken") or "",
+            "why": payload.get("why") or "",
+            "sound": payload.get("sound") or "",
+            "sound_url": payload.get("sound_url") or "",
+            "demo_score": r.pop("demo_score"),
+            "product_reveal_s": payload.get("product_reveal_s"),
+            "hook_on_screen": payload.get("hook_on_screen"),
+        }
+        rpayload = json.loads(r.pop("rpayload") or "{}")
+        r["made_with"] = _made_with(r["model"], rpayload)
+        r["video"] = _video_facts(store, r["id"], rpayload, r.get("post_path"), r.get("final_path"))
+        lab = labels_of(rpayload)
         r["labels"] = (
             {
                 "tags": lab["tags"],
@@ -258,6 +273,53 @@ def renders(limit: int = 50, niche: str = DEFAULT_NICHE):
             else None
         )
     return rows
+
+
+def _made_with(model: str | None, rpayload: dict) -> dict:
+    """How the clip was generated, read off the provider's request and result that the renderer
+    kept on the row: the asked-for resolution and length, aspect ratio, whether the model made
+    the audio, how many reference images it was shown, and the seed."""
+    inp = rpayload.get("input") if isinstance(rpayload.get("input"), dict) else {}
+    res = rpayload.get("result") if isinstance(rpayload.get("result"), dict) else {}
+    refs = inp.get("image_urls") or inp.get("reference_images") or []
+    duration = inp.get("duration")
+    try:
+        duration = int(duration) if duration not in (None, "", "auto") else None
+    except (TypeError, ValueError):
+        duration = None
+    return {
+        "provider": "fal" if model and "/" in model else model,
+        "model": model,
+        "resolution": inp.get("resolution"),
+        "duration_s": duration,
+        "aspect_ratio": inp.get("aspect_ratio"),
+        "audio_generated": str(inp.get("generate_audio")).lower() == "true"
+        if "generate_audio" in inp
+        else None,
+        "reference_images": len(refs) if isinstance(refs, list) else None,
+        "seed": res.get("seed"),
+    }
+
+
+def _video_facts(store, render_id: int, rpayload: dict, *paths) -> dict | None:
+    """The file's own width, height, length and size (ffprobe), measured once and kept on the
+    render's payload so later reads are free. None when no file is on this machine yet."""
+    probe = rpayload.get("probe")
+    if isinstance(probe, dict) and probe.get("width"):
+        return probe
+    path = next((Path(x) for x in paths if x and Path(x).exists()), None)
+    if path is None:
+        return None
+    try:
+        from .video.edit import probe_video
+
+        probe = probe_video(path)
+    except Exception:  # noqa: BLE001  (no ffprobe here: the clip is still listed)
+        return None
+    rpayload["probe"] = probe
+    with store.conn() as c:
+        c.execute("UPDATE renders SET payload=? WHERE id=?", (json.dumps(rpayload), render_id))
+    return probe
 
 
 CLIPS_URL = os.environ.get("MKT_CLIPS_URL", "https://mkt-dashboard-eta.vercel.app/renders")
