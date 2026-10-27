@@ -470,7 +470,7 @@ def rubric():
     candidate variables from the open fields. Written by `mkt rubric`."""
     from .rubric import report
 
-    return report(_store())
+    return report(_store(), winner_ids=CAMPAIGN.product.promo_video_ids or None)
 
 
 @app.get("/learnings.md", response_class=PlainTextResponse)

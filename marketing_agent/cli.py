@@ -168,7 +168,11 @@ def panel_untagged(store, niche: str, limit: int | None = None) -> list[dict]:
 
 @cli.command()
 @click.option(
-    "--concept", default=None, type=int, help="Format to grade (default: the one we chase)"
+    "--concept",
+    default=None,
+    type=int,
+    help="Concept to grade instead of campaign.toml's promo_videos (default: those, else the "
+    "concept we chase)",
 )
 @click.option("--model", default=None)
 @click.option("--again", is_flag=True, help="Grade videos that already have a grade")
@@ -181,6 +185,7 @@ def rubric(concept, model, again, limit):
     from .rubric import report, run
 
     store = _store()
+    promo = [] if concept else _campaign().product.promo_video_ids
     res = run(
         store,
         settings.cdp_url,
@@ -191,13 +196,15 @@ def rubric(concept, model, again, limit):
         again=again,
         limit=limit,
         log=console.print,
+        video_ids=promo or None,
     )
     console.print(
         f"graded {res['winners']} winners and {res['ours']} of ours"
         + (f" for {res['concept']['name']}" if res.get("concept") else "")
+        + (f" for the {len(promo)} videos that promote the product" if promo else "")
         + (f"; {len(res['failed'])} failed" if res["failed"] else "")
     )
-    rep = report(store)
+    rep = report(store, winner_ids=promo or None)
     for m in rep["must_have"]:
         console.print(f"  {m['label']:>14}: {m['text']} ({round(m['share'] * 100)}% of winners)")
     for r in rep["ours"]:

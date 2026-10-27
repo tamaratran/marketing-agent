@@ -212,3 +212,59 @@ def test_must_have_counts_only_winners_with_a_person():
     assert must["movement"]["value"] == "fast" and must["movement"]["share"] == 1.0
     # one person video is too few to lean on: everyone counts
     assert rubric.comparable([person, screen, screen]) == [person, screen, screen]
+
+
+def test_run_and_report_use_the_named_promo_videos_not_the_concept(tmp_path, monkeypatch):
+    """When campaign.toml names the TikToks that promote the product, those are the winners (all
+    of them, most viewed first) and an earlier format's winner grades drop out of the comparison."""
+    store = _store(tmp_path, monkeypatch)
+    now = int(time.time())
+    for i, views in enumerate([802_000, 3_800_000]):
+        store.upsert_video(
+            {
+                "id": f"p{i}",
+                "url": f"https://www.tiktok.com/@b/video/p{i}",
+                "author": "b",
+                "followers": 100,
+                "create_time": now - 86400,
+                "duration": 20,
+                "desc": "",
+                "music": "",
+                "source_tag": "immersiveworkout",
+                "views": views,
+            }
+        )
+    monkeypatch.setattr(
+        "marketing_agent.research.tiktok_browser.fetch_video_sync",
+        lambda url, out, cdp: Path(out).write_bytes(b"win"),
+    )
+    seen = []
+
+    def grade(video, meta, model=None):
+        seen.append(video.name)
+        g = dict(GRADE)
+        if video.name.startswith("p"):
+            g.update(movement="slow")
+        return {
+            "grade": g,
+            "run": {"model": "m", "latency_s": 1.0, "rubric_version": rubric.RUBRIC_VERSION},
+        }
+
+    monkeypatch.setattr(rubric, "grade_video", grade)
+    args = (store, "http://cdp", tmp_path / "videos", tmp_path / "renders")
+    rubric.run(*args, log=lambda *a: None)  # the old format's winners, w0..w2, movement fast
+    seen.clear()
+    res = rubric.run(*args, log=lambda *a: None, video_ids=["p0", "p1", "gone"])
+    assert res["winners"] == 2 and res["concept"] is None and res["failed"] == []
+    assert seen == ["p1.mp4", "p0.mp4"]  # most viewed first; the unknown id is skipped
+
+    rep = rubric.report(store, winner_ids=["p0", "p1", "gone"])
+    assert sorted(w["video_id"] for w in rep["winners"]) == ["p0", "p1"]
+    must = {m["variable"]: m for m in rep["must_have"]}
+    assert must["movement"]["value"] == "slow" and must["movement"]["n"] == 2
+    assert [(d["ours"], d["winners"]) for d in rep["ours"][0]["differences"]] == [
+        ("fast", "slow")
+    ]
+    assert rep["candidates"]["helped"][0]["n"] == 2
+    # without the filter every winner grade in the db counts, old format included
+    assert len(rubric.report(store)["winners"]) == 5

@@ -6,6 +6,7 @@ cycle button needs no hidden settings. MKT_* environment variables override sing
 from __future__ import annotations
 
 import os
+import re
 import tomllib
 from pathlib import Path
 
@@ -38,6 +39,11 @@ class Product(BaseModel):
     # the status story's "format that wins" and the Learnings tab's embedded videos are these.
     promo_videos: list[str] = Field(default_factory=list)
     promo_format: str = ""
+
+    @property
+    def promo_video_ids(self) -> list[str]:
+        """The TikTok ids in promo_videos, in order."""
+        return [m.group(1) for u in self.promo_videos if (m := re.search(r"/video/(\d+)", u))]
 
 
 class Cycle(BaseModel):
