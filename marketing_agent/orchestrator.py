@@ -209,7 +209,8 @@ def record_stage(store: Store, niche: str, name: str, status: str, note: str = "
     import json
 
     rows = store.rows(
-        "SELECT id, stages FROM runs WHERE niche=? ORDER BY id DESC LIMIT 1",
+        "SELECT id, stages FROM runs WHERE niche=? AND (note IS NULL OR note NOT LIKE 'post s%') "
+        "ORDER BY id DESC LIMIT 1",
         (niche,),
     )
     if not rows:
@@ -389,7 +390,8 @@ class DailyReport:
         stages = json.dumps(self.stages)
         now = int(time.time())
         open_runs = store.rows(
-            "SELECT id FROM runs WHERE finished_at IS NULL AND niche=? ORDER BY id DESC LIMIT 1",
+            "SELECT id FROM runs WHERE finished_at IS NULL AND niche=? "
+            "AND (note IS NULL OR note NOT LIKE 'post s%') ORDER BY id DESC LIMIT 1",
             (self.niche,),
         )
         if open_runs:
