@@ -658,10 +658,33 @@ def ours_add_post(body: PostIn):
     """Register a post we made so the re-poll tracks its views and the picker learns from it."""
     from .own import add_post
 
+    store = _store()
     try:
-        return add_post(_store(), body.url, body.caption, niche=DEFAULT_NICHE)
+        res = add_post(store, body.url, body.caption, niche=DEFAULT_NICHE)
     except ValueError as e:
         raise HTTPException(400, str(e)) from e
+    if res.get("script_id"):
+        _finish_post_runs(store, res["script_id"])
+    return res
+
+
+def _finish_post_runs(store: Store, script_id: int) -> None:
+    """A post request's run row is done once its clip is registered; otherwise the Learnings page
+    keeps treating it as a cycle still going and disables its buttons."""
+    with store.conn() as c:
+        cols = {r[1] for r in c.execute("PRAGMA table_info(runs)")}
+        for col, typ in (("status", "TEXT"), ("stages", "TEXT"), ("finished_at", "INTEGER")):
+            if col not in cols:
+                c.execute(f"ALTER TABLE runs ADD COLUMN {col} {typ}")
+        c.execute(
+            """UPDATE runs SET finished_at=?, status='ok'
+               WHERE finished_at IS NULL AND (note=? OR note LIKE ?)""",
+            (
+                int(time.time()),
+                f"post s{script_id} from @{CAMPAIGN.account.handle}",
+                f"post s{script_id} from @% (try %",
+            ),
+        )
 
 
 @app.get("/ours")

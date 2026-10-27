@@ -33,7 +33,7 @@ export default async function Page() {
   const batchFormats = [...new Set(batch.map((s) => s.concept))];
   const rendered = new Set(renders.map((r) => r.script_id));
   const now = nowSec();
-  const running = runs.find((r) => !r.finished_at && now - r.created_at < 3 * 3600);
+  const running = runs.find((r) => !r.finished_at && !r.note?.startsWith("post s") && now - r.created_at < 3 * 3600);
   const cycles = rows.filter((e) => e.kind === "cycle" && e.facts).sort((a, b) => a.created_at - b.created_at);
   const notes = rows.filter((e) => e.kind !== "cycle");
   const latest = cycles[cycles.length - 1]?.facts;
