@@ -26,7 +26,7 @@ export function TraitBars({ rows, column, title, max = 6 }: { rows: RankRow[]; c
                 <div className={`absolute inset-y-1 rounded-sm ${v >= 0 ? "bg-neutral-200" : "bg-neutral-600"}`} style={{ left: `${left}%`, width: `${Math.max(w, 0.5)}%`, opacity: 0.45 + 0.55 * Math.sqrt(r.n / bigN) }} />
                 {err > 0 && <div className="absolute top-1/2 h-px bg-neutral-100/70" style={{ left: `${50 + (v / span) * 50 - err}%`, width: `${2 * err}%` }} />}
               </div>
-              <span className="text-right tabular-nums text-neutral-400"><span className={v >= 0 ? "text-neutral-50" : "text-neutral-500"}>{times(v)}</span> · {r.n} videos</span>
+              <span className="text-right tabular-nums text-neutral-400"><span className={v >= 0 ? "text-neutral-50" : "text-neutral-500"}>{times(v)}</span> · {r.n}<span className="hidden sm:inline"> videos</span></span>
             </li>
           );
         })}

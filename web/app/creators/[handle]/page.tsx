@@ -24,7 +24,7 @@ export default async function Page({ params }: { params: Promise<{ handle: strin
         <Table head={["", "posted", "video", "tag", "views", "likes", "lift 72h"]} rows={c.videos.map((v) => [
           <Thumb key={`t${v.id}`} id={v.id} href={`/videos/${v.id}`} />,
           dateOf(v.create_time),
-          <Link key={v.id} href={`/videos/${v.id}`} className="text-accent hover:underline">{(v.desc || v.id).slice(0, 70)}</Link>,
+          <Link key={v.id} href={`/videos/${v.id}`} className="text-gold hover:underline">{(v.desc || v.id).slice(0, 70)}</Link>,
           v.source_tag, v.views?.toLocaleString() ?? "", v.likes?.toLocaleString() ?? "", fmt(v.lift_72h),
         ])} />
       </Card>
