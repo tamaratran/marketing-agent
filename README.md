@@ -90,6 +90,8 @@ passes the scoreboard's winning and losing hooks, concepts and styles into the p
 
 ```bash
 # Supply TIKTOK_POST_HANDLE and TIKTOK_POST_PASSWORD through protected secrets, not CLI arguments.
+# TIKTOK_POST_EMAIL / TIKTOK_POST_EMAIL_PASSWORD: the Gmail inbox on the TikTok account, read only
+# for TikTok's email verification codes.
 mkt own login
 mkt own add @youraccount --product "your product"
 mkt own sync                      # niche and hashtags from campaign.toml

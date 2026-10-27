@@ -158,8 +158,12 @@ Setup (in the repo):
   Own-post discovery requires a TikTok session in that Chrome. `mkt own login` reuses a verified
   login or submits TIKTOK_POST_HANDLE and TIKTOK_POST_PASSWORD from protected environment secrets.
   Do not print them, put them in prompts, export cookies, or copy them to shared services.
-  If TikTok requires verification/CAPTCHA or the browser is signed into another account, stop
-  that stage and report it. A fresh VM is not guaranteed to inherit a personal browser login.
+  If TikTok asks for an email code, the account's inbox is TIKTOK_POST_EMAIL (Gmail, password
+  TIKTOK_POST_EMAIL_PASSWORD, both protected secrets): sign into it in the same Chrome via
+  accounts.google.com/AddSession, read the code, continue. If Google wants a phone or passkey
+  step, or TikTok shows a CAPTCHA, or the browser is signed into another account, stop that stage
+  and report it; never change a password or security setting. A fresh VM is not guaranteed to
+  inherit a personal browser login.
 
 State lives on the `{state_branch}` branch (sqlite db, daily reports, and site/ with the static dashboard and its clips),
 checked out as a worktree:
@@ -321,8 +325,13 @@ signed-in session into Chrome, so TikTok sees the same browser as last time and 
 Only if that fails (no saved session, or it expired) run `mkt own login`, which submits
 TIKTOK_POST_HANDLE and TIKTOK_POST_PASSWORD from protected environment secrets. Never print them,
 put them in prompts or copy them anywhere; the only place the session goes is `mkt browser save`.
-If TikTok asks for a verification code or a CAPTCHA you cannot solve, or the browser is signed into
-a different account, stop and report; do not post from another account.
+If TikTok asks for an email verification code: the account's email is TIKTOK_POST_EMAIL (a Gmail
+inbox) and its Google password is TIKTOK_POST_EMAIL_PASSWORD, both protected environment secrets.
+Sign into that Gmail in the same Chrome (https://accounts.google.com/AddSession, so the TikTok tab
+keeps its session), read the newest TikTok code, enter it, then carry on. If Google itself asks for
+a phone or passkey step, or TikTok shows a CAPTCHA you cannot solve, or the browser is signed into
+a different account, stop and report; do not post from another account, and never change any
+password or security setting on either account.
 
 Uploader notes: https://www.tiktok.com/tiktokstudio/upload has one hidden input[type=file]; set the
 file on it. Click Cancel on the "automatic content checks" dialog and let the tour finish (never
