@@ -13,9 +13,11 @@ primary_region = "sjc"
 [http_service]
   internal_port = 8080
   force_https = true
+  # One machine stays up: the API hands stale clips back to the poster session from an
+  # in-process loop (retry_stale_posts), which dies with the machine when it idles out.
   auto_stop_machines = "stop"
   auto_start_machines = true
-  min_machines_running = 0
+  min_machines_running = 1
 
 [[vm]]
   size = "shared-cpu-1x"
