@@ -4,6 +4,7 @@ from click.testing import CliRunner
 
 from marketing_agent import cli as cli_mod
 from marketing_agent.classifier import classify as classify_mod
+from marketing_agent.classifier import tagger
 from marketing_agent.research import tiktok_browser
 from marketing_agent.store import Store
 
@@ -29,7 +30,7 @@ def test_classify_refetches_missing_local_file_and_skips_unfetchable(tmp_path: P
 
     seen = []
 
-    def fake_classify(path, v, model, transcribe_model):
+    def fake_classify(path, v, model, transcribe_model, client=None):
         seen.append(Path(path))
         return {
             "run": {"latency_s": 0},
@@ -43,6 +44,7 @@ def test_classify_refetches_missing_local_file_and_skips_unfetchable(tmp_path: P
 
     monkeypatch.setattr(tiktok_browser, "fetch_video_sync", fake_fetch)
     monkeypatch.setattr(classify_mod, "classify", fake_classify)
+    monkeypatch.setattr(tagger.settings, "gemini_api_key", None)  # the frames path
     monkeypatch.setattr(store, "save_tags", lambda vid, model, res: None)
     res = CliRunner().invoke(cli_mod.cli, ["classify"])
     assert res.exit_code == 0, res.output

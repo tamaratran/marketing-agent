@@ -39,7 +39,7 @@ export type Concept = {
 export type Script = { id: number; concept: string; product: string; created_at: number; hook: string; demo_score: number; captions: string[]; body: string; spoken?: string; hook_on_screen?: boolean; sound?: string; sound_url?: string; why?: ScriptWhy | null };
 export type ScriptWhy = { pick_share?: number; head_start?: number; expected_lift?: number; own_mean_reward?: number | null; own_n?: number; kind?: string; traits?: { trait: string; value: string | boolean | null; ours: number; ours_n: number; market: number; market_n: number }[] };
 export type Beat = { t_s: number; what: string };
-export type ClipLabels = { tags: Record<string, unknown>; beats: Beat[] };
+export type ClipLabels = { tags: Record<string, unknown>; beats: Beat[]; model?: string | null };
 export type Render = { id: number; script_id: number; created_at: number; model: string; cost_usd: number; hook: string; post_path: string | null; post_text: string[]; hold_reason: string | null; post_session_url: string | null; post_requested_at: number | null; post_attempts: number; labels?: ClipLabels | null };
 export type Campaign = {
   account: { handle: string; backup_hashtag: string };
@@ -71,7 +71,7 @@ export type Features = Record<string, number | string | boolean | string[] | nul
 export type VideoDetail = {
   video: { id: string; url: string; author: string; followers: number | null; create_time: number; duration: number | null; desc: string; music: string; hashtags: string[]; source_tag: string; niche: string | null; cohort_at: number | null; gone_at: number | null };
   observations: Observation[];
-  tags: { tags: Record<string, unknown>; run: { model: string; prompt_version: string; latency_s: number; transcript: string; frame_times: number[] } } | null;
+  tags: { tags: Record<string, unknown>; run: { model: string; prompt_version: string; latency_s: number; transcript: string | null; frame_times: number[] | null } } | null;
   tagged_at: number | null;
   features: Features | null;
   creator: { followers: number | null; n_posts: number; median_views: number | null; video_count: number | null; heart_count: number | null; taken_at: number } | null;

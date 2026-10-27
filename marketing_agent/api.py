@@ -249,7 +249,13 @@ def renders(limit: int = 50, niche: str = DEFAULT_NICHE):
         r["hook"] = strip_label(r["hook"] or "")
         lab = labels_of(json.loads(r.pop("rpayload") or "{}"))
         r["labels"] = (
-            {"tags": lab["tags"], "beats": lab["tags"].get("beats") or []} if lab else None
+            {
+                "tags": lab["tags"],
+                "beats": lab["tags"].get("beats") or [],
+                "model": (lab.get("run") or {}).get("model"),
+            }
+            if lab
+            else None
         )
     return rows
 

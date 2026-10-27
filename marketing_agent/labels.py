@@ -9,7 +9,6 @@ import json
 import time
 from pathlib import Path
 
-from .config import settings
 from .store import Store
 
 
@@ -23,7 +22,7 @@ def label_render(
 ) -> dict | None:
     """Classify one render's clean clip and store the result on its payload. None when there is
     no file to watch."""
-    from .classifier.classify import classify
+    from .classifier.tagger import tag_video
 
     rows = store.rows(
         "SELECT r.id, r.payload, r.post_path, r.final_path, s.hook, s.payload spayload "
@@ -45,13 +44,14 @@ def label_render(
         "hashtags": [],
         "duration": sp.get("duration"),
     }
-    out = classify(
-        video, meta, model or settings.openai_model, settings.transcribe_model, client=client
-    )
+    out = tag_video(video, meta, model=model, client=client)
     run = out.get("run") or {}
     labels = {
         "tags": out["tags"],
-        "run": {k: run.get(k) for k in ("model", "prompt_version", "transcript", "frame_times")},
+        "run": {
+            k: run.get(k)
+            for k in ("model", "prompt_version", "transcript", "frame_times", "watched")
+        },
         "labelled_at": int(time.time()),
     }
     payload = json.loads(r["payload"] or "{}")

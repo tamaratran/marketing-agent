@@ -123,11 +123,10 @@ def classify(limit, model, niche):
     the scored research panel instead, so trait tables rest on the videos that have a score. The
     default is every video that qualifies: a scored video without tags is a lost lesson, and after
     the first full pass only the cycle's new videos are left each run."""
-    from .classifier.classify import classify as run_classify
+    from .classifier.tagger import tag_video
     from .research.tiktok_browser import fetch_video_sync
 
     store = _store()
-    model = model or settings.openai_model
     rows = store.untagged(limit) if niche is None else panel_untagged(store, _niche(niche), limit)
     console.print(f"{len(rows)} to classify")
     done = 0
@@ -144,8 +143,8 @@ def classify(limit, model, niche):
                 continue
             store.set_local_path(v["id"], str(path))
         v["hashtags"] = json.loads(v["hashtags"] or "[]")
-        res = run_classify(path, v, model=model, transcribe_model=settings.transcribe_model)
-        store.save_tags(v["id"], model, res)
+        res = tag_video(path, v, model=model)
+        store.save_tags(v["id"], res["run"].get("model") or model or settings.openai_model, res)
         done += 1
         tg = res["tags"]
         console.print(
@@ -334,11 +333,10 @@ def own_sync(niche, tags, source="profile"):
 def own_research(limit, model):
     """Download and classify our accounts' campaign posts so we know which hook, style and pacing each one actually used, not only which script it
     came from."""
-    from .classifier.classify import classify as run_classify
+    from .classifier.tagger import tag_video
     from .research.tiktok_browser import fetch_video_sync
 
     store = _store()
-    model = model or settings.openai_model
     todo = store.rows(
         """SELECT v.* FROM videos v WHERE v.ours=1
             AND NOT EXISTS (SELECT 1 FROM tags t WHERE t.video_id=v.id)
@@ -354,10 +352,8 @@ def own_research(limit, model):
                 store.set_local_path(v["id"], str(out))
                 v["local_path"] = str(out)
             v["hashtags"] = json.loads(v["hashtags"] or "[]")
-            res = run_classify(
-                Path(v["local_path"]), v, model=model, transcribe_model=settings.transcribe_model
-            )
-            store.save_tags(v["id"], model, res)
+            res = tag_video(Path(v["local_path"]), v, model=model)
+            store.save_tags(v["id"], res["run"].get("model") or model or settings.openai_model, res)
             tagged += 1
             console.print(f"{v['id']} @{v['author']}: {res['tags']['hook_type']}")
         except Exception as e:  # noqa: BLE001 - one bad post must not stop the rest
