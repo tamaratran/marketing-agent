@@ -90,6 +90,133 @@ TRAITS = [
     ("product_early", "product_on_screen_by_5s"),
 ]
 
+TRAIT_WORDS = {
+    ("visual_style", "screen_recording"): "screen recordings",
+    ("visual_style", "realistic_footage"): "real footage",
+    ("visual_style", "ugc_selfie"): "selfie clips",
+    ("visual_style", "talking_head"): "talking heads",
+    ("hook_type", "text_on_screen"): "a text hook",
+    ("hook_type", "pov"): "a POV hook",
+    ("hook_type", "question"): "a question hook",
+    ("hook_type", "bold_claim"): "a bold claim",
+    ("hook_type", "other"): "no set hook",
+    ("pacing_bucket", "slow"): "slow pacing",
+    ("pacing_bucket", "medium"): "medium pacing",
+    ("pacing_bucket", "fast"): "fast cuts",
+    ("music_role", "background"): "background music",
+    ("music_role", "trend_sound"): "a trending sound",
+    ("music_role", "voiceover_only"): "voiceover only",
+    ("music_role", "none"): "no sound",
+    ("product_on_screen_by_5s", "True"): "the product on screen in 5 seconds",
+}
+
+
+def _views(n) -> str:
+    n = n or 0
+    if n >= 1_000_000:
+        return f"{n / 1_000_000:.1f}M".replace(".0M", "M")
+    if n >= 1_000:
+        return f"{n / 1_000:.0f}K"
+    return str(int(n))
+
+
+def _plain_name(name) -> str:
+    """A concept name as it reads in a sentence: without the "Clone:" prefix."""
+    return (name or "").split(":", 1)[-1].strip()
+
+
+def _and(items: list[str]) -> str:
+    items = [i for i in items if i]
+    return ", ".join(items[:-1]) + (" and " if len(items) > 1 else "") + items[-1] if items else ""
+
+
+def _story(facts: dict, min_n: int, concepts: list, batch: list, posts: list) -> dict:
+    """Three plain sentences a person reads first: what was scanned, what it says, what we make.
+    Every number is read from the data; nothing here is written by a model.
+
+    The winning format is the batch's concept with the most-viewed examples (its `early_score`),
+    which is the product's own viral posts when a clone format is in the batch."""
+    n_scored = facts.get("n_scored") or 0
+    n_tagged = facts.get("n_tagged") or 0
+    bets = [
+        b
+        for b in _best_bets(facts.get("traits") or {}, min_n)
+        if (b.get("lift") or 0) > 0 and b.get("value") != "other"
+    ]
+    by_id = {c.get("id"): c for c in concepts or []}
+    in_batch = {s.get("concept_id") for s in batch}
+    pool = [by_id[i] for i in in_batch if i in by_id] or list(by_id.values())
+    top = max(pool, key=lambda c: c.get("early_score") or 0, default=None)
+
+    scanned = (
+        f"Scanned {n_scored} videos in the niche, scored each against videos of the same age "
+        f"and account size, and sorted {n_tagged} of them by trait."
+        if n_scored
+        else "No videos scanned yet."
+    )
+
+    learned_bits = []
+    fmt = None
+    if top:
+        ex = sorted(top.get("examples") or [], key=lambda e: -(e.get("views") or 0))[:3]
+        views = _and([_views(e.get("views")) for e in ex if e.get("views")])
+        learned_bits.append(
+            f"The format that wins is the {_plain_name(top.get('name'))}"
+            + (f": its top videos have {views} views" if views else "")
+            + "."
+        )
+        fmt = {
+            "id": top.get("id"),
+            "name": top.get("name"),
+            "description": top.get("description"),
+            "examples": [
+                {"author": e.get("author"), "url": e.get("url"), "views": e.get("views")}
+                for e in ex
+            ],
+            "n_scripts": sum(1 for s in batch if s.get("concept_id") == top.get("id")),
+        }
+    if bets:
+        learned_bits.append(
+            "Across the whole set, the traits that lift views are "
+            + _and(
+                [
+                    f"{TRAIT_WORDS.get((b['trait'], b['value']), b['value'].replace('_', ' '))} "
+                    f"({b['lift_text']}, {b['n']} videos)"
+                    for b in bets[:4]
+                ]
+            )
+            + "."
+        )
+    learned = " ".join(learned_bits) or "Not enough scored videos to say what wins yet."
+
+    if batch:
+        names = []
+        for s in batch:
+            if s.get("concept") and s["concept"] not in names:
+                names.append(s["concept"])
+        making = f"So we are making {len(batch)} script{'s' if len(batch) != 1 else ''}"
+        if fmt and fmt["n_scripts"]:
+            making += f", {fmt['n_scripts']} in the {_plain_name(fmt['name'])}"
+            others = [_plain_name(n) for n in names if n != fmt["name"]]
+            if others:
+                making += f" and the rest in {_and(others)}"
+        elif names:
+            making += f" in {_and([_plain_name(n) for n in names])}"
+        making += "."
+    else:
+        making = "No batch of scripts proposed yet."
+    scored = [p for p in posts if p.get("lift_now") is not None]
+    if posts:
+        best = max(scored, key=lambda p: p["lift_now"], default=None)
+        making += f" {len(posts)} posted so far"
+        making += (
+            f"; the best, s{best.get('script_id')}, does {pct(best['lift_now'])} vs videos like it."
+            if best
+            else "; none old enough to read yet."
+        )
+
+    return {"scanned": scanned, "learned": learned, "making": making, "format": fmt}
+
 
 def build(get: Get, now: float | None = None) -> dict:
     """Pull the campaign from the API (`get(path)` returns parsed JSON) into one status dict."""
@@ -101,6 +228,7 @@ def build(get: Get, now: float | None = None) -> dict:
     runs = get("/runs?limit=30") or []
     learnings = get("/learnings?limit=100") or []
     findings = get("/findings") or {}
+    concepts = get("/concepts") or []
 
     posts = sorted(ours.get("posts") or [], key=lambda p: -(p.get("create_time") or 0))
     for p in posts:
@@ -178,6 +306,7 @@ def build(get: Get, now: float | None = None) -> dict:
             "rules": [e for e in notes if e.get("kind") == "rule"],
             "notes": [e for e in notes if e.get("kind") != "rule"][:10],
         },
+        "story": _story(facts, min_n, concepts, batch, posts),
         "running": running,
         "posting": posting,
         "runs": runs[:5],
@@ -211,6 +340,10 @@ def render(st: dict) -> str:
             "Posting now: "
             + ", ".join((r.get("note") or "").removeprefix("post ") for r in st["posting"])
         )
+
+    if st.get("story"):
+        y = st["story"]
+        out.append(f"\n{y['scanned']} {y['learned']} {y['making']}")
 
     out.append("\n## Our posts")
     if not st["posts"]:
