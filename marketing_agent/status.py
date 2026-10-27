@@ -7,6 +7,7 @@ the latest batch of proposed scripts, clips with their post state, what the data
 plus the trait tables), the agent's notes and rules, and any run in flight."""
 
 import os
+import re
 import time
 from collections.abc import Callable
 
@@ -178,8 +179,45 @@ def _and(items: list[str]) -> str:
     return ", ".join(items[:-1]) + (" and " if len(items) > 1 else "") + items[-1] if items else ""
 
 
+def _video_id(url) -> str | None:
+    """The TikTok video id at the end of a /video/<id> URL, for the embedded player."""
+    m = re.search(r"/video/(\d+)", url or "")
+    return m.group(1) if m else None
+
+
+def _promo_format(campaign: dict, get: Get) -> dict | None:
+    """The format to copy when campaign.toml names the TikToks that actually promote the
+    product: their author, url and latest views (GET /videos/{id}), most viewed first."""
+    product = campaign.get("product") or {}
+    urls = product.get("promo_videos") or []
+    if not urls:
+        return None
+    examples = []
+    for url in urls:
+        vid = _video_id(url)
+        detail = (get(f"/videos/{vid}") if vid else None) or {}
+        video = detail.get("video") or {}
+        views = max((o.get("views") or 0 for o in detail.get("observations") or []), default=0)
+        author = video.get("author") or (re.search(r"/@([^/]+)/", url or "") or [None, None])[1]
+        examples.append({"id": vid, "author": author, "url": url, "views": views or None})
+    examples.sort(key=lambda e: -(e.get("views") or 0))
+    return {
+        "id": None,
+        "name": f"The videos that promote {product.get('name') or 'the product'}",
+        "description": product.get("promo_format") or "",
+        "examples": examples,
+        "n_scripts": 0,
+    }
+
+
 def _story(
-    facts: dict, min_n: int, concepts: list, batch: list, posts: list, rubric: dict | None = None
+    facts: dict,
+    min_n: int,
+    concepts: list,
+    batch: list,
+    posts: list,
+    rubric: dict | None = None,
+    promo: dict | None = None,
 ) -> dict:
     """Three plain sentences a person reads first: what was scanned, what it says, what we make.
     Every number is read from the data; nothing here is written by a model.
@@ -207,7 +245,16 @@ def _story(
 
     learned_bits = []
     fmt = None
-    if top:
+    if promo and promo.get("examples"):
+        ex = promo["examples"][:3]
+        views = _and([_views(e.get("views")) for e in ex if e.get("views")])
+        learned_bits.append(
+            f"The format that wins is {promo['name'][0].lower() + promo['name'][1:]}"
+            + (f": the top ones have {views} views" if views else "")
+            + "."
+        )
+        fmt = {**promo, "examples": ex}
+    elif top:
         ex = sorted(top.get("examples") or [], key=lambda e: -(e.get("views") or 0))[:3]
         views = _and([_views(e.get("views")) for e in ex if e.get("views")])
         learned_bits.append(
@@ -382,7 +429,7 @@ def build(get: Get, now: float | None = None) -> dict:
         (a.get("handle") for a in ours.get("accounts") or []), None
     )
     followers = next((p.get("followers") for p in posts if p.get("followers")), None)
-    story = _story(facts, min_n, concepts, batch, posts, rubric)
+    story = _story(facts, min_n, concepts, batch, posts, rubric, _promo_format(campaign, get))
     fmt = next((c for c in concepts if c.get("id") == (story.get("format") or {}).get("id")), None)
     win_lengths = [e["duration"] for e in (fmt or {}).get("examples") or [] if e.get("duration")]
     graded = {g.get("script_id"): g for g in (rubric or {}).get("ours") or []}

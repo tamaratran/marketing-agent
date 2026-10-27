@@ -414,3 +414,37 @@ def test_story_carries_the_rubric(monkeypatch):
 def test_story_without_a_rubric_is_empty_not_missing():
     y = status.build(_get(_data()), now=NOW)["story"]
     assert y["must_have"] == [] and y["differences"] == [] and y["n_winners_graded"] == 0
+
+
+def test_story_format_is_the_products_own_promo_videos_when_named():
+    """campaign.toml can name the TikToks that actually promote the product; then they are the
+    format to copy (most viewed first, with ids for the embedded player), not the batch concept."""
+    data = _data()
+    data["/campaign"]["product"] = {
+        "name": "Immersive Workout",
+        "promo_format": "One person playing Subway Surfers on the TV with their body.",
+        "promo_videos": [
+            "https://www.tiktok.com/@tala.eckert/video/7666732988629060877",
+            "https://www.tiktok.com/@cardiowithale/video/7697295480425843999",
+            "https://www.tiktok.com/@nobody/video/1",
+        ],
+    }
+    data["/videos/7666732988629060877"] = {
+        "video": {"author": "tala.eckert"},
+        "observations": [{"views": 900000}, {"views": 1300000}],
+    }
+    data["/videos/7697295480425843999"] = {
+        "video": {"author": "cardiowithale"},
+        "observations": [{"views": 3800000}],
+    }
+    y = status.build(_get(data), now=NOW)["story"]
+    assert y["format"]["name"] == "The videos that promote Immersive Workout"
+    assert y["format"]["description"].startswith("One person playing")
+    assert [(e["author"], e["views"], e["id"]) for e in y["format"]["examples"]] == [
+        ("cardiowithale", 3800000, "7697295480425843999"),
+        ("tala.eckert", 1300000, "7666732988629060877"),
+        ("nobody", None, "1"),
+    ]
+    assert y["learned"].startswith(
+        "The format that wins is the videos that promote Immersive Workout: the top ones have 3.8M and 1.3M views."
+    )
