@@ -16,6 +16,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from . import rubric as rubric_cfg
 from .schema import PROMPT_VERSION, VideoTags
 
 ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
@@ -30,7 +31,10 @@ quality_issues lists anything that
 looks fake or AI-made, warped hands or faces, a screen whose content changes or does not match the
 caption, audio that does not match the picture, or bad edits. A screen that shows one game or
 app and then a different one later in the clip is always a quality issue: name both and the
-second it switches. Return JSON matching the schema."""
+second it switches. Fill in every rubric field from what you see and hear; describe people only as
+they look on screen. Return JSON matching the schema."""
+
+Rubric = rubric_cfg.model()
 
 
 class Shot(BaseModel):
@@ -65,9 +69,12 @@ class DetailedTags(VideoTags):
     product_timeline: list[ProductMoment] = Field(
         description="Each moment the product, app or game is on screen, in order"
     )
+    rubric: Rubric = Field(description="The video rubric, one answer per variable")
 
 
 TEXT_FIELDS = {k for k, f in DetailedTags.model_fields.items() if f.annotation is str}
+RUBRIC_TEXT = {v["key"] for v in rubric_cfg.variables() if v["kind"] == "text"}
+EMPTY_WORDS = {"none", "null", "n/a"}
 
 
 def _context(meta: dict) -> str:
@@ -129,9 +136,10 @@ def label_video(
     resp = post(ENDPOINT.format(model=model) + f"?key={api_key}", body, timeout)
     text = resp["candidates"][0]["content"]["parts"][0]["text"]
     raw = json.loads(text)
-    for k in TEXT_FIELDS:  # the model sometimes writes the word None for an empty text field
-        if isinstance(raw.get(k), str) and raw[k].strip().lower() in {"none", "null", "n/a"}:
-            raw[k] = ""
+    for doc, keys in ((raw, TEXT_FIELDS), (raw.get("rubric") or {}, RUBRIC_TEXT)):
+        for k in keys:  # the model sometimes writes the word None for an empty text field
+            if isinstance(doc.get(k), str) and doc[k].strip().lower() in EMPTY_WORDS:
+                doc[k] = ""
     tags = DetailedTags.model_validate(raw)
     usage = resp.get("usageMetadata") or {}
     return {
@@ -145,5 +153,6 @@ def label_video(
             "transcript": None,
             "frame_times": None,
             "watched": "whole video with sound",
+            "rubric_version": rubric_cfg.version(),
         },
     }

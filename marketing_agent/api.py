@@ -675,6 +675,41 @@ class PostIn(BaseModel):
     script_id: int | None = None  # the poster session passes the clip it uploaded
 
 
+class TagRow(BaseModel):
+    video_id: str
+    model: str
+    payload: dict
+
+
+@app.post("/tags", dependencies=[Depends(_auth)])
+def tags_import(rows: list[TagRow]):
+    """Merge labels made on another machine (the video model's rubric pass) into the db, row by
+    row, without replacing the whole file the way POST /db does."""
+    store = _store()
+    ids = [r.video_id for r in rows]
+    marks = ",".join("?" * len(ids))
+    known = (
+        {r["id"] for r in store.rows(f"SELECT id FROM videos WHERE id IN ({marks})", tuple(ids))}
+        if ids
+        else set()
+    )
+    for r in rows:
+        if r.video_id in known:
+            store.save_tags(r.video_id, r.model, r.payload)
+    return {
+        "saved": sum(r.video_id in known for r in rows),
+        "unknown": [i for i in ids if i not in known],
+    }
+
+
+@app.get("/rubric")
+def rubric_variables():
+    """The video rubric: every variable the video model records, in the order it asks them."""
+    from .classifier import rubric
+
+    return {"version": rubric.version(), "variables": rubric.variables()}
+
+
 @app.post("/ours/posts", dependencies=[Depends(_auth)])
 def ours_add_post(body: PostIn):
     """Register a post we made so the re-poll tracks its views and the picker learns from it."""
