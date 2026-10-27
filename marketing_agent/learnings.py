@@ -230,7 +230,8 @@ def write_cycle(store: Store, niche: str, product: str, stages: list[dict] | Non
             f"- Sound: {fmt.get('sound') or 'no shared sound'}",
         ]
         if sheet.get("dont"):
-            lines.append("- Never: " + "; ".join(sheet["dont"]))
+            lines.append("- Never:")
+            lines += [f"    - {d}" for d in sheet["dont"]]
     else:
         lines.append(
             "No videos about the product itself in the db yet, so scripts follow the niche's"
@@ -334,12 +335,12 @@ def write_cycle(store: Store, niche: str, product: str, stages: list[dict] | Non
     elif cmp:
         wins = [r for r in cmp if r["market"] is not None][:5]
         lines.append(
-            "Market only so far. What beats the account's usual views in the niche: "
-            + "; ".join(
-                f"{r['trait']} {r['value']} ({r['market']:+.2f}, n={r['market_n']})" for r in wins
-            )
-            + ". All untried by us."
+            "Market only so far. What beats the account's usual views in the niche, all untried by us:"
         )
+        lines += [
+            "",
+            *(f"- {r['trait']} {r['value']} ({r['market']:+.2f}, n={r['market_n']})" for r in wins),
+        ]
     else:
         lines.append("Nothing scored on either side yet.")
 

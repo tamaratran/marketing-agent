@@ -42,11 +42,18 @@ export function RunsPanel({ rows, c }: { rows: Run[]; c: Campaign }) {
             const bad = stages.filter((s) => s.status === "failed");
             const human = bad.filter((s) => /top-up|login|captcha|TikTok session|credit/i.test(s.note));
             const status = !r.finished_at ? "running" : human.length === bad.length && bad.length ? "needs a human" : r.status === "failed" ? "failed" : "done";
-            const summary = stages.length ? `${stages.filter((s) => s.status === "ok").length}/${stages.length} ok` + (bad.length ? `; failed: ${bad.map((s) => s.stage).join(", ")}` : "") : "";
+            const summary = stages.length ? `${stages.filter((s) => s.status === "ok").length}/${stages.length} ok` : "";
             return [
               dateOf(r.created_at),
               <span key="s" className={status === "done" ? "text-neutral-50" : status === "running" ? "text-neutral-400" : "text-gold"}>{status}</span>,
-              <span key="g" title={bad.map((s) => `${s.stage}: ${s.note}`).join("\n")}>{summary}</span>,
+              <span key="g">
+                {summary}
+                {bad.length > 0 && (
+                  <ul className="mt-1 list-disc pl-4 text-xs text-gold">
+                    {bad.map((s) => <li key={s.stage} title={s.note}>{s.stage} failed</li>)}
+                  </ul>
+                )}
+              </span>,
               r.url ? <a key="u" href={r.url} target="_blank" className="text-gold hover:underline">{r.session_id}</a> : "CLI",
               r.note,
             ];
