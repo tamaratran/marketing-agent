@@ -616,6 +616,38 @@ def render(script_ids, provider, duration, resolution, sound, ref):
         console.print(
             f"script {sid}: {final} ({res.model}, ${res.cost_usd}, {round(time.time() - t0)}s)"
         )
+        if provider != "stub":
+            try:
+                from .labels import label_render
+
+                rid = store.rows(
+                    "SELECT id FROM renders WHERE script_id=? ORDER BY id DESC LIMIT 1", (sid,)
+                )
+                label_render(store, rid[0]["id"])
+                console.print(f"script {sid}: labelled like a research video")
+            except Exception as e:  # a label is nice to have; the clip is the deliverable
+                console.print(f"script {sid}: labels skipped ({type(e).__name__}: {e})")
+
+
+@cli.command("label-clips")
+@click.option("--again", is_flag=True, help="Re-label clips that already have labels")
+def label_clips(again):
+    """Label our rendered clips the way research videos are labelled (hook type, look, sound,
+    pacing, product by 5s, beats), with the same classifier, so Clips and What wins agree."""
+    from .labels import label_render, unlabelled
+
+    store = _store()
+    ids = unlabelled(store, again)
+    if not ids:
+        console.print("every clip is labelled")
+    for rid in ids:
+        lab = label_render(store, rid)
+        t = (lab or {}).get("tags") or {}
+        console.print(
+            f"render {rid}: {t.get('hook_type')}, {t.get('visual_style')}, {t.get('music_role')}, {len(t.get('beats') or [])} beats"
+            if lab
+            else f"render {rid}: no file"
+        )
 
 
 @cli.command()

@@ -2,7 +2,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-PROMPT_VERSION = "v1"
+PROMPT_VERSION = "v2"  # v2: beats
 
 HookType = Literal[
     "question",
@@ -19,6 +19,13 @@ VisualStyle = Literal[
     "realistic_footage", "screen_recording", "animation", "talking_head", "ugc_selfie", "mixed"
 ]
 MusicRole = Literal["none", "background", "beat_synced", "trend_sound", "voiceover_only"]
+
+
+class Beat(BaseModel):
+    t_s: float = Field(description="Seconds from the start")
+    what: str = Field(
+        description="What happens on screen and in the audio at that moment, one line"
+    )
 
 
 class VideoTags(BaseModel):
@@ -42,3 +49,7 @@ class VideoTags(BaseModel):
     )
     concept_confidence_0_1: float = Field(ge=0, le=1)
     summary: str
+    beats: list[Beat] = Field(
+        default_factory=list,
+        description="2 to 6 beats, in order: what the viewer sees and hears, like a shot list",
+    )
