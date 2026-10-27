@@ -7,7 +7,6 @@ import pytest
 from fastapi.testclient import TestClient
 
 from marketing_agent import api
-from marketing_agent.store import Store
 
 
 @pytest.fixture
@@ -18,7 +17,7 @@ def client(tmp_path, monkeypatch):
 
 
 def test_registering_a_post_finishes_its_run_rows(client, tmp_path, monkeypatch):
-    store = Store(tmp_path / "db.sqlite")
+    store = api._store()  # the API reads MKT_DB per request; share its file, not a fresh path
     handle = api.CAMPAIGN.account.handle
     now = int(time.time())
     base = {"created_at": now, "session_id": "s", "url": "u", "niche": "fitness", "product": "P"}
