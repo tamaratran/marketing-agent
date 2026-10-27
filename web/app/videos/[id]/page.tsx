@@ -4,6 +4,7 @@ import { Card, H1, Pill, Stat, Table, human, times } from "../../ui";
 import { Curve } from "../../curve";
 import { Thumb } from "../../thumb";
 import { tiktokEmbed } from "@/lib/api";
+import { VideoBreakdown, isDetailed } from "../../clips/labels";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +16,9 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
   const last = d.observations.at(-1);
   const hasFrame = v.gone_at ? await fetch(frameUrl(v.id), { method: "HEAD", cache: "no-store" }).then((r) => r.ok, () => false) : true;
   const tagRows = t
-    ? Object.entries(t).filter(([k]) => !["summary", "quality_issues"].includes(k)).map(([k, val]) => [human(k), Array.isArray(val) ? val.join(", ") : human(String(val ?? ""))])
+    ? Object.entries(t)
+        .filter(([k, val]) => !["summary", "quality_issues", "beats"].includes(k) && !(Array.isArray(val) && val.some((x) => typeof x === "object")))
+        .map(([k, val]) => [human(k), Array.isArray(val) ? val.join(", ") : human(String(val ?? ""))])
     : [];
   return (
     <>
@@ -60,17 +63,21 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
         </Card>
       </div>
       <div className="mt-4 grid gap-4 md:grid-cols-2">
-        <Card title={t ? `Classifier (${run?.model}, ${run?.latency_s}s)` : "Classifier"}>
+        <Card title={t ? `${isDetailed(t) ? "Video labeller" : "Classifier"} (${run?.model}, ${run?.latency_s}s)` : "Classifier"}>
           {t ? (
             <>
               <p className="mb-3 text-sm text-neutral-200">{String(t.summary ?? "")}</p>
               {Array.isArray(t.quality_issues) && t.quality_issues.length > 0 && (
                 <p className="mb-3 text-sm text-gold">issues: {(t.quality_issues as string[]).join("; ")}</p>
               )}
-              <Table head={["field", "value"]} rows={tagRows} />
+              {isDetailed(t) && <VideoBreakdown tags={t} />}
+              <details className="mt-3 text-sm text-neutral-400">
+                <summary className="cursor-pointer">every field</summary>
+                <div className="mt-2"><Table head={["field", "value"]} rows={tagRows} /></div>
+              </details>
               <details className="mt-3 text-sm text-neutral-400">
                 <summary className="cursor-pointer">what the model saw</summary>
-                <p className="mt-2">frames at {run?.frame_times.map((x) => `${x}s`).join(", ")}; transcript: <span className="text-neutral-300">{run?.transcript || "(none)"}</span></p>
+                <p className="mt-2">{run?.frame_times ? <>frames at {run.frame_times.map((x) => `${x}s`).join(", ")}; transcript: <span className="text-neutral-300">{run?.transcript || "(none)"}</span></> : "the whole video, with sound"}</p>
               </details>
             </>
           ) : (
