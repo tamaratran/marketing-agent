@@ -288,11 +288,18 @@ def winning_concept(store: Store, days: int = 14) -> dict | None:
     return pool[0] if pool else None
 
 
-def winners(store: Store, concept: dict | None, n: int = 5) -> list[dict]:
-    """The concept's example videos with what we know about them, most viewed first."""
-    if not concept:
+def winners(
+    store: Store, concept: dict | None, n: int = 5, video_ids: list[str] | None = None
+) -> list[dict]:
+    """The format's example videos with what we know about them, most viewed first: the ones
+    named (campaign.toml's promo_videos, all of them) or else the concept's examples."""
+    if video_ids:
+        ids: list = list(video_ids)
+        n = len(ids)
+    elif concept:
+        ids = json.loads(concept.get("video_ids") or "[]")
+    else:
         return []
-    ids = json.loads(concept.get("video_ids") or "[]")
     out = []
     for vid in ids:
         rows = store.rows("SELECT * FROM videos WHERE id=?", (str(vid),))
@@ -345,13 +352,18 @@ def run(
     again: bool = False,
     limit: int | None = None,
     log=print,
+    video_ids: list[str] | None = None,
 ) -> dict:
-    """Grade the winning format's examples and every clip of ours that is not graded yet."""
+    """Grade the winning format's examples and every clip of ours that is not graded yet. The
+    format is `video_ids` when given (the TikToks that promote the product, from campaign.toml),
+    else `concept_id`, else the concept we chase."""
     from .research.tiktok_browser import fetch_video_sync
 
     migrate(store)
     concept = (
-        next(iter(store.rows("SELECT * FROM concepts WHERE id=?", (concept_id,))), None)
+        None
+        if video_ids
+        else next(iter(store.rows("SELECT * FROM concepts WHERE id=?", (concept_id,))), None)
         if concept_id
         else winning_concept(store)
     )
@@ -362,7 +374,7 @@ def run(
     )
     graded = {"winners": 0, "ours": 0, "failed": []}
     todo = 0
-    for v in winners(store, concept):
+    for v in winners(store, concept, video_ids=video_ids):
         if f"v:{v['id']}" in done or (limit and todo >= limit):
             continue
         todo += 1
@@ -480,11 +492,17 @@ def candidates(rows: list[dict], field: str, kind: str | None = None) -> list[di
     return [{"text": text[k], "n": n} for k, n in c.most_common(12)]
 
 
-def report(store: Store) -> dict:
+def report(store: Store, winner_ids: list[str] | None = None) -> dict:
     """Everything the page needs: the winners' grades, ours, the must-have list, each clip's
-    differences, and the candidate variables."""
+    differences, and the candidate variables. With `winner_ids` (the format named in
+    campaign.toml) only those videos count as winners; grades of an earlier format stay in the db
+    but out of the comparison."""
     rows = grades(store)
     win = [r for r in rows if r["kind"] == WINNER]
+    if winner_ids:
+        keep = {str(i) for i in winner_ids}
+        win = [r for r in win if str(r["video_id"]) in keep]
+        rows = win + [r for r in rows if r["kind"] != WINNER]
     ours = [r for r in rows if r["kind"] == OURS]
     must = must_have([r["grade"] for r in win])
     used = {id(g) for g in comparable([r["grade"] for r in win])}
