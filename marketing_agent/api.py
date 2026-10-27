@@ -702,14 +702,6 @@ def tags_import(rows: list[TagRow]):
     }
 
 
-@app.get("/rubric")
-def rubric_variables():
-    """The video rubric: every variable the video model records, in the order it asks them."""
-    from .classifier import rubric
-
-    return {"version": rubric.version(), "variables": rubric.variables()}
-
-
 @app.post("/ours/posts", dependencies=[Depends(_auth)])
 def ours_add_post(body: PostIn):
     """Register a post we made so the re-poll tracks its views and the picker learns from it."""

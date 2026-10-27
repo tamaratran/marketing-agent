@@ -29,6 +29,26 @@ GRADE = {
     "looks_fake": [],
     "helped": ["one locked shot", "the game visibly reacts to the body"],
     "hurt": [],
+    "first_frame": "a man facing a TV",
+    "payoff": "",
+    "humor": False,
+    "caption_amount": "a_sentence",
+    "caption_placement": "top",
+    "age": "20s",
+    "size_in_frame": "full_body",
+    "face_visible": True,
+    "clothing_type": "gym_wear",
+    "talks_to_camera": False,
+    "dance": False,
+    "dance_name": "",
+    "energy": "high",
+    "setting": "living_room",
+    "camera": "tripod",
+    "lighting": "natural",
+    "body_controls_game": "yes",
+    "sound_name": "",
+    "sound_synced": True,
+    "looks_ai_made": False,
 }
 
 
@@ -125,7 +145,10 @@ def test_run_grades_the_winners_and_ours_then_reports(tmp_path, monkeypatch):
             )
         elif video.name == "w2.mp4":
             g.update(gender="woman")
-        return {"grade": g, "run": {"model": "m", "latency_s": 1.0}}
+        return {
+            "grade": g,
+            "run": {"model": "m", "latency_s": 1.0, "rubric_version": rubric.RUBRIC_VERSION},
+        }
 
     monkeypatch.setattr(rubric, "grade_video", grade)
     res = rubric.run(
