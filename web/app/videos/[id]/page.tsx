@@ -4,7 +4,7 @@ import { Card, H1, Pill, Stat, Table, human, times } from "../../ui";
 import { Curve } from "../../curve";
 import { Thumb } from "../../thumb";
 import { tiktokEmbed } from "@/lib/api";
-import { VideoBreakdown, isDetailed } from "../../clips/labels";
+import { Issues, VideoBreakdown, isDetailed } from "../../clips/labels";
 
 export const dynamic = "force-dynamic";
 
@@ -67,9 +67,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
           {t ? (
             <>
               <p className="mb-3 text-sm text-neutral-200">{String(t.summary ?? "")}</p>
-              {Array.isArray(t.quality_issues) && t.quality_issues.length > 0 && (
-                <p className="mb-3 text-sm text-gold">issues: {(t.quality_issues as string[]).join("; ")}</p>
-              )}
+              {Array.isArray(t.quality_issues) && <Issues issues={t.quality_issues as string[]} className="mb-3 text-sm" />}
               {isDetailed(t) && <VideoBreakdown tags={t} />}
               <details className="mt-3 text-sm text-neutral-400">
                 <summary className="cursor-pointer">every field</summary>

@@ -22,7 +22,7 @@ const TRAITS: { key: string; table: "hooks" | "styles" | "pacing" | "sound" | "p
 const n = (x: number) => Math.round(x).toLocaleString("en-US");
 const hours = (h: number) => (h < 48 ? `${Math.round(h)}h` : `${Math.round(h / 24)}d`);
 
-export type Why = { verdict: "early" | "unscored" | "win" | "average" | "miss"; headline: string; reason: string; lines: Line[] };
+export type Why = { verdict: "early" | "unscored" | "win" | "average" | "miss"; headline: string; reason: string; reasons?: string[]; lines: Line[] };
 
 /** Everything measured about one of our posts, read into a verdict and the facts behind it. No model writes this. */
 export function explain(p: OursPost, v: VideoDetail | null, o: Overview): Why {
@@ -101,8 +101,8 @@ export function explain(p: OursPost, v: VideoDetail | null, o: Overview): Why {
     if (growth === "good") parts.push("views still climbing");
   }
   const lead = verdict === "miss" ? "Fell short" : verdict === "win" ? "Did well" : "About average";
-  const reason = parts.length ? `${parts.join("; ")}.` : verdict === "average" ? "Nothing in the data stands out either way." : "Nothing in the data explains it yet.";
-  return { verdict, headline: `${lead}: ${times(p.lift_matched)} videos like it, ${where}`, reason, lines };
+  const reason = parts.length ? "" : verdict === "average" ? "Nothing in the data stands out either way." : "Nothing in the data explains it yet.";
+  return { verdict, headline: `${lead}: ${times(p.lift_matched)} videos like it, ${where}`, reason, reasons: parts, lines };
 }
 
 const tones: Record<Tone, string> = { good: "text-neutral-50", bad: "text-neutral-500", neutral: "text-neutral-300" };
@@ -112,7 +112,12 @@ export function WhyBlock({ why }: { why: Why }) {
   return (
     <Card title={title}>
       <p className="text-neutral-50">{why.headline}</p>
-      <p className="mt-1 text-neutral-400">{why.reason}</p>
+      {why.reason && <p className="mt-1 text-neutral-400">{why.reason}</p>}
+      {(why.reasons ?? []).length > 0 && (
+        <ul className="mt-2 list-disc space-y-1 pl-5 text-neutral-400">
+          {why.reasons!.map((r, i) => <li key={i}>{r}</li>)}
+        </ul>
+      )}
       {why.lines.length > 0 && (
         <ul className="rule mt-4 text-sm">
           {why.lines.map((l, i) => (

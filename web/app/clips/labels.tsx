@@ -25,6 +25,19 @@ type Moment = { t_s: number; what: string };
 const list = <T,>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
 const sec = (t: number) => `${Math.round(t * 10) / 10}s`;
 
+/** What the labeller flagged, one bullet per problem. */
+export function Issues({ issues, className = "" }: { issues: string[]; className?: string }) {
+  if (issues.length === 0) return null;
+  return (
+    <div className={className}>
+      <p className="mb-1 text-[11px] uppercase tracking-wide text-gold">flagged</p>
+      <ul className="list-disc space-y-1 pl-5 text-gold">
+        {issues.map((x, i) => <li key={i}>{x}</li>)}
+      </ul>
+    </div>
+  );
+}
+
 /** True when the tags came from the video labeller (whole clip watched), not sampled frames. */
 export const isDetailed = (t: Record<string, unknown> | null | undefined) => !!t && Array.isArray(t.shots);
 
@@ -85,9 +98,7 @@ export function VideoBreakdown({ tags: t }: { tags: Record<string, unknown> }) {
           </ol>
         </div>
       )}
-      {list<string>(t.quality_issues).length > 0 && (
-        <p className="text-gold">flagged: {list<string>(t.quality_issues).join("; ")}</p>
-      )}
+      <Issues issues={list<string>(t.quality_issues)} />
     </div>
   );
 }
