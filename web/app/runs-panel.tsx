@@ -20,9 +20,9 @@ export function RunsPanel({ rows, c }: { rows: Run[]; c: Campaign }) {
         <Table
           head={["", ""]}
           rows={[
-            ["posting account", c.account.handle ? <a key="a" href={`https://www.tiktok.com/@${c.account.handle}`} target="_blank" className="text-sky-300 hover:underline">@{c.account.handle}</a> : "none registered"],
+            ["posting account", c.account.handle ? <a key="a" href={`https://www.tiktok.com/@${c.account.handle}`} target="_blank" className="text-accent hover:underline">@{c.account.handle}</a> : "none registered"],
             ["niche watched", `${c.niche.name}: ${c.niche.hashtags.map((t) => `#${t}`).join(" ")}`],
-            ["product", <span key="p">{c.product.name}{c.product.developer ? ` by ${c.product.developer}` : ""}{c.product.website ? <> · <a href={c.product.website} target="_blank" className="text-sky-300 hover:underline">site</a></> : null}{c.product.app_store ? <> · <a href={c.product.app_store} target="_blank" className="text-sky-300 hover:underline">App Store</a></> : null}</span>],
+            ["product", <span key="p">{c.product.name}{c.product.developer ? ` by ${c.product.developer}` : ""}{c.product.website ? <> · <a href={c.product.website} target="_blank" className="text-accent hover:underline">site</a></> : null}{c.product.app_store ? <> · <a href={c.product.app_store} target="_blank" className="text-accent hover:underline">App Store</a></> : null}</span>],
             ["how scripts describe it", c.product.description],
             ["TikToks whose format is cloned", c.product.hashtags.length ? c.product.hashtags.map((t) => `#${t}`).join(" ") : "none, niche concepts only"],
             ["reference images for renders", <span key="r" className="flex gap-2">{c.product.references.map((u) => <a key={u} href={u} target="_blank"><img src={u} alt="" className="h-14 rounded border border-neutral-800" /></a>)}</span>],
@@ -45,9 +45,9 @@ export function RunsPanel({ rows, c }: { rows: Run[]; c: Campaign }) {
             const summary = stages.length ? `${stages.filter((s) => s.status === "ok").length}/${stages.length} ok` + (bad.length ? `; failed: ${bad.map((s) => s.stage).join(", ")}` : "") : "";
             return [
               dateOf(r.created_at),
-              <span key="s" className={status === "done" ? "text-emerald-300" : status === "running" ? "text-neutral-400" : "text-amber-200"}>{status}</span>,
+              <span key="s" className={status === "done" ? "text-neutral-50" : status === "running" ? "text-neutral-400" : "text-accent"}>{status}</span>,
               <span key="g" title={bad.map((s) => `${s.stage}: ${s.note}`).join("\n")}>{summary}</span>,
-              r.url ? <a key="u" href={r.url} target="_blank" className="text-sky-300 hover:underline">{r.session_id}</a> : "CLI",
+              r.url ? <a key="u" href={r.url} target="_blank" className="text-accent hover:underline">{r.session_id}</a> : "CLI",
               r.note,
             ];
           })}

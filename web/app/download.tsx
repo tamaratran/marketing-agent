@@ -2,7 +2,7 @@
 import { useState } from "react";
 
 /** Saves the clip as a file; a plain <a download> is ignored for cross-origin URLs and just opens the video. */
-export function Download({ src, children = "Download", className = "text-sky-300 hover:underline" }: { src: string; children?: React.ReactNode; className?: string }) {
+export function Download({ src, children = "Download", className = "text-accent hover:underline" }: { src: string; children?: React.ReactNode; className?: string }) {
   const [busy, setBusy] = useState(false);
   const save = async (e: React.MouseEvent) => {
     e.preventDefault();
