@@ -34,6 +34,10 @@ class Product(BaseModel):
     description: str = ""
     hashtags: list[str] = Field(default_factory=list)
     references: list[str] = Field(default_factory=list)
+    # TikToks by other people that actually promote the product: the format to copy. When set,
+    # the status story's "format that wins" and the Learnings tab's embedded videos are these.
+    promo_videos: list[str] = Field(default_factory=list)
+    promo_format: str = ""
 
 
 class Cycle(BaseModel):
