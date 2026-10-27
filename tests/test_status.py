@@ -342,4 +342,75 @@ def test_story_on_an_empty_api():
         "learned": "Not enough scored videos to say what wins yet.",
         "making": "No batch of scripts proposed yet.",
         "format": None,
+        "must_have": [],
+        "n_winners_graded": 0,
+        "differences": [],
+        "candidates": {"hurt": [], "helped": []},
     }
+
+
+def test_story_carries_the_rubric(monkeypatch):
+    data = _data()
+    data["/rubric"] = {
+        "winners": [{"key": "v:a"}, {"key": "v:b"}, {"key": "v:c"}],
+        "must_have": [
+            {
+                "variable": "movement",
+                "label": "Movement",
+                "value": "fast",
+                "text": "fast",
+                "share": 1.0,
+                "n": 3,
+                "agreed": True,
+            },
+            {
+                "variable": "gender",
+                "label": "Gender",
+                "value": "man",
+                "text": "man",
+                "share": 0.34,
+                "n": 3,
+                "agreed": False,
+            },
+        ],
+        "ours": [
+            {
+                "script_id": 95,
+                "hook": "POV",
+                "grade": {"hurt": ["TV switches game"], "looks_fake": []},
+                "differences": [
+                    {
+                        "variable": "movement",
+                        "label": "Movement",
+                        "ours": "slow",
+                        "winners": "fast",
+                        "share": 1.0,
+                    }
+                ],
+            },
+            {
+                "script_id": 141,
+                "hook": "6 moves",
+                "grade": {"hurt": [], "looks_fake": []},
+                "differences": [],
+            },
+        ],
+        "candidates": {"hurt": [{"text": "TV switches game", "n": 1}], "helped": []},
+    }
+    y = status.build(_get(data), now=NOW)["story"]
+    assert [m["variable"] for m in y["must_have"]] == ["movement"]  # only what the winners agree on
+    assert y["n_winners_graded"] == 3
+    assert [(d["script_id"], d["posted"], d["lift_text"]) for d in y["differences"]] == [
+        (95, True, "-50%"),
+        (141, False, "not posted"),
+    ]
+    assert y["differences"][0]["differences"][0]["ours"] == "slow"
+    assert y["differences"][0]["hurt"] == ["TV switches game"]
+    md = status.render(status.build(_get(data), now=NOW))
+    assert "What the 3 top videos share: movement fast (100%)." in md
+    assert "- s95 (-50%): movement slow (they: fast)" in md
+
+
+def test_story_without_a_rubric_is_empty_not_missing():
+    y = status.build(_get(_data()), now=NOW)["story"]
+    assert y["must_have"] == [] and y["differences"] == [] and y["n_winners_graded"] == 0
