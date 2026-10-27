@@ -2,7 +2,41 @@ import { human, times } from "./ui";
 
 export type RankRow = { n: number; mean_reward: number; stderr?: number; win_rate: number } & Record<string, unknown>;
 
-export const traitValue = (v: unknown) => (v === "True" || v === true ? "yes" : v === "False" || v === false ? "no" : human(String(v)));
+/** What each classifier value means, in words a reader can act on. Pacing edges are
+ *  scoreboard.PACING_EDGES (cuts per 10 seconds: under 2, 2 to 4, 4 to 7, 7 and up). */
+export const TRAIT_WORDS: Record<string, string> = {
+  // hook type
+  other: "no set hook",
+  bold_claim: "bold claim",
+  question: "question",
+  pov: "POV caption",
+  text_on_screen: "text on screen",
+  visual_surprise: "visual surprise",
+  storytime: "story time",
+  tutorial: "how-to",
+  before_after: "before and after",
+  // visual style
+  realistic_footage: "filmed, no screen",
+  screen_recording: "screen recording",
+  animation: "animation",
+  talking_head: "talking to camera",
+  ugc_selfie: "selfie-style video",
+  mixed: "filmed plus screen",
+  // sound
+  none: "no music",
+  background: "music under speech",
+  beat_synced: "cuts on the beat",
+  trend_sound: "trending sound",
+  voiceover_only: "voiceover, no music",
+  // pacing (cuts per 10 seconds)
+  slow: "slow, under 2 cuts/10s",
+  medium: "medium, 2 to 4 cuts/10s",
+  fast: "fast, 4 to 7 cuts/10s",
+  frantic: "frantic, 7+ cuts/10s",
+};
+
+export const traitValue = (v: unknown) =>
+  v === "True" || v === true ? "yes" : v === "False" || v === false ? "no" : TRAIT_WORDS[String(v)] ?? human(String(v));
 
 /** Mean lift per trait value as horizontal bars with the sample size, so a bar on 2 videos
  *  reads as thin evidence next to one on 20. The bar is log10 lift: +1 is 10x. */
@@ -19,7 +53,7 @@ export function TraitBars({ rows, column, title, max = 6 }: { rows: RankRow[]; c
           const v = r.mean_reward, w = (Math.abs(v) / span) * 50, left = v >= 0 ? 50 : 50 - w;
           const err = ((r.stderr ?? 0) / span) * 50;
           return (
-            <li key={String(r[column])} className="grid grid-cols-[6.5rem_1fr_6rem] items-center gap-2 text-xs sm:grid-cols-[9rem_1fr_7rem]">
+            <li key={String(r[column])} className="grid grid-cols-[8rem_1fr_6rem] items-center gap-2 text-xs sm:grid-cols-[11rem_1fr_7rem]">
               <span className="truncate text-neutral-300" title={traitValue(r[column])}>{traitValue(r[column])}</span>
               <div className="relative h-4 rounded bg-neutral-900" role="img" aria-label={`${traitValue(r[column])}: ${times(v)} videos like it on ${r.n} videos`}>
                 <div className="absolute inset-y-0 left-1/2 w-px bg-neutral-700" />

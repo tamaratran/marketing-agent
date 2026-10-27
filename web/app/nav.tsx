@@ -7,8 +7,7 @@ export function Nav() {
   const path = usePathname();
   const current = path === "/concepts" ? "/" : path;
   return (
-    <nav className="mx-auto flex max-w-4xl items-baseline justify-between px-5 pb-10 pt-8 sm:px-8">
-      <Link href="/" className="text-sm font-medium tracking-tight text-neutral-500 hover:text-neutral-200">mkt</Link>
+    <nav className="flex justify-center px-5 pb-10 pt-8 sm:px-8">
       <ol className="flex items-baseline gap-6 sm:gap-8">
         {STEPS.map((s, i) => {
           const on = current === s.href;
