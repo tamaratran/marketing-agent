@@ -1,7 +1,7 @@
 import type { Overview, VideoDetail } from "@/lib/api";
 import type { OursPost } from "@/lib/ours";
 import { traitValue } from "../charts";
-import { Fold, Pill, times } from "../ui";
+import { Card, times } from "../ui";
 
 // Mirrors scoreboard.MIN_AGE_H_FOR_OWN: younger posts are not judged.
 export const MIN_AGE_H_OWN = 6;
@@ -107,21 +107,22 @@ export function explain(p: OursPost, v: VideoDetail | null, o: Overview): Why {
 
 const tones: Record<Tone, string> = { good: "text-neutral-50", bad: "text-neutral-500", neutral: "text-neutral-300" };
 
-export function WhyFold({ why }: { why: Why }) {
-  const pill = why.verdict === "win" ? <Pill tone="good">why it worked</Pill> : why.verdict === "miss" ? <Pill tone="bad">why it fell short</Pill> : <Pill tone="neutral">why</Pill>;
+export function WhyBlock({ why }: { why: Why }) {
+  const title = why.verdict === "win" ? "Why it worked" : why.verdict === "miss" ? "Why it fell short" : "Why";
   return (
-    <Fold className="mt-3" summary={<span className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1 text-sm">{pill}<span className="text-neutral-100">{why.headline}</span></span>}>
-      <p className="text-sm text-neutral-200">{why.reason}</p>
+    <Card title={title}>
+      <p className="text-neutral-50">{why.headline}</p>
+      <p className="mt-1 text-neutral-400">{why.reason}</p>
       {why.lines.length > 0 && (
-        <ul className="mt-2 space-y-1 text-xs">
+        <ul className="rule mt-4 text-sm">
           {why.lines.map((l, i) => (
-            <li key={i} className="flex flex-wrap items-baseline gap-x-2">
+            <li key={i} className="flex flex-wrap items-baseline gap-x-2 py-2">
               <span className={`tabular-nums ${tones[l.tone]}`}>{l.text}</span>
-              {l.detail && <span className="text-neutral-500">{l.detail}</span>}
+              {l.detail && <span className="text-xs text-neutral-500">{l.detail}</span>}
             </li>
           ))}
         </ul>
       )}
-    </Fold>
+    </Card>
   );
 }
