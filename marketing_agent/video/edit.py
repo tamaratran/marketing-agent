@@ -1,6 +1,7 @@
 """ffmpeg editing: trim/concat clips, burn TikTok-style captions, mix a sound, export 1080x1920 H.264.
 A TikTok-library sound cannot be attached via API, so audio is baked in here."""
 
+import json
 import re
 import shlex
 import subprocess
@@ -124,6 +125,33 @@ def assemble(
     cmd.append(str(out))
     subprocess.run(cmd, check=True)
     return out
+
+
+def probe(path: Path) -> dict:
+    """What the file really is: pixels, frame rate, length, codecs, sound or not, size."""
+    r = subprocess.run(
+        ["ffprobe", "-v", "error", "-show_streams", "-show_format", "-of", "json", str(path)],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    d = json.loads(r.stdout)
+    streams = d.get("streams") or []
+    v = next((s for s in streams if s.get("codec_type") == "video"), {})
+    a = next((s for s in streams if s.get("codec_type") == "audio"), None)
+    num, _, den = (v.get("avg_frame_rate") or "0/1").partition("/")
+    fmt = d.get("format") or {}
+    return {
+        "width": v.get("width"),
+        "height": v.get("height"),
+        "fps": round(float(num) / float(den), 2) if float(den or 0) else None,
+        "duration_s": round(float(fmt.get("duration") or 0), 2) or None,
+        "video_codec": v.get("codec_name"),
+        "audio": a is not None,
+        "audio_codec": (a or {}).get("codec_name"),
+        "size_bytes": int(fmt.get("size") or 0) or None,
+        "bitrate_kbps": round(int(fmt.get("bit_rate") or 0) / 1000) or None,
+    }
 
 
 def probe_duration(path: Path) -> float:

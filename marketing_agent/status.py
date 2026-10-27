@@ -111,6 +111,54 @@ TRAIT_WORDS = {
 }
 
 
+def clip_check(clip: dict, graded: dict | None, win_lengths: list[float]) -> list[dict]:
+    """The clip against the winners, one row per item (`ok` False is something to fix): the
+    file spec, then the rubric differences, what hurt and what looks fake once the video model
+    has graded it, then the quality issues its label found."""
+    meta = clip.get("meta") or {}
+    f = meta.get("file") or {}
+    gen = meta.get("generation") or {}
+    out = []
+    w, h = f.get("width"), f.get("height")
+    if w and h:
+        out.append({"item": "Vertical 9:16", "ok": abs(w / h - 9 / 16) < 0.01, "ours": f"{w}x{h}"})
+    elif gen.get("aspect_ratio"):
+        out.append(
+            {
+                "item": "Vertical 9:16",
+                "ok": gen["aspect_ratio"] == "9:16",
+                "ours": gen["aspect_ratio"],
+            }
+        )
+    sound = f.get("audio") if f else gen.get("audio")
+    if sound is not None:
+        out.append({"item": "Has sound", "ok": bool(sound), "ours": "yes" if sound else "no"})
+    length = f.get("duration_s") or gen.get("duration_s")
+    if length and len(win_lengths) >= 2:
+        lo, hi = min(win_lengths), max(win_lengths)
+        out.append(
+            {
+                "item": "Length like the winners",
+                "ok": lo <= length <= hi,
+                "ours": f"{length:g}s",
+                "want": f"{lo:g} to {hi:g}s",
+            }
+        )
+    if graded:
+        for d in graded.get("differences") or []:
+            out.append({"item": d["label"], "ok": False, "ours": d["ours"], "want": d["winners"]})
+        grade = graded.get("grade") or {}
+        out += [
+            {"item": "Looks fake", "ok": False, "ours": x} for x in grade.get("looks_fake") or []
+        ]
+        out += [{"item": "Hurt", "ok": False, "ours": x} for x in grade.get("hurt") or []]
+    tags = (clip.get("labels") or {}).get("tags") or {}
+    out += [
+        {"item": "Quality issue", "ok": False, "ours": q} for q in tags.get("quality_issues") or []
+    ]
+    return out
+
+
 def _views(n) -> str:
     n = n or 0
     if n >= 1_000_000:
@@ -334,6 +382,12 @@ def build(get: Get, now: float | None = None) -> dict:
         (a.get("handle") for a in ours.get("accounts") or []), None
     )
     followers = next((p.get("followers") for p in posts if p.get("followers")), None)
+    story = _story(facts, min_n, concepts, batch, posts, rubric)
+    fmt = next((c for c in concepts if c.get("id") == (story.get("format") or {}).get("id")), None)
+    win_lengths = [e["duration"] for e in (fmt or {}).get("examples") or [] if e.get("duration")]
+    graded = {g.get("script_id"): g for g in (rubric or {}).get("ours") or []}
+    for r in renders:
+        r["check"] = clip_check(r, graded.get(r["script_id"]), win_lengths)
     return {
         "as_of": int(now),
         "api": None,  # filled by the CLI with the URL it read from
@@ -352,7 +406,7 @@ def build(get: Get, now: float | None = None) -> dict:
             "rules": [e for e in notes if e.get("kind") == "rule"],
             "notes": [e for e in notes if e.get("kind") != "rule"][:10],
         },
-        "story": _story(facts, min_n, concepts, batch, posts, rubric),
+        "story": story,
         "running": running,
         "posting": posting,
         "runs": runs[:5],

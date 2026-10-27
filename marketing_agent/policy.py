@@ -205,7 +205,7 @@ def concept_examples(store: Store, video_ids: list[str], n: int = 3) -> list[dic
         return []
     marks = ",".join("?" * len(video_ids))
     rows = store.rows(
-        f"""SELECT v.id, v.author, v.url,
+        f"""SELECT v.id, v.author, v.url, v.duration,
                    (SELECT o.views FROM observations o WHERE o.video_id=v.id
                     ORDER BY o.observed_at DESC LIMIT 1) AS views
             FROM videos v WHERE v.id IN ({marks})""",
