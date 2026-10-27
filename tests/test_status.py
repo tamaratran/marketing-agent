@@ -297,3 +297,49 @@ def test_cli_status_json_and_markdown(monkeypatch):
     res = CliRunner().invoke(cli_mod.cli, ["status"])
     assert res.exit_code == 0, res.output
     assert res.output.startswith("# Immersive Workout on TikTok")
+
+
+def test_story_reads_as_three_plain_sentences():
+    data = _data()
+    data["/concepts"] = [
+        {
+            "id": 81,
+            "name": "Clone: TV follow-along demo",
+            "description": "One locked room shot of a person copying the TV while music plays",
+            "early_score": 33400.0,
+            "examples": [
+                {"author": "a", "url": "https://t/a", "views": 33400000},
+                {"author": "b", "url": "https://t/b", "views": 19100000},
+            ],
+        },
+        {"id": 75, "name": "Subway Surfers run", "early_score": 5739.6, "examples": []},
+        {"id": 1, "name": "Not in the batch", "early_score": 99999999.0, "examples": []},
+    ]
+    for s in data["/scripts"]:
+        if s["id"] == 139:
+            s["concept_id"], s["concept"] = 81, "Clone: TV follow-along demo"
+        if s["id"] == 141:
+            s["concept_id"], s["concept"] = 75, "Subway Surfers run"
+    y = status.build(_get(data), now=NOW)["story"]
+    assert y["scanned"].startswith("Scanned 220 videos")
+    assert y["learned"].startswith(
+        "The format that wins is the TV follow-along demo: its top videos have 33.4M and 19.1M views."
+    )
+    assert "screen recordings (+91%, 74 videos)" in y["learned"]
+    assert y["making"].startswith(
+        "So we are making 2 scripts, 1 in the TV follow-along demo and the rest in Subway Surfers run."
+    )
+    assert y["format"]["id"] == 81 and y["format"]["n_scripts"] == 1
+    assert [e["views"] for e in y["format"]["examples"]] == [33400000, 19100000]
+    md = status.render(status.build(_get(data), now=NOW))
+    assert "Scanned 220 videos" in md
+
+
+def test_story_on_an_empty_api():
+    y = status.build(lambda path: None, now=NOW)["story"]
+    assert y == {
+        "scanned": "No videos scanned yet.",
+        "learned": "Not enough scored videos to say what wins yet.",
+        "making": "No batch of scripts proposed yet.",
+        "format": None,
+    }
