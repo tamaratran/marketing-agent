@@ -2,7 +2,41 @@ import { human, times } from "./ui";
 
 export type RankRow = { n: number; mean_reward: number; stderr?: number; win_rate: number } & Record<string, unknown>;
 
-export const traitValue = (v: unknown) => (v === "True" || v === true ? "yes" : v === "False" || v === false ? "no" : human(String(v)));
+/** What each classifier value means, in words a reader can act on. Pacing edges are
+ *  scoreboard.PACING_EDGES (cuts per 10 seconds: under 2, 2 to 4, 4 to 7, 7 and up). */
+export const TRAIT_WORDS: Record<string, string> = {
+  // hook type
+  other: "no set hook (none of the types below)",
+  bold_claim: "bold claim",
+  question: "question to the viewer",
+  pov: "POV caption",
+  text_on_screen: "text on screen",
+  visual_surprise: "visual surprise",
+  storytime: "story time",
+  tutorial: "how-to",
+  before_after: "before and after",
+  // visual style
+  realistic_footage: "filmed footage, no screen",
+  screen_recording: "screen recording",
+  animation: "animation",
+  talking_head: "person talking to camera",
+  ugc_selfie: "selfie-style phone video",
+  mixed: "filmed footage plus screen",
+  // sound
+  none: "no music",
+  background: "music under speech",
+  beat_synced: "cuts on the beat",
+  trend_sound: "trending TikTok sound",
+  voiceover_only: "voiceover, no music",
+  // pacing (cuts per 10 seconds)
+  slow: "slow, under 2 cuts per 10s",
+  medium: "medium, 2 to 4 cuts per 10s",
+  fast: "fast, 4 to 7 cuts per 10s",
+  frantic: "frantic, 7+ cuts per 10s",
+};
+
+export const traitValue = (v: unknown) =>
+  v === "True" || v === true ? "yes" : v === "False" || v === false ? "no" : TRAIT_WORDS[String(v)] ?? human(String(v));
 
 /** Mean lift per trait value as horizontal bars with the sample size, so a bar on 2 videos
  *  reads as thin evidence next to one on 20. The bar is log10 lift: +1 is 10x. */
