@@ -9,9 +9,9 @@ function inline(text: string, key: number): ReactNode {
   while ((m = re.exec(text))) {
     if (m.index > last) parts.push(text.slice(last, m.index));
     if (m[1]) parts.push(<strong key={i++} className="text-neutral-100">{m[1]}</strong>);
-    else if (m[2]) parts.push(<a key={i++} href={m[3]} target="_blank" className="text-sky-300 hover:underline">{m[2]}</a>);
+    else if (m[2]) parts.push(<a key={i++} href={m[3]} target="_blank" className="text-accent hover:underline">{m[2]}</a>);
     else if (m[4]) parts.push(<em key={i++} className="text-neutral-400">{m[4]}</em>);
-    else if (m[5]) parts.push(<a key={i++} href={m[5]} target="_blank" className="text-sky-300 hover:underline break-all">{m[5].replace(/^https?:\/\/(www\.)?/, "").slice(0, 60)}</a>);
+    else if (m[5]) parts.push(<a key={i++} href={m[5]} target="_blank" className="text-accent hover:underline break-all">{m[5].replace(/^https?:\/\/(www\.)?/, "").slice(0, 60)}</a>);
     last = m.index + m[0].length;
   }
   if (last < text.length) parts.push(text.slice(last));

@@ -21,9 +21,9 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
     <>
       <H1 sub={`@${v.author} · posted ${posted} · ${v.duration ?? "?"}s · #${v.source_tag}${v.niche ? ` · ${v.niche}` : ""}${v.cohort_at ? " · cohort" : ""}${v.gone_at ? " · no longer on TikTok" : ""}`}>{v.desc || v.id}</H1>
       <p className="mb-4 text-sm">
-        <a href={v.url} target="_blank" className="text-sky-300 hover:underline">open on TikTok</a>
+        <a href={v.url} target="_blank" className="text-accent hover:underline">open on TikTok</a>
         {" · "}
-        <Link href={`/creators/${v.author}`} className="text-sky-300 hover:underline">creator page</Link>
+        <Link href={`/creators/${v.author}`} className="text-accent hover:underline">creator page</Link>
         {v.music && <span className="text-neutral-400"> · sound: {v.music}</span>}
         {v.hashtags.length > 0 && <span className="text-neutral-500"> · {v.hashtags.map((h) => `#${h}`).join(" ")}</span>}
       </p>
@@ -65,7 +65,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
             <>
               <p className="mb-3 text-sm text-neutral-200">{String(t.summary ?? "")}</p>
               {Array.isArray(t.quality_issues) && t.quality_issues.length > 0 && (
-                <p className="mb-3 text-sm text-amber-300">issues: {(t.quality_issues as string[]).join("; ")}</p>
+                <p className="mb-3 text-sm text-accent">issues: {(t.quality_issues as string[]).join("; ")}</p>
               )}
               <Table head={["field", "value"]} rows={tagRows} />
               <details className="mt-3 text-sm text-neutral-400">

@@ -23,10 +23,10 @@ export function TraitBars({ rows, column, title, max = 6 }: { rows: RankRow[]; c
               <span className="truncate text-neutral-300" title={traitValue(r[column])}>{traitValue(r[column])}</span>
               <div className="relative h-4 rounded bg-neutral-900" role="img" aria-label={`${traitValue(r[column])}: ${times(v)} videos like it on ${r.n} videos`}>
                 <div className="absolute inset-y-0 left-1/2 w-px bg-neutral-700" />
-                <div className={`absolute inset-y-1 rounded-sm ${v >= 0 ? "bg-emerald-400" : "bg-red-400"}`} style={{ left: `${left}%`, width: `${Math.max(w, 0.5)}%`, opacity: 0.45 + 0.55 * Math.sqrt(r.n / bigN) }} />
+                <div className={`absolute inset-y-1 rounded-sm ${v >= 0 ? "bg-neutral-200" : "bg-neutral-600"}`} style={{ left: `${left}%`, width: `${Math.max(w, 0.5)}%`, opacity: 0.45 + 0.55 * Math.sqrt(r.n / bigN) }} />
                 {err > 0 && <div className="absolute top-1/2 h-px bg-neutral-100/70" style={{ left: `${50 + (v / span) * 50 - err}%`, width: `${2 * err}%` }} />}
               </div>
-              <span className="text-right tabular-nums text-neutral-400"><span className={v >= 0 ? "text-emerald-300" : "text-red-300"}>{times(v)}</span> · {r.n} videos</span>
+              <span className="text-right tabular-nums text-neutral-400"><span className={v >= 0 ? "text-neutral-50" : "text-neutral-500"}>{times(v)}</span> · {r.n} videos</span>
             </li>
           );
         })}
@@ -45,7 +45,7 @@ export function Trend({ points, label, fmt }: { points: { t: number; v: number }
   const y = (v: number) => H - pad - ((v - lo) / range) * (H - 2 * pad);
   const last = points[points.length - 1];
   return (
-    <div className="rounded-lg border border-neutral-800 p-3">
+    <div className="border-t border-rule p-3">
       <div className="flex items-baseline justify-between text-xs"><span className="text-neutral-400">{label}</span><span className="font-medium text-neutral-100">{fmt(last.v)}</span></div>
       <svg viewBox={`0 0 ${W} ${H}`} className="mt-1 w-full" role="img" aria-label={`${label} over ${points.length} cycles, now ${fmt(last.v)}`}>
         {points.length > 1 && <polyline fill="none" stroke="#a3a3a3" strokeWidth={1.5} points={points.map((p, i) => `${x(i)},${y(p.v)}`).join(" ")} />}

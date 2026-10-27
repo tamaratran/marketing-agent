@@ -105,7 +105,7 @@ export function explain(p: OursPost, v: VideoDetail | null, o: Overview): Why {
   return { verdict, headline: `${lead}: ${times(p.lift_matched)} videos like it, ${where}`, reason, lines };
 }
 
-const tones: Record<Tone, string> = { good: "text-emerald-300", bad: "text-red-300", neutral: "text-neutral-300" };
+const tones: Record<Tone, string> = { good: "text-neutral-50", bad: "text-neutral-500", neutral: "text-neutral-300" };
 
 export function WhyFold({ why }: { why: Why }) {
   const pill = why.verdict === "win" ? <Pill tone="good">why it worked</Pill> : why.verdict === "miss" ? <Pill tone="bad">why it fell short</Pill> : <Pill tone="neutral">why</Pill>;

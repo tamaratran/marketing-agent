@@ -2,7 +2,7 @@ import Link from "next/link";
 import { CLIPS, dateOf, get, usd, type Overview, type Render, type Script, type VideoDetail, frameUrl } from "@/lib/api";
 import type { Ours, OursPost } from "@/lib/ours";
 import { Download } from "../download";
-import { Card, Fold, H1, NextStep, Pill, Stat, Table, reward, formatName } from "../ui";
+import { Card, Fold, H1, Pill, Stat, Table, reward, formatName } from "../ui";
 import { Thumb } from "../thumb";
 import { postClip, releaseClip } from "../actions";
 import { MIN_AGE_H_OWN, WhyFold, explain } from "./why";
@@ -61,15 +61,15 @@ export default async function Page() {
                   )}
                 </div>
                 <p className="mt-1.5 text-xs text-neutral-500">s{r.script_id}{s?.concept && <> · {formatName(s.concept)}</>} · {dateOf(r.created_at)}</p>
-                {r.hold_reason && <p className="mt-2 text-xs text-red-200">{r.hold_reason}</p>}
+                {r.hold_reason && <p className="mt-2 text-xs text-neutral-500">{r.hold_reason}</p>}
                 {!p && !r.hold_reason && clean && (!r.post_session_url || gaveUp(r)) && <div className="mt-3"><PostButton action={postClip} scriptId={r.script_id} account={account} /></div>}
                 <Fold summary={<span className="text-xs text-neutral-400">{p ? "numbers, text and sound" : "text, sound and download"}</span>} className="mt-3">
                   <div className="min-w-0 text-sm">
               {p && <PostStats p={p} />}
               {p && <WhyFold why={explain(p, details.get(p.id) ?? null, overview)} />}
-              {!p && r.post_session_url && !stale(r) && <p className="text-xs text-neutral-400">Devin is posting this from @{account}{r.post_attempts > 1 ? `, try ${r.post_attempts} of ${MAX_POST_ATTEMPTS}` : ""}: <a href={r.post_session_url} target="_blank" className="text-sky-300 hover:underline">watch</a></p>}
-              {!p && r.post_session_url && stale(r) && !gaveUp(r) && <p className="text-xs text-neutral-400">No post after try {r.post_attempts} of {MAX_POST_ATTEMPTS} (TikTok login, most likely); handed back within 30 min: <a href={r.post_session_url} target="_blank" className="text-sky-300 hover:underline">see why</a></p>}
-              {!p && gaveUp(r) && <p className="text-xs text-neutral-400">Gave up after {MAX_POST_ATTEMPTS} tries over {hoursSince(r.post_requested_at)}h: <a href={r.post_session_url ?? "#"} target="_blank" className="text-sky-300 hover:underline">see why</a></p>}
+              {!p && r.post_session_url && !stale(r) && <p className="text-xs text-neutral-400">Devin is posting this from @{account}{r.post_attempts > 1 ? `, try ${r.post_attempts} of ${MAX_POST_ATTEMPTS}` : ""}: <a href={r.post_session_url} target="_blank" className="text-accent hover:underline">watch</a></p>}
+              {!p && r.post_session_url && stale(r) && !gaveUp(r) && <p className="text-xs text-neutral-400">No post after try {r.post_attempts} of {MAX_POST_ATTEMPTS} (TikTok login, most likely); handed back within 30 min: <a href={r.post_session_url} target="_blank" className="text-accent hover:underline">see why</a></p>}
+              {!p && gaveUp(r) && <p className="text-xs text-neutral-400">Gave up after {MAX_POST_ATTEMPTS} tries over {hoursSince(r.post_requested_at)}h: <a href={r.post_session_url ?? "#"} target="_blank" className="text-accent hover:underline">see why</a></p>}
               {!p && r.hold_reason && (
                 <form action={releaseClip} className="mt-2"><input type="hidden" name="script_id" value={r.script_id} /><button className="text-xs text-neutral-400 hover:text-neutral-100">Release</button></form>
               )}
@@ -85,7 +85,7 @@ export default async function Page() {
               </p>
               <p className="mt-1 text-xs text-neutral-500">
                 <Link href={`/learnings#s${r.script_id}`} className="hover:underline">script #{r.script_id}</Link> · {dateOf(r.created_at)} · {usd(r.cost_usd)} ·{" "}
-                {clean ? <Download src={clean} className="text-sky-300 hover:underline">clean clip</Download> : <Download src={src} className="text-sky-300 hover:underline">download</Download>}
+                {clean ? <Download src={clean} className="text-accent hover:underline">clean clip</Download> : <Download src={src} className="text-accent hover:underline">download</Download>}
               </p>
                   </div>
                 </Fold>
@@ -101,15 +101,14 @@ export default async function Page() {
           <Table head={["", "posted", "post", "views", "vs videos like it"]} rows={unmatched.map((p) => [
             <Thumb key={`t${p.id}`} id={p.id} href={`/videos/${p.id}`} />,
             dateOf(p.create_time),
-            <Link key={p.id} href={`/videos/${p.id}`} className="text-sky-300 hover:underline">{(p.desc || p.id).slice(0, 60)}</Link>,
+            <Link key={p.id} href={`/videos/${p.id}`} className="text-accent hover:underline">{(p.desc || p.id).slice(0, 60)}</Link>,
             views(p.views_now),
             lift(p),
           ])} />
         </Card>
       )}
 
-      {ours.accounts.length === 0 && <p className="mt-3 text-sm text-amber-200">No posting account yet: <code>mkt own login</code>, then <code>mkt own add @handle</code>.</p>}
-      <NextStep from="/clips" />
+      {ours.accounts.length === 0 && <p className="mt-3 text-sm text-accent">No posting account yet: <code>mkt own login</code>, then <code>mkt own add @handle</code>.</p>}
     </>
   );
 }
@@ -124,7 +123,7 @@ function PostStats({ p }: { p: OursPost }) {
   return (
     <div className="mb-3">
       <p className="text-xs text-neutral-500">
-        <a href={p.url} target="_blank" className="text-sky-300 hover:underline">on TikTok</a> · posted {dateOf(p.create_time)} · <Link href={`/videos/${p.id}`} className="hover:underline">history, {p.n_obs} polls</Link>
+        <a href={p.url} target="_blank" className="text-accent hover:underline">on TikTok</a> · posted {dateOf(p.create_time)} · <Link href={`/videos/${p.id}`} className="hover:underline">history, {p.n_obs} polls</Link>
       </p>
       <dl className="mt-2 grid grid-cols-2 gap-2">
         <Figure label="views now" value={views(p.views_now) || "none yet"} />
@@ -138,7 +137,7 @@ function PostStats({ p }: { p: OursPost }) {
 
 function Figure({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="rounded-lg border border-neutral-800 px-3 py-2">
+    <div className="border-t border-rule px-3 py-2">
       <dt className="text-xs text-neutral-500">{label}</dt>
       <dd className="mt-0.5 tabular-nums text-neutral-100">{value}</dd>
     </div>

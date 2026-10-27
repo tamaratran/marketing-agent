@@ -108,7 +108,7 @@ export async function HowItDecides({ part, sp = {} }: { part: "formats" | "learn
         </p>
         <PickChart rows={ranked} />
         {leader && leader.p > 0.95 && (
-          <div className="mt-3 rounded-lg border border-amber-900/60 bg-amber-950/30 p-3 text-sm text-amber-200">
+          <div className="mt-3 rounded-lg border border-amber-900/60 bg-amber-950/30 p-3 text-sm text-accent">
             Right now {formatName(leader.c.name)} wins {pct(leader.p)} of picks. Its head start of {lg.format_prior} is far
             ahead of the rest, so the other formats effectively never get tested.
           </div>
@@ -142,7 +142,7 @@ export async function HowItDecides({ part, sp = {} }: { part: "formats" | "learn
           Along with the format, GPT gets this summary of what has worked, word for word. Our own posts come first,
           then research patterns, then places where the two disagree.
         </p>
-        <pre className="mt-3 max-h-72 overflow-auto whitespace-pre-wrap rounded-lg border border-neutral-800 bg-neutral-900/60 p-3 text-xs leading-relaxed text-neutral-400">{o.winning || "Nothing scored yet, so the writer only gets the format."}</pre>
+        <pre className="mt-3 max-h-72 overflow-auto whitespace-pre-wrap border-t border-rule bg-neutral-900/60 p-3 text-xs leading-relaxed text-neutral-400">{o.winning || "Nothing scored yet, so the writer only gets the format."}</pre>
       </Section>
 
       <Section n={6} title="Check: is a pattern real or luck?" id="check">
@@ -216,7 +216,7 @@ function TraitTable({ concepts }: { concepts: Concept[] }) {
               <td className="py-1.5 pr-3 text-neutral-400">{d.map(label).join(" · ")}</td>
               <td className="py-1.5 pr-3 text-right tabular-nums">{(d.reduce((a, x) => a + x.ours, 0) / d.length).toFixed(2)} <span className="text-neutral-600">({Math.max(...d.map((x) => x.ours_n))} post{Math.max(...d.map((x) => x.ours_n)) === 1 ? "" : "s"})</span></td>
               <td className="py-1.5 pr-3 text-right tabular-nums">{(d.reduce((a, x) => a + x.market, 0) / d.length).toFixed(2)} <span className="text-neutral-600">({Math.max(...d.map((x) => x.market_n))} videos)</span></td>
-              <td className={`py-1.5 text-right tabular-nums ${(c.trait_bonus ?? 0) > 0 ? "text-emerald-300" : (c.trait_bonus ?? 0) < 0 ? "text-red-300" : "text-neutral-500"}`}>{(c.trait_bonus ?? 0) > 0 ? "+" : ""}{(c.trait_bonus ?? 0).toFixed(2)}</td>
+              <td className={`py-1.5 text-right tabular-nums ${(c.trait_bonus ?? 0) > 0 ? "text-neutral-50" : (c.trait_bonus ?? 0) < 0 ? "text-neutral-500" : "text-neutral-500"}`}>{(c.trait_bonus ?? 0) > 0 ? "+" : ""}{(c.trait_bonus ?? 0).toFixed(2)}</td>
             </tr>
           ))}
         </tbody>
@@ -259,8 +259,8 @@ function WhatIf({ rows }: { rows: { name: string; before: number; after: number;
           <div className="grid grid-cols-[3rem_1fr] items-center gap-x-3 gap-y-1">
             <span className="text-right tabular-nums text-neutral-500">{pct(r.before)}</span>
             <div className="h-2 rounded bg-neutral-800"><div className="h-2 rounded bg-neutral-500" style={{ width: `${r.before * 100}%` }} /></div>
-            <span className={`text-right tabular-nums ${r.after > r.before ? "text-emerald-300" : "text-red-300"}`}>{pct(r.after)}</span>
-            <div className="h-2 rounded bg-neutral-800"><div className={`h-2 rounded ${r.after > r.before ? "bg-emerald-400/80" : "bg-red-400/80"}`} style={{ width: `${r.after * 100}%` }} /></div>
+            <span className={`text-right tabular-nums ${r.after > r.before ? "text-neutral-50" : "text-neutral-500"}`}>{pct(r.after)}</span>
+            <div className="h-2 rounded bg-neutral-800"><div className={`h-2 rounded ${r.after > r.before ? "bg-neutral-200" : "bg-neutral-600"}`} style={{ width: `${r.after * 100}%` }} /></div>
           </div>
         </div>
       ))}
@@ -293,7 +293,7 @@ function Levels({ levels, minN }: { levels: Level[]; minN: number }) {
       head={["value", "videos", "raw average", "after controls", "likely range", "verdict"]}
       rows={levels.map((l) => [
         human(l.level),
-        l.n < minN ? <span key="n" className="text-amber-300" title={`under the ${minN} needed`}>{l.n}</span> : l.n,
+        l.n < minN ? <span key="n" className="text-accent" title={`under the ${minN} needed`}>{l.n}</span> : l.n,
         fmt(l.raw_mean),
         l.reference ? "baseline" : (l.coef > 0 ? "+" : "") + fmt(l.coef),
         l.reference ? "" : `${fmt(l.lo)} to ${fmt(l.hi)}`,
@@ -325,7 +325,7 @@ function FindingsTables({ f, sp }: { f: Findings; sp: { outcome?: string; niche?
       </div>
       {f.collecting && (
         <Card className="mb-4">
-          <p className="text-sm text-amber-200">
+          <p className="text-sm text-accent">
             Still collecting, so nothing below is a result yet. {st.reached["scored"] ?? 0} of {st.videos} videos are scored (a day old, with a view count); {minN} are needed before a trait is called better or worse. Until then the writer gets the raw version from step 5.
           </p>
         </Card>

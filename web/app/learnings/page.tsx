@@ -6,7 +6,7 @@ import { Markdown } from "../md";
 import { HowItDecides, type HowParams } from "../how";
 import { RunsPanel } from "../runs-panel";
 import { ScriptCards } from "../script-cards";
-import { Card, Fold, H1, NextStep, Note, button, formatName, ghost, times } from "../ui";
+import { Card, Fold, H1, Note, button, formatName, ghost, times } from "../ui";
 
 export const dynamic = "force-dynamic";
 
@@ -51,7 +51,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<How
           <button className={ghost} disabled={!!running}>Research again</button>
           <Note>
             About an hour the first time, then about 15 minutes. No clips, so no fal cost.
-            {running && <> A run is already going: <Link href="#runs" className="text-sky-300 hover:underline">see the runs below</Link>.</>}
+            {running && <> A run is already going: <Link href="#runs" className="text-accent hover:underline">see the runs below</Link>.</>}
           </Note>
         </form>
       </Card>
@@ -65,7 +65,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<How
       <Card title="What the data says">
         <Note>
           {latest ? <>As of {when(cycles[cycles.length - 1].created_at)}: {latest.n_scored ?? 0} research videos scored against videos of the same age and account size, {latest.n_tagged ?? 0} of them classified by trait. </> : null}
-          What wins now is on <Link href="/" className="text-sky-300 hover:underline">Formats</Link>.
+          What wins now is on <Link href="/" className="text-accent hover:underline">Formats</Link>.
         </Note>
         {!latest ? (
           <Note className="mt-3">No cycle entry yet. Research again writes the first one.</Note>
@@ -92,9 +92,9 @@ export default async function Page({ searchParams }: { searchParams: Promise<How
                       <span className="w-12 shrink-0 text-xs text-neutral-500">s{s.id}</span>
                       <span className="font-medium text-neutral-100">{s.hook}</span>
                       <span className="text-xs text-neutral-400">{formatName(s.concept)}</span>
-                      {s.why?.expected_lift != null && <span className={`text-xs ${s.why.expected_lift >= 0 ? "text-emerald-300" : "text-red-300"}`}>{times(s.why.expected_lift)} expected</span>}
+                      {s.why?.expected_lift != null && <span className={`text-xs ${s.why.expected_lift >= 0 ? "text-neutral-50" : "text-neutral-500"}`}>{times(s.why.expected_lift)} expected</span>}
                       <span className="text-xs text-neutral-500">demo {s.demo_score}/5</span>
-                      {rendered.has(s.id) && <Link href="/clips" className="text-xs text-emerald-300 hover:underline">clip ready</Link>}
+                      {rendered.has(s.id) && <Link href="/clips" className="text-xs text-neutral-50 hover:underline">clip ready</Link>}
                     </span>
                   }>
                     <Why s={s} />
@@ -135,7 +135,6 @@ export default async function Page({ searchParams }: { searchParams: Promise<How
           </div>
         </Card>
       )}
-      <NextStep from="/learnings" />
     </>
   );
 }
@@ -181,7 +180,7 @@ const pct = (r: number) => {
   const d = Math.round((x - 1) * 100);
   return d === 0 ? "same" : `${d > 0 ? "+" : ""}${d}%`;
 };
-const tone = (r: number) => (10 ** r >= 1.1 ? "text-emerald-300" : 10 ** r <= 0.9 ? "text-red-300" : "text-neutral-300");
+const tone = (r: number) => (10 ** r >= 1.1 ? "text-neutral-50" : 10 ** r <= 0.9 ? "text-neutral-500" : "text-neutral-300");
 
 /** One table per trait: each value, its views against videos like it as a percent, how many videos that
  *  rests on, and whether that is enough (min_n) to count. A one-line takeaway sits above each table,
@@ -246,7 +245,7 @@ function TraitTables({ latest, prev, minN }: { latest: CycleFacts; prev?: CycleF
           </div>
         );
       })}
-      <Note>&quot;+90%&quot; means those videos got 90% more views than videos of the same age from accounts of the same size. Raw averages; the controlled version is step 6 on <Link href="/how#check" className="text-sky-300 hover:underline">How it decides</Link>.</Note>
+      <Note>&quot;+90%&quot; means those videos got 90% more views than videos of the same age from accounts of the same size. Raw averages; the controlled version is step 6 on <Link href="/how#check" className="text-accent hover:underline">How it decides</Link>.</Note>
     </div>
   );
 }
