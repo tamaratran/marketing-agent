@@ -17,7 +17,7 @@ export function Nav() {
   return (
     <nav className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 text-sm">
       <div className="flex min-w-0 items-center gap-3 sm:gap-4">
-        <Link href="/" className="font-semibold tracking-tight">mkt</Link>
+        <Link href="/" className="font-semibold tracking-tight">Marketing agent</Link>
         <ol className="flex min-w-0 items-center gap-2 sm:gap-3">
           {STEPS.map((s, i) => {
             const on = current === s.href;
