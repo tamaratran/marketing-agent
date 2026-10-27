@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import "./globals.css";
 import { Nav } from "./nav";
 
-export const metadata: Metadata = { title: "mkt", description: "organic marketing loop" };
+export const metadata: Metadata = { title: "Marketing agent", description: "Organic TikTok marketing loop for Immersive Workout" };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
