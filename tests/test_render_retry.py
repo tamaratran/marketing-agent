@@ -56,6 +56,9 @@ def test_record_stage_targets_newest_run_even_without_stages(tmp_path):
 def test_record_stage_skips_post_request_rows(tmp_path):
     """A Post press writes a `post s<id>` run row; a cycle's stage must land on the cycle, not it."""
     store = Store(tmp_path / "db.sqlite")
+    with store.conn() as c:
+        for col, typ in (("status", "TEXT"), ("stages", "TEXT"), ("finished_at", "INTEGER")):
+            c.execute(f"ALTER TABLE runs ADD COLUMN {col} {typ}")
     base = {"created_at": 1, "session_id": "s", "url": "u", "niche": "n", "product": "P"}
     cycle = store.insert("runs", {**base, "note": "clips only: 5 at 720p"})
     store.insert("runs", {**base, "note": "post s125 from @us"})
