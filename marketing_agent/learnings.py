@@ -74,6 +74,29 @@ def rules_text(store: Store, niche: str | None = None) -> str:
     return "Standing rules from review (always apply):\n" + "\n".join(f"- {r}" for r in rs)
 
 
+def notes_text(
+    store: Store,
+    niche: str | None = None,
+    limit: int = 4,
+    max_chars: int = 500,
+    exclude_titles: set[str] | None = None,
+) -> str:
+    """The latest review notes for the script writer, newest first, each trimmed to one line.
+    Rules say what must hold; these say what was last observed."""
+    ns = [
+        e
+        for e in entries(store, niche, limit=50)
+        if e["kind"] == NOTE and e["title"] not in (exclude_titles or set())
+    ][:limit]
+    if not ns:
+        return ""
+    lines = ["Recent observations from review (newest first):"]
+    for e in ns:
+        body = " ".join(e["body"].split())
+        lines.append(f"- {e['title']}: {body[:max_chars]}")
+    return "\n".join(lines)
+
+
 def hold(store: Store, script_id: int, reason: str) -> int:
     """Keep a clip out of the walkthrough and off the ready-to-post list, with the reason shown
     on Clips. Returns how many renders it touched."""

@@ -492,6 +492,78 @@ def candidates(rows: list[dict], field: str, kind: str | None = None) -> list[di
     return [{"text": text[k], "n": n} for k, n in c.most_common(12)]
 
 
+def digest(store: Store, winner_ids: list[str] | None = None) -> str:
+    """The latest grades as plain text for the script writer: what the winners share, where our
+    clips keep differing from them, and what the model named as helping or hurting. Empty until
+    enough winners are graded to agree on anything."""
+    rep = report(store, winner_ids=winner_ids)
+    must = [m for m in rep["must_have"] if m["agreed"]]
+    if not must:
+        return ""
+    ours = rep["ours"]
+    lines = [
+        "What the rubric found (the video model watched the winning videos and our clips and "
+        f"graded both the same way; {rep['n_comparable']} winners count):",
+        "The winners share:",
+    ]
+    lines += [f"- {m['label']}: {m['text']} ({round(m['share'] * 100)}% of them)" for m in must]
+    gaps: Counter = Counter()
+    for r in ours:
+        for d in r.get("differences", []):
+            gaps[(d["label"], d["ours"], d["winners"])] += 1
+    if gaps:
+        lines.append(f"Where our clips keep missing ({len(ours)} graded):")
+        lines += [
+            f"- {label}: ours {ours_v}, winners {win_v} ({k} of {len(ours)} clips)"
+            for (label, ours_v, win_v), k in gaps.most_common(10)
+        ]
+    hurt = rep["candidates"]["hurt"][:5]
+    if hurt:
+        lines.append(
+            "Named as hurting our clips: " + "; ".join(f"{c['text']} ({c['n']}x)" for c in hurt)
+        )
+    helped = rep["candidates"]["helped"][:5]
+    if helped:
+        lines.append(
+            "Named as helping the winners: "
+            + "; ".join(f"{c['text']} ({c['n']}x)" for c in helped)
+        )
+    return "\n".join(lines)
+
+
+LEARNING_TITLE = "Rubric digest (auto): what the winners share and where our clips differ"
+
+
+def write_learning(
+    store: Store, niche: str, product: str, winner_ids: list[str] | None = None
+) -> int:
+    """Write the digest into the learnings, replacing the previous auto entry, so the Learnings
+    page always shows the current read and the script writer sees it with the rest. Returns the
+    entry id, or 0 when there is nothing to say yet."""
+    from .learnings import NOTE, add, migrate
+
+    text = digest(store, winner_ids)
+    if not text:
+        return 0
+    body = (
+        text
+        + "\n\nUpdated automatically from the latest rubric grades before each script batch;"
+        " the per-video grades are on the Clips pages."
+    )
+    migrate(store)
+    rows = store.rows(
+        "SELECT id FROM learnings WHERE title=? AND niche=?", (LEARNING_TITLE, niche)
+    )
+    if rows:
+        with store.conn() as c:
+            c.execute(
+                "UPDATE learnings SET body=?, created_at=? WHERE id=?",
+                (body, int(time.time()), rows[0]["id"]),
+            )
+        return rows[0]["id"]
+    return add(store, niche, product, LEARNING_TITLE, body, kind=NOTE)
+
+
 def report(store: Store, winner_ids: list[str] | None = None) -> dict:
     """Everything the page needs: the winners' grades, ours, the must-have list, each clip's
     differences, and the candidate variables. With `winner_ids` (the format named in

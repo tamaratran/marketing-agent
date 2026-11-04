@@ -171,11 +171,15 @@ def winning_traits(store: Store, tag: str | None = None, top: int = 3) -> str:
     scored, rendered or ruled."""
     from . import campaign as campaign_cfg
     from .compare import compare_text
-    from .learnings import rules_text
+    from .learnings import notes_text, rules_text
+    from .rubric import LEARNING_TITLE, digest
 
-    niche = campaign_cfg.load().niche.name
+    c = campaign_cfg.load()
+    niche = c.niche.name
     parts = (
         rules_text(store, niche),
+        digest(store, winner_ids=c.product.promo_video_ids or None),
+        notes_text(store, niche, exclude_titles={LEARNING_TITLE}),
         verdicts(store, niche, top),
         reference_traits(store, tag, top),
         compare_text(store, tag),
