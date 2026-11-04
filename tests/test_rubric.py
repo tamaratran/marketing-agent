@@ -262,9 +262,7 @@ def test_run_and_report_use_the_named_promo_videos_not_the_concept(tmp_path, mon
     assert sorted(w["video_id"] for w in rep["winners"]) == ["p0", "p1"]
     must = {m["variable"]: m for m in rep["must_have"]}
     assert must["movement"]["value"] == "slow" and must["movement"]["n"] == 2
-    assert [(d["ours"], d["winners"]) for d in rep["ours"][0]["differences"]] == [
-        ("fast", "slow")
-    ]
+    assert [(d["ours"], d["winners"]) for d in rep["ours"][0]["differences"]] == [("fast", "slow")]
     assert rep["candidates"]["helped"][0]["n"] == 2
     # without the filter every winner grade in the db counts, old format included
     assert len(rubric.report(store)["winners"]) == 5

@@ -13,12 +13,11 @@ from collections.abc import Callable
 
 Get = Callable[[str], object]
 
-CLIPS_URL = os.environ.get("MKT_CLIPS_URL", "https://mkt-dashboard-eta.vercel.app/renders").rstrip(
-    "/"
-)
-FRAMES_URL = os.environ.get("MKT_FRAMES_URL", "https://mkt-dashboard-eta.vercel.app/frames").rstrip(
-    "/"
-)
+API_URL = os.environ.get("MKT_API_URL", "https://mkt-api.fly.dev").rstrip("/")
+# Clips and posters are served by the API from its volume (PUT/GET /files, filled by
+# `mkt sync push`); MKT_CLIPS_URL / MKT_FRAMES_URL still override for another host.
+CLIPS_URL = os.environ.get("MKT_CLIPS_URL", f"{API_URL}/files/renders").rstrip("/")
+FRAMES_URL = os.environ.get("MKT_FRAMES_URL", f"{API_URL}/files/frames").rstrip("/")
 # Same rules as the site (web/app/clips/status.ts): a hand-off older than this with no post is
 # stale; after MAX_POST_ATTEMPTS automatic hand-backs the API stops retrying.
 POST_RETRY_AFTER_S = 3600

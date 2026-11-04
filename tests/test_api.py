@@ -479,3 +479,21 @@ def test_tags_merge_row_by_row(client, monkeypatch):
     r = client.post("/tags", json=rows, headers=AUTH).json()
     assert r == {"saved": 1, "unknown": ["nope"]}
     assert store.tags_for(["v1"])["v1"]["tags"]["hook_type"] == "text_on_screen"
+
+
+def test_clip_and_poster_files_roundtrip(client):
+    assert client.get("/files").json() == []
+    assert client.put("/files/renders/s95.mp4", content=b"mp4bytes").status_code == 401
+    r = client.put("/files/renders/s95.mp4", content=b"mp4bytes", headers=AUTH)
+    assert r.status_code == 200 and r.json()["bytes"] == 8
+    assert client.put("/files/frames/s95.jpg", content=b"jpg", headers=AUTH).status_code == 200
+    assert client.put("/files/renders/evil.sh", content=b"x", headers=AUTH).status_code == 400
+    assert client.put("/files/other/s1.mp4", content=b"x", headers=AUTH).status_code == 400
+    got = client.get("/files/renders/s95.mp4")
+    assert got.status_code == 200 and got.content == b"mp4bytes"
+    assert got.headers["content-type"].startswith("video/mp4")
+    assert client.get("/files/renders/s96.mp4").status_code == 404
+    assert [(f["kind"], f["name"], f["bytes"]) for f in client.get("/files").json()] == [
+        ("frames", "s95.jpg", 3),
+        ("renders", "s95.mp4", 8),
+    ]
