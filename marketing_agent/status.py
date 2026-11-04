@@ -410,6 +410,7 @@ def build(get: Get, now: float | None = None) -> dict:
     min_n = findings.get("min_n") or 20
     notes = [e for e in learnings if e.get("kind") != "cycle"]
     notes.sort(key=lambda e: -(e.get("created_at") or 0))
+    entries = sorted(learnings, key=lambda e: -(e.get("created_at") or 0))
 
     running = next(
         (
@@ -452,6 +453,12 @@ def build(get: Get, now: float | None = None) -> dict:
             "traits": facts.get("traits") or {},
             "rules": [e for e in notes if e.get("kind") == "rule"],
             "notes": [e for e in notes if e.get("kind") != "rule"][:10],
+            # The whole dated list, newest first, bodies included (not the cycle facts, which
+            # are the trait tables above): what the Learnings tab shows as the running log.
+            "entries": [
+                {k: e.get(k) for k in ("id", "created_at", "kind", "title", "body")}
+                for e in entries
+            ],
         },
         "story": story,
         "running": running,
