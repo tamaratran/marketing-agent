@@ -500,6 +500,8 @@ async def file_put(kind: str, name: str, request: Request):
     body = await request.body()
     if not body:
         raise HTTPException(400, "empty body")
+    if path.suffix == ".mp4" and b"moov" not in body:
+        raise HTTPException(400, "not a complete mp4: no moov atom (still rendering, or cut short)")
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(path.suffix + ".tmp")
     tmp.write_bytes(body)
