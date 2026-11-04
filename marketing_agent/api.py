@@ -5,6 +5,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -449,6 +450,61 @@ def render_file(render_id: int):
     if not rows or not rows[0]["final_path"] or not Path(rows[0]["final_path"]).exists():
         raise HTTPException(404, "no file")
     return FileResponse(rows[0]["final_path"], media_type="video/mp4")
+
+
+# Clip and poster files live on the API's volume beside the db, so the dashboards read them
+# from here and no session has to push video files to a git repo. Names are fixed by the
+# renderer: s<script_id>.mp4, s<script_id>_clean.mp4 and s<script_id>.jpg.
+FILE_KINDS = {
+    "renders": re.compile(r"^s\d+(_clean)?\.mp4$"),
+    "frames": re.compile(r"^s\d+\.jpg$"),
+}
+MEDIA = {".mp4": "video/mp4", ".jpg": "image/jpeg"}
+
+
+def _file_path(kind: str, name: str) -> Path:
+    pattern = FILE_KINDS.get(kind)
+    if not pattern or not pattern.match(name):
+        raise HTTPException(400, "unknown file kind or name")
+    return settings.data_dir / "files" / kind / name
+
+
+@app.get("/files")
+def files_index():
+    """Every stored clip and poster file with its size, so `mkt sync push` uploads only what
+    is new."""
+    out = []
+    for kind in FILE_KINDS:
+        d = settings.data_dir / "files" / kind
+        if d.exists():
+            out += [
+                {"kind": kind, "name": f.name, "bytes": f.stat().st_size}
+                for f in sorted(d.iterdir())
+                if FILE_KINDS[kind].match(f.name)
+            ]
+    return out
+
+
+@app.get("/files/{kind}/{name}")
+def file_get(kind: str, name: str):
+    path = _file_path(kind, name)
+    if not path.exists():
+        raise HTTPException(404, "no such file")
+    return FileResponse(path, media_type=MEDIA[path.suffix])
+
+
+@app.put("/files/{kind}/{name}", dependencies=[Depends(_auth)])
+async def file_put(kind: str, name: str, request: Request):
+    """Store a clip or poster (raw body). `mkt sync push` sends the local files here."""
+    path = _file_path(kind, name)
+    body = await request.body()
+    if not body:
+        raise HTTPException(400, "empty body")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_bytes(body)
+    tmp.replace(path)
+    return {"ok": True, "kind": kind, "name": name, "bytes": len(body)}
 
 
 @app.get("/runs")

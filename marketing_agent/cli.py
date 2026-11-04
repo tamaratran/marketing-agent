@@ -1234,6 +1234,41 @@ def sync_push():
     )
     r.raise_for_status()
     console.print(f"pushed {r.json()['bytes']} bytes -> {url}")
+    n = push_files(url, token)
+    console.print(f"pushed {n} clip/poster files -> {url}/files")
+
+
+def push_files(url: str, token: str) -> int:
+    """Upload every local clip (s<id>.mp4, s<id>_clean.mp4) and poster (s<id>.jpg) the API does
+    not have yet, or has at another size. The dashboards read them from the API, so nothing
+    is pushed to a git repo. Returns how many files went up."""
+    import httpx
+
+    have = {
+        (f["kind"], f["name"]): f["bytes"]
+        for f in httpx.get(f"{url}/files", timeout=60, follow_redirects=True).json()
+    }
+    local = [("renders", p) for p in sorted(settings.renders_dir.glob("s*.mp4"))] + [
+        ("frames", p) for p in sorted((settings.data_dir / "frames").glob("s*.jpg"))
+    ]
+    n = 0
+    for kind, path in local:
+        if path.name.endswith("_raw.mp4") or have.get((kind, path.name)) == path.stat().st_size:
+            continue
+        r = httpx.put(
+            f"{url}/files/{kind}/{path.name}",
+            content=path.read_bytes(),
+            headers={
+                "Authorization": f"Bearer {token}",
+                "content-type": "application/octet-stream",
+            },
+            timeout=300,
+        )
+        if r.status_code == 400:
+            continue  # a name the API does not store (scratch files)
+        r.raise_for_status()
+        n += 1
+    return n
 
 
 @cli.group()
