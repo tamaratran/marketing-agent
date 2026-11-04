@@ -75,3 +75,22 @@ def test_second_cycle_names_the_trait_that_changed(tmp_path):
     learnings.write_cycle(store, "fitness", "an app")
     first = learnings.entries(store)[0]
     assert "best hook type is now pov" in first["body"]
+
+
+def test_rule_title_is_the_first_sentence_in_whole_words():
+    from marketing_agent.learnings import rule_title
+
+    long = (
+        "The TV may show Subway Surfers as well as Immersive Workout's own games (the flappy "
+        "bird with green pipes, or the runner from the second screenshot). Those three are the "
+        "only games allowed."
+    )
+    t = rule_title(long)  # first sentence is over 120 characters: whole words, then an ellipsis
+    assert t.endswith("...") and long.startswith(t[:-3]) and len(t) <= 124
+    assert rule_title("Short rule, one line. And a second.") == "Short rule, one line."
+    assert (
+        rule_title("Never name the app on screen. Captions may.") == "Never name the app on screen."
+    )
+    runon = "a rule " * 40
+    t = rule_title(runon)
+    assert t.endswith("...") and len(t) <= 124 and not t[:-3].endswith(" ")

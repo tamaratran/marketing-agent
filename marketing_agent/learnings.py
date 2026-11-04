@@ -6,6 +6,7 @@ and what changed since the last cycle. Served by the API as JSON and as one lear
 from __future__ import annotations
 
 import json
+import re
 import time
 from datetime import UTC, datetime
 
@@ -41,10 +42,22 @@ def migrate(store: Store) -> None:
                 pass
 
 
+def rule_title(text: str, limit: int = 120) -> str:
+    """The rule's first sentence, whole words only; longer rules end in an ellipsis instead of
+    stopping mid-word (the Learnings pages show the title as the line)."""
+    first = text.strip().split("\n")[0].strip()
+    m = re.match(r"(.+?[.!?])(\s|$)", first)
+    sentence = m.group(1) if m else first
+    if len(sentence) <= limit:
+        return sentence
+    cut = sentence[:limit].rsplit(" ", 1)[0].rstrip(",;:")
+    return cut + "..."
+
+
 def add_rule(store: Store, niche: str, product: str, text: str) -> int:
     """A standing rule in plain words ("the TV must show our game for the whole clip"). Rules go
     into every script prompt and every video prompt from now on; notes are what happened once."""
-    return add(store, niche, product, text.strip().split("\n")[0][:80], text, kind=RULE)
+    return add(store, niche, product, rule_title(text), text, kind=RULE)
 
 
 def rules(store: Store, niche: str | None = None) -> list[str]:
