@@ -454,10 +454,13 @@ def render_file(render_id: int):
 
 # Clip and poster files live on the API's volume beside the db, so the dashboards read them
 # from here and no session has to push video files to a git repo. Names are fixed by the
-# renderer: s<script_id>.mp4, s<script_id>_clean.mp4 and s<script_id>.jpg.
+# renderer: s<script_id>.mp4, s<script_id>_clean.mp4 and s<script_id>.jpg; "videos" holds our own
+# copy of the reference TikToks named in campaign.toml (<video_id>.mp4 and .jpg), so the
+# Learnings page plays them without depending on TikTok's embed player.
 FILE_KINDS = {
     "renders": re.compile(r"^s\d+(_clean)?\.mp4$"),
     "frames": re.compile(r"^s\d+\.jpg$"),
+    "videos": re.compile(r"^\d+\.(mp4|jpg)$"),
 }
 MEDIA = {".mp4": "video/mp4", ".jpg": "image/jpeg"}
 
