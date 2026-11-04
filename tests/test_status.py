@@ -225,6 +225,10 @@ def test_build_joins_posts_clips_scripts_and_learnings():
     assert [b["trait"] for b in L["best_bets"]] == ["visual_style", "pacing_bucket"]
     assert [e["title"] for e in L["rules"]] == ["TV rule"]
     assert [e["title"] for e in L["notes"]] == ["First post is up"]
+    # every entry, newest first, with its body and kind, no cycle facts
+    assert L["entries"] == sorted(L["entries"], key=lambda e: -e["created_at"])
+    assert {e["kind"] for e in L["entries"]} == {"cycle", "rule", "note"}
+    assert set(L["entries"][0]) == {"id", "created_at", "kind", "title", "body"}
 
     assert (
         st["running"]["id"] == 9
