@@ -18,6 +18,7 @@ API_URL = os.environ.get("MKT_API_URL", "https://mkt-api.fly.dev").rstrip("/")
 # `mkt sync push`); MKT_CLIPS_URL / MKT_FRAMES_URL still override for another host.
 CLIPS_URL = os.environ.get("MKT_CLIPS_URL", f"{API_URL}/files/renders").rstrip("/")
 FRAMES_URL = os.environ.get("MKT_FRAMES_URL", f"{API_URL}/files/frames").rstrip("/")
+VIDEOS_URL = f"{API_URL}/files/videos"
 # Same rules as the site (web/app/clips/status.ts): a hand-off older than this with no post is
 # stale; after MAX_POST_ATTEMPTS automatic hand-backs the API stops retrying.
 POST_RETRY_AFTER_S = 3600
@@ -191,6 +192,7 @@ def _promo_format(campaign: dict, get: Get) -> dict | None:
     urls = product.get("promo_videos") or []
     if not urls:
         return None
+    hosted = {f.get("name") for f in (get("/files") or []) if f.get("kind") == "videos"}
     examples = []
     for url in urls:
         vid = _video_id(url)
@@ -198,7 +200,17 @@ def _promo_format(campaign: dict, get: Get) -> dict | None:
         video = detail.get("video") or {}
         views = max((o.get("views") or 0 for o in detail.get("observations") or []), default=0)
         author = video.get("author") or (re.search(r"/@([^/]+)/", url or "") or [None, None])[1]
-        examples.append({"id": vid, "author": author, "url": url, "views": views or None})
+        examples.append(
+            {
+                "id": vid,
+                "author": author,
+                "url": url,
+                "views": views or None,
+                # our own copy on the API (mkt sync push uploads it), else the page embeds TikTok
+                "file_url": f"{VIDEOS_URL}/{vid}.mp4" if f"{vid}.mp4" in hosted else None,
+                "poster_url": f"{VIDEOS_URL}/{vid}.jpg" if f"{vid}.jpg" in hosted else None,
+            }
+        )
     examples.sort(key=lambda e: -(e.get("views") or 0))
     return {
         "id": None,

@@ -1238,6 +1238,20 @@ def sync_push():
     console.print(f"pushed {n} clip/poster files -> {url}/files")
 
 
+def promo_video_ids() -> list[str]:
+    """The TikToks campaign.toml names as the ones that promote the product; our copies go to
+    the API as files/videos/<id>.mp4 so the Learnings page plays them itself."""
+    import re
+
+    from . import campaign as campaign_cfg
+
+    try:
+        urls = list(getattr(campaign_cfg.load().product, "promo_videos", None) or [])
+    except Exception:
+        return []
+    return [m.group(1) for u in urls if (m := re.search(r"/video/(\d+)", u))]
+
+
 def complete_mp4(path: Path) -> bool:
     """A finished mp4 carries its index (the moov atom); a file still being written, or cut
     short, does not, and no player can show it (s145 went up that way)."""
@@ -1253,7 +1267,7 @@ def make_poster(clip: Path, frames_dir: Path) -> Path | None:
     import re
     import subprocess
 
-    m = re.match(r"^(s\d+)(_clean|_raw)?\.mp4$", clip.name)
+    m = re.match(r"^(s?\d+)(_clean|_raw)?\.mp4$", clip.name)
     if not m or m.group(2):
         return None
     out = frames_dir / f"{m.group(1)}.jpg"
@@ -1301,11 +1315,18 @@ def push_files(url: str, token: str) -> int:
     local = [("renders", p) for p in sorted(settings.renders_dir.glob("s*.mp4"))] + [
         ("frames", p) for p in sorted(frames_dir.glob("s*.jpg"))
     ]
+    for vid in promo_video_ids():
+        clip = settings.videos_dir / f"{vid}.mp4"
+        if clip.exists():
+            local.append(("videos", clip))
+            poster = make_poster(clip, settings.videos_dir)
+            if poster:
+                local.append(("videos", poster))
     n = 0
     for kind, path in local:
         if path.name.endswith("_raw.mp4") or have.get((kind, path.name)) == path.stat().st_size:
             continue
-        if kind == "renders" and not complete_mp4(path):
+        if path.suffix == ".mp4" and not complete_mp4(path):
             console.print(f"skipping {path.name}: not a complete mp4 (still rendering, or broken)")
             continue
         r = httpx.put(

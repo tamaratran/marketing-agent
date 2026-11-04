@@ -495,6 +495,21 @@ def test_clip_and_poster_files_roundtrip(client, tmp_path, monkeypatch):
     assert client.put("/files/frames/s95.jpg", content=b"jpg", headers=AUTH).status_code == 200
     assert client.put("/files/renders/evil.sh", content=b"x", headers=AUTH).status_code == 400
     assert client.put("/files/other/s1.mp4", content=b"x", headers=AUTH).status_code == 400
+    assert (
+        client.put(
+            "/files/videos/7697295480425843999.mp4", content=b"ftyp moov", headers=AUTH
+        ).status_code
+        == 200
+    )
+    assert (
+        client.put(
+            "/files/videos/7697295480425843999.jpg", content=b"jpg", headers=AUTH
+        ).status_code
+        == 200
+    )
+    assert (
+        client.put("/files/videos/s95.mp4", content=b"ftyp moov", headers=AUTH).status_code == 400
+    )
     got = client.get("/files/renders/s95.mp4")
     assert got.status_code == 200 and got.content == b"ftyp moov"
     assert got.headers["content-type"].startswith("video/mp4")
@@ -502,4 +517,6 @@ def test_clip_and_poster_files_roundtrip(client, tmp_path, monkeypatch):
     assert [(f["kind"], f["name"], f["bytes"]) for f in client.get("/files").json()] == [
         ("renders", "s95.mp4", 9),
         ("frames", "s95.jpg", 3),
+        ("videos", "7697295480425843999.jpg", 3),
+        ("videos", "7697295480425843999.mp4", 9),
     ]
