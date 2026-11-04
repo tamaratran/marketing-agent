@@ -1238,6 +1238,53 @@ def sync_push():
     console.print(f"pushed {n} clip/poster files -> {url}/files")
 
 
+def complete_mp4(path: Path) -> bool:
+    """A finished mp4 carries its index (the moov atom); a file still being written, or cut
+    short, does not, and no player can show it (s145 went up that way)."""
+    try:
+        return b"moov" in path.read_bytes()
+    except OSError:
+        return False
+
+
+def make_poster(clip: Path, frames_dir: Path) -> Path | None:
+    """s<id>.jpg for s<id>.mp4 (a frame half a second in) when it is missing, so every clip has
+    a picture before it plays; clean and raw copies share the final clip's poster."""
+    import re
+    import subprocess
+
+    m = re.match(r"^(s\d+)(_clean|_raw)?\.mp4$", clip.name)
+    if not m or m.group(2):
+        return None
+    out = frames_dir / f"{m.group(1)}.jpg"
+    if out.exists():
+        return out
+    frames_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        subprocess.run(
+            [
+                "ffmpeg",
+                "-y",
+                "-loglevel",
+                "error",
+                "-ss",
+                "0.5",
+                "-i",
+                str(clip),
+                "-frames:v",
+                "1",
+                "-q:v",
+                "3",
+                str(out),
+            ],
+            check=True,
+            timeout=120,
+        )
+    except Exception:
+        return None
+    return out if out.exists() else None
+
+
 def push_files(url: str, token: str) -> int:
     """Upload every local clip (s<id>.mp4, s<id>_clean.mp4) and poster (s<id>.jpg) the API does
     not have yet, or has at another size. The dashboards read them from the API, so nothing
@@ -1248,12 +1295,18 @@ def push_files(url: str, token: str) -> int:
         (f["kind"], f["name"]): f["bytes"]
         for f in httpx.get(f"{url}/files", timeout=60, follow_redirects=True).json()
     }
+    frames_dir = settings.data_dir / "frames"
+    for clip in sorted(settings.renders_dir.glob("s*.mp4")):
+        make_poster(clip, frames_dir)
     local = [("renders", p) for p in sorted(settings.renders_dir.glob("s*.mp4"))] + [
-        ("frames", p) for p in sorted((settings.data_dir / "frames").glob("s*.jpg"))
+        ("frames", p) for p in sorted(frames_dir.glob("s*.jpg"))
     ]
     n = 0
     for kind, path in local:
         if path.name.endswith("_raw.mp4") or have.get((kind, path.name)) == path.stat().st_size:
+            continue
+        if kind == "renders" and not complete_mp4(path):
+            console.print(f"skipping {path.name}: not a complete mp4 (still rendering, or broken)")
             continue
         r = httpx.put(
             f"{url}/files/{kind}/{path.name}",
