@@ -497,6 +497,6 @@ def test_clip_and_poster_files_roundtrip(client, tmp_path, monkeypatch):
     assert got.headers["content-type"].startswith("video/mp4")
     assert client.get("/files/renders/s96.mp4").status_code == 404
     assert [(f["kind"], f["name"], f["bytes"]) for f in client.get("/files").json()] == [
-        ("frames", "s95.jpg", 3),
         ("renders", "s95.mp4", 8),
+        ("frames", "s95.jpg", 3),
     ]
