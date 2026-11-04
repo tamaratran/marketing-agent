@@ -120,6 +120,7 @@ def write_scripts(
     context: str = "",
     keep: int | None = None,
     why: dict | None = None,
+    learnings: str = "",
 ) -> list[dict]:
     """Write `n` scripts in the concept and store them. With `keep`, only the `keep` best (demo
     score first, those under `min_score` last) are stored, so a batch can span formats without
@@ -145,6 +146,11 @@ def write_scripts(
                 + (
                     f"\n\nWhat has worked so far on this account (scores are log10 views against niche videos of the same age and account size; +1 is 10x):\n{context}\nLean on the winners, avoid the losers, but keep 2-3 scripts that try something else."
                     if context
+                    else ""
+                )
+                + (
+                    f"\n\nWhat we have learned on this account, from watching the winners and our own clips. Read it before writing; the standing rules always apply:\n{learnings}"
+                    if learnings
                     else ""
                 ),
             }
