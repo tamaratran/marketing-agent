@@ -481,7 +481,10 @@ def test_tags_merge_row_by_row(client, monkeypatch):
     assert store.tags_for(["v1"])["v1"]["tags"]["hook_type"] == "text_on_screen"
 
 
-def test_clip_and_poster_files_roundtrip(client):
+def test_clip_and_poster_files_roundtrip(client, tmp_path, monkeypatch):
+    from marketing_agent import api
+
+    monkeypatch.setattr(api.settings, "data_dir", tmp_path / "data")
     assert client.get("/files").json() == []
     assert client.put("/files/renders/s95.mp4", content=b"mp4bytes").status_code == 401
     r = client.put("/files/renders/s95.mp4", content=b"mp4bytes", headers=AUTH)
