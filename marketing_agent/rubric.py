@@ -342,6 +342,22 @@ def _our_file(clip: dict, out_dir: Path) -> Path:
     raise RuntimeError(f"no file for s{clip['script_id']}: {last}")
 
 
+def _from_api(video_id: str, out: Path) -> bool:
+    """Our copy of a reference video on the API (files/videos, uploaded by `mkt sync push`), so
+    grading needs no browser on a machine that has none."""
+    import httpx
+
+    api = os.environ.get("MKT_API_URL", "https://mkt-api.fly.dev").rstrip("/")
+    try:
+        r = httpx.get(f"{api}/files/videos/{video_id}.mp4", timeout=120, follow_redirects=True)
+    except Exception:  # noqa: BLE001 - the browser is the fallback
+        return False
+    if r.status_code != 200 or b"moov" not in r.content:
+        return False
+    out.write_bytes(r.content)
+    return True
+
+
 def run(
     store: Store,
     cdp_url: str,
@@ -383,7 +399,7 @@ def run(
             path = videos_dir / f"{v['id']}.mp4"
             path.parent.mkdir(parents=True, exist_ok=True)
             try:
-                fetch_video_sync(v["url"], path, cdp_url)
+                _from_api(v["id"], path) or fetch_video_sync(v["url"], path, cdp_url)
             except Exception as e:  # noqa: BLE001 - one unfetchable video must not stop the rest
                 graded["failed"].append(f"{v['id']}: {e!r}")
                 log(f"{v['id']}: {e!r}")

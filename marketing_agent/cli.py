@@ -571,13 +571,35 @@ def concepts(niche, tag, max_age_h, limit):
     console.print(t)
 
 
+def _before_scripts(store, product, niche=None) -> str:
+    """Grade with the video model, write the learnings, read them back (prereq.before_scripts);
+    stops the command when that did not hold, so no script is written from a stale grade."""
+    from .prereq import NotReady, before_scripts
+
+    try:
+        return before_scripts(
+            store,
+            niche=_niche(niche),
+            product=product,
+            winner_ids=_campaign().product.promo_video_ids or None,
+            cdp_url=settings.cdp_url,
+            videos_dir=settings.videos_dir,
+            renders_dir=settings.renders_dir,
+            log=console.print,
+        )
+    except NotReady as e:
+        raise click.ClickException(f"not writing scripts: {e}") from e
+
+
 @cli.command()
 @click.argument("concept_id", type=int)
 @click.argument("product")
 @click.option("-n", default=12)
 @click.option("--min-score", default=3)
 def scripts(concept_id, product, n, min_score):
-    """Write N remix scripts for a concept and a product; drop ones that don't demo in 5s."""
+    """Write N remix scripts for a concept and a product; drop ones that don't demo in 5s. First
+    the video model grades the winners and our clips, the grading is written into the learnings,
+    and the learnings are read into the writer's prompt (see prereq.py)."""
     from .video.scripts import write_scripts
 
     store = _store()
@@ -587,8 +609,16 @@ def scripts(concept_id, product, n, min_score):
     c = {**json.loads(rows[0]["payload"]), "id": concept_id}
     from .policy import winning_traits
 
+    learned = _before_scripts(store, product)
     out = write_scripts(
-        store, c, product, n, min_score, settings.openai_model, winning_traits(store)
+        store,
+        c,
+        product,
+        n,
+        min_score,
+        settings.openai_model,
+        winning_traits(store),
+        learnings=learned,
     )
     for s in out:
         mark = "keep" if s["kept"] else "drop"
@@ -866,6 +896,7 @@ def run(ctx, niche, tags, product, product_tags, top, batch_formats=3, batch_per
         from .video.scripts import write_scripts
 
         store = _store()
+        learned = _before_scripts(store, product, niche)
         for c in propose_batch(store, niche, formats=batch_formats):
             console.print(
                 f"format {c['id']} '{c['name']}': picked {c['pick_share']:.0%} of the time, "
@@ -884,6 +915,7 @@ def run(ctx, niche, tags, product, product_tags, top, batch_formats=3, batch_per
                 context=winning_traits(store),
                 keep=batch_per_format,
                 why=c["why"],
+                learnings=learned,
             )
             for s in out:
                 console.print(f"  #{s['id']} demo {s['demo_score_1_5']}  {s['hook']}")
