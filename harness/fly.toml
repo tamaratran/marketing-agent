@@ -1,0 +1,42 @@
+# Fly.io config for the marketing agent (see products/marketing/Dockerfile).
+# Same shape as the Everything Agent app: one always-on machine, SQLite and
+# session workspaces on the volume, auto_stop off so a long render or post
+# is never killed for looking idle. 2 GB: Chromium and ffmpeg run here.
+#
+# First deploy, from the repo root:
+#   fly apps create autonomous-marketing-agent
+#   fly volumes create agent_data --size 5 -a autonomous-marketing-agent -r sjc
+#   fly secrets set -a autonomous-marketing-agent ANTHROPIC_API_KEY=... AGENT_PUBLIC_URL=https://autonomous-marketing-agent.fly.dev \
+#       EMAIL_AUTH_ALLOWLIST=owner@example.com \
+#       MKT_API_TOKEN=... FAL_KEY=... OPENAI_API_KEY=... GEMINI_API_KEY=... \
+#       TIKTOK_POST_HANDLE=... TIKTOK_POST_PASSWORD=... TIKTOK_POST_EMAIL=...
+#   GH_TOKEN=$(gh auth token) fly deploy -c products/marketing/fly.toml --build-secret GH_TOKEN="$GH_TOKEN"
+
+app = "autonomous-marketing-agent"
+primary_region = "sjc"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[mounts]
+  source = "agent_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 8321
+  force_https = true
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+
+[checks.health]
+  port = 8321
+  type = "http"
+  interval = "30s"
+  timeout = "5s"
+  grace_period = "20s"
+  path = "/api/product"
+
+[[vm]]
+  size = "shared-cpu-2x"
+  memory = "2gb"

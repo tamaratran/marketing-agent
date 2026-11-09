@@ -1,0 +1,68 @@
+{
+  "name": "Marketing agent",
+  "letter": "M",
+  "theme": "site",
+  "hero": "Marketing agent",
+  "hero_sub": "It finds what works on TikTok, makes clips, posts them from our account and learns from the numbers.",
+  "starters": [
+    {
+      "label": "See what we learned about the winning format",
+      "tab": "mkt-learnings"
+    },
+    {
+      "label": "See our clips and how each one is doing",
+      "tab": "mkt-clips"
+    },
+    {
+      "label": "Ask it to write and render the next batch",
+      "text": "Write the next batch of scripts in the winning format, explain for each one why it should work, tell me what rendering will cost, then render the best 5 at 720p and hold anything that must not go out."
+    }
+  ],
+  "repos": false,
+  "links": [
+    {
+      "label": "Formats",
+      "url": "https://www.tamarajtran.com/marketing-agent"
+    },
+    {
+      "label": "Learnings",
+      "url": "https://www.tamarajtran.com/marketing-agent/learnings"
+    },
+    {
+      "label": "Clips",
+      "url": "https://www.tamarajtran.com/marketing-agent/clips"
+    }
+  ],
+  "prompt_file": "prompt.md",
+  "session_env": {
+    "MKT_DATA_DIR": "{workspace}/mkt",
+    "MKT_API_URL": "https://mkt-api.fly.dev",
+    "CDP_URL": "http://localhost:9222"
+  },
+  "env_passthrough": [
+    "MKT_API_TOKEN",
+    "FAL_KEY",
+    "OPENAI_API_KEY",
+    "GEMINI_API_KEY",
+    "TIKTOK_POST_HANDLE",
+    "TIKTOK_POST_PASSWORD",
+    "TIKTOK_POST_EMAIL",
+    "TIKTOK_POST_EMAIL_PASSWORD"
+  ],
+  "opening": "Show me where the campaign stands.",
+  "briefing": "mkt status --json",
+  "repo": "tamaratran/marketing-agent",
+  "setup": "(command -v mkt >/dev/null || pip install -q -e .) && mkt sync pull",
+  "secrets": [
+    "MKT_API_TOKEN",
+    "FAL_KEY",
+    "OPENAI_API_KEY",
+    "GEMINI_API_KEY",
+    "TIKTOK_POST_HANDLE",
+    "TIKTOK_POST_PASSWORD",
+    "TIKTOK_POST_EMAIL",
+    "TIKTOK_POST_EMAIL_PASSWORD"
+  ],
+  "auto_approve": true,
+  "hide_settings": true
+}
