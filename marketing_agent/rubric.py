@@ -342,6 +342,22 @@ def _our_file(clip: dict, out_dir: Path) -> Path:
     raise RuntimeError(f"no file for s{clip['script_id']}: {last}")
 
 
+def _from_api(video_id: str, out: Path) -> bool:
+    """Our copy of a reference video on the API (files/videos, uploaded by `mkt sync push`), so
+    grading needs no browser on a machine that has none."""
+    import httpx
+
+    api = os.environ.get("MKT_API_URL", "https://mkt-api.fly.dev").rstrip("/")
+    try:
+        r = httpx.get(f"{api}/files/videos/{video_id}.mp4", timeout=120, follow_redirects=True)
+    except Exception:  # noqa: BLE001 - the browser is the fallback
+        return False
+    if r.status_code != 200 or b"moov" not in r.content:
+        return False
+    out.write_bytes(r.content)
+    return True
+
+
 def run(
     store: Store,
     cdp_url: str,
@@ -383,7 +399,7 @@ def run(
             path = videos_dir / f"{v['id']}.mp4"
             path.parent.mkdir(parents=True, exist_ok=True)
             try:
-                fetch_video_sync(v["url"], path, cdp_url)
+                _from_api(v["id"], path) or fetch_video_sync(v["url"], path, cdp_url)
             except Exception as e:  # noqa: BLE001 - one unfetchable video must not stop the rest
                 graded["failed"].append(f"{v['id']}: {e!r}")
                 log(f"{v['id']}: {e!r}")
@@ -490,78 +506,6 @@ def candidates(rows: list[dict], field: str, kind: str | None = None) -> list[di
                 c[k] += 1
                 text.setdefault(k, s.strip())
     return [{"text": text[k], "n": n} for k, n in c.most_common(12)]
-
-
-def digest(store: Store, winner_ids: list[str] | None = None) -> str:
-    """The latest grades as plain text for the script writer: what the winners share, where our
-    clips keep differing from them, and what the model named as helping or hurting. Empty until
-    enough winners are graded to agree on anything."""
-    rep = report(store, winner_ids=winner_ids)
-    must = [m for m in rep["must_have"] if m["agreed"]]
-    if not must:
-        return ""
-    ours = rep["ours"]
-    lines = [
-        "What the rubric found (the video model watched the winning videos and our clips and "
-        f"graded both the same way; {rep['n_comparable']} winners count):",
-        "The winners share:",
-    ]
-    lines += [f"- {m['label']}: {m['text']} ({round(m['share'] * 100)}% of them)" for m in must]
-    gaps: Counter = Counter()
-    for r in ours:
-        for d in r.get("differences", []):
-            gaps[(d["label"], d["ours"], d["winners"])] += 1
-    if gaps:
-        lines.append(f"Where our clips keep missing ({len(ours)} graded):")
-        lines += [
-            f"- {label}: ours {ours_v}, winners {win_v} ({k} of {len(ours)} clips)"
-            for (label, ours_v, win_v), k in gaps.most_common(10)
-        ]
-    hurt = rep["candidates"]["hurt"][:5]
-    if hurt:
-        lines.append(
-            "Named as hurting our clips: " + "; ".join(f"{c['text']} ({c['n']}x)" for c in hurt)
-        )
-    helped = rep["candidates"]["helped"][:5]
-    if helped:
-        lines.append(
-            "Named as helping the winners: "
-            + "; ".join(f"{c['text']} ({c['n']}x)" for c in helped)
-        )
-    return "\n".join(lines)
-
-
-LEARNING_TITLE = "Rubric digest (auto): what the winners share and where our clips differ"
-
-
-def write_learning(
-    store: Store, niche: str, product: str, winner_ids: list[str] | None = None
-) -> int:
-    """Write the digest into the learnings, replacing the previous auto entry, so the Learnings
-    page always shows the current read and the script writer sees it with the rest. Returns the
-    entry id, or 0 when there is nothing to say yet."""
-    from .learnings import NOTE, add, migrate
-
-    text = digest(store, winner_ids)
-    if not text:
-        return 0
-    body = (
-        text
-        + "\n\nUpdated automatically from the latest rubric grades before each script batch;"
-        " the per-video grades are on the Clips pages."
-    )
-    migrate(store)
-    rows = store.rows(
-        "SELECT id FROM learnings WHERE title=? AND niche=?", (LEARNING_TITLE, niche)
-    )
-    if rows:
-        with store.conn() as c:
-            c.execute(
-                "UPDATE learnings SET body=?, created_at=? WHERE id=?",
-                (body, int(time.time()), rows[0]["id"]),
-            )
-        return rows[0]["id"]
-    return add(store, niche, product, LEARNING_TITLE, body, kind=NOTE)
 
 
 def report(store: Store, winner_ids: list[str] | None = None) -> dict:

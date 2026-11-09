@@ -571,34 +571,24 @@ def concepts(niche, tag, max_age_h, limit):
     console.print(t)
 
 
-def _watch_then_learn(store, niche: str, product: str) -> None:
-    """The prerequisite before any script is written: the video model watches every winner and
-    every clip of ours that is not graded yet, the graded gap goes into the learnings, and the
-    script prompt is built from those learnings. Grading needs Gemini and the browser; when
-    either is missing the refresh still runs on the grades already stored, and says so."""
-    from .rubric import run as rubric_run
-    from .rubric import write_learning
+def _before_scripts(store, product, niche=None) -> str:
+    """Grade with the video model, write the learnings, read them back (prereq.before_scripts);
+    stops the command when that did not hold, so no script is written from a stale grade."""
+    from .prereq import NotReady, before_scripts
 
-    promo = _campaign().product.promo_video_ids
     try:
-        res = rubric_run(
+        return before_scripts(
             store,
-            settings.cdp_url,
-            settings.videos_dir,
-            settings.renders_dir,
+            niche=_niche(niche),
+            product=product,
+            winner_ids=_campaign().product.promo_video_ids or None,
+            cdp_url=settings.cdp_url,
+            videos_dir=settings.videos_dir,
+            renders_dir=settings.renders_dir,
             log=console.print,
-            video_ids=promo or None,
         )
-        if res["winners"] or res["ours"]:
-            console.print(
-                f"rubric: graded {res['winners']} winner(s) and {res['ours']} of ours before writing scripts"
-            )
-        if res["failed"]:
-            console.print(f"[yellow]rubric: {len(res['failed'])} video(s) failed to grade")
-    except Exception as e:  # noqa: BLE001 - scripts still use the grades already stored
-        console.print(f"[yellow]rubric grading skipped ({type(e).__name__}: {e}); using stored grades")
-    if write_learning(store, niche, product, winner_ids=promo or None):
-        console.print("rubric: learnings updated from the grades")
+    except NotReady as e:
+        raise click.ClickException(f"not writing scripts: {e}") from e
 
 
 @cli.command()
@@ -607,9 +597,9 @@ def _watch_then_learn(store, niche: str, product: str) -> None:
 @click.option("-n", default=12)
 @click.option("--min-score", default=3)
 def scripts(concept_id, product, n, min_score):
-    """Write N remix scripts for a concept and a product; drop ones that don't demo in 5s.
-    Before writing, the video model grades any ungraded winner or clip of ours on the rubric and
-    the learnings are refreshed from the grades; the prompt is then built from those learnings."""
+    """Write N remix scripts for a concept and a product; drop ones that don't demo in 5s. First
+    the video model grades the winners and our clips, the grading is written into the learnings,
+    and the learnings are read into the writer's prompt (see prereq.py)."""
     from .video.scripts import write_scripts
 
     store = _store()
@@ -619,9 +609,16 @@ def scripts(concept_id, product, n, min_score):
     c = {**json.loads(rows[0]["payload"]), "id": concept_id}
     from .policy import winning_traits
 
-    _watch_then_learn(store, _niche(None), product)
+    learned = _before_scripts(store, product)
     out = write_scripts(
-        store, c, product, n, min_score, settings.openai_model, winning_traits(store)
+        store,
+        c,
+        product,
+        n,
+        min_score,
+        settings.openai_model,
+        winning_traits(store),
+        learnings=learned,
     )
     for s in out:
         mark = "keep" if s["kept"] else "drop"
@@ -899,7 +896,7 @@ def run(ctx, niche, tags, product, product_tags, top, batch_formats=3, batch_per
         from .video.scripts import write_scripts
 
         store = _store()
-        _watch_then_learn(store, niche, product)
+        learned = _before_scripts(store, product, niche)
         for c in propose_batch(store, niche, formats=batch_formats):
             console.print(
                 f"format {c['id']} '{c['name']}': picked {c['pick_share']:.0%} of the time, "
@@ -918,6 +915,7 @@ def run(ctx, niche, tags, product, product_tags, top, batch_formats=3, batch_per
                 context=winning_traits(store),
                 keep=batch_per_format,
                 why=c["why"],
+                learnings=learned,
             )
             for s in out:
                 console.print(f"  #{s['id']} demo {s['demo_score_1_5']}  {s['hook']}")
