@@ -707,6 +707,109 @@ def render(script_ids, provider, duration, resolution, sound, ref):
                 console.print(f"script {sid}: labels skipped ({type(e).__name__}: {e})")
 
 
+def _recut_base(store, script_id: int, render: dict) -> Path:
+    """The video to re-edit: the raw generation when this machine still has it, else the clean
+    export (no text burned in), fetched from the API when the file is not local."""
+    import os
+
+    import httpx
+
+    for k in ("raw_path", "post_path"):
+        if render.get(k) and Path(render[k]).exists():
+            return Path(render[k])
+    target = settings.renders_dir / f"s{script_id}_base.mp4"
+    if target.exists():
+        return target
+    api = os.environ.get("MKT_API_URL", "https://mkt-api.fly.dev").rstrip("/")
+    r = httpx.get(
+        f"{api}/files/renders/s{script_id}_clean.mp4", timeout=120, follow_redirects=True
+    )
+    if r.status_code != 200 or b"moov" not in r.content:
+        raise click.ClickException(
+            f"no clip to recut for s{script_id}: nothing local and the API has no clean export"
+        )
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(r.content)
+    return target
+
+
+@cli.command()
+@click.argument("script_id", type=int)
+@click.option("--hook", default=None, help="New hook text (default: keep the script's)")
+@click.option(
+    "--caption",
+    "captions",
+    multiple=True,
+    help="On-screen line after the hook, once per line; replaces the script's lines when given",
+)
+@click.option("--sound", type=click.Path(exists=True), default=None)
+def recut(script_id, hook, captions, sound):
+    """Re-caption and re-cut the newest render of a script without paying for a new generation.
+    The new hook and caption lines are saved on the script (so the poster types the same text
+    into TikTok's text tool) and burned into a fresh preview; the clean export is rebuilt from
+    the same footage. Costs nothing but ffmpeg time."""
+    from .learnings import migrate as learnings_migrate
+    from .video.edit import assemble, captions_from_script, probe, probe_duration
+
+    store = _store()
+    store.migrate()
+    learnings_migrate(store)
+    rows = store.rows("SELECT * FROM scripts WHERE id=?", (script_id,))
+    if not rows:
+        raise click.ClickException(f"no script {script_id}")
+    renders = store.rows(
+        "SELECT * FROM renders WHERE script_id=? ORDER BY id DESC LIMIT 1", (script_id,)
+    )
+    if not renders:
+        raise click.ClickException(f"script {script_id} has no render to recut")
+    old = renders[0]
+    s = json.loads(rows[0]["payload"] or "{}")
+    hook = hook if hook is not None else s.get("hook") or rows[0]["hook"]
+    lines = list(captions) if captions else s.get("captions") or []
+    s["hook"], s["captions"] = hook, lines
+    s["hook_on_screen"] = True
+    base = _recut_base(store, script_id, old)
+    final = settings.renders_dir / f"s{script_id}.mp4"
+    clean = settings.renders_dir / f"s{script_id}_clean.mp4"
+    caps = captions_from_script(hook, lines, probe_duration(base))
+    assemble([base], final, captions=caps, sound=Path(sound) if sound else None)
+    assemble([base], clean, sound=Path(sound) if sound else None)
+    try:
+        facts = probe(clean)
+    except Exception:  # no ffprobe on this machine: the recut still counts
+        facts = None
+    with store.conn() as c:
+        c.execute(
+            "UPDATE scripts SET hook=?, payload=? WHERE id=?",
+            (hook, json.dumps(s), script_id),
+        )
+    payload = json.loads(old.get("payload") or "{}")
+    payload["file"] = facts
+    payload["recut"] = {
+        "at": int(time.time()),
+        "from_render": old["id"],
+        "hook": hook,
+        "captions": lines,
+    }
+    store.insert(
+        "renders",
+        {
+            "script_id": script_id,
+            "created_at": int(time.time()),
+            "model": old["model"],
+            "prompt": old.get("prompt"),
+            "raw_path": str(base),
+            "final_path": str(final),
+            "post_path": str(clean),
+            "cost_usd": 0.0,
+            "hold_reason": old.get("hold_reason"),
+            "payload": json.dumps(payload, default=str),
+        },
+    )
+    shown = " / ".join(c.text.replace("\n", " ") for c in caps) or "(no text)"
+    console.print(f"script {script_id}: recut {final} at no render cost; text now: {shown}")
+
+
 @cli.command("label-clips")
 @click.option("--again", is_flag=True, help="Re-label clips that already have labels")
 def label_clips(again):
